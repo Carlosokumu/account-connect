@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+
+package messages;
+
+import "OpenApiModelMessages.proto";
+
+option go_package = "github.com/Carlosokumu/messages";
+
+message ProtoMessage {
+    required uint32 payloadType = 1; // Contains id of ProtoPayloadType or other custom PayloadTypes (e.g. ProtoOAPayloadType)
+    optional bytes payload = 2;      // Serialized protobuf message that corresponds to payloadType
+    optional string clientMsgId = 3; // Request message id, assigned by the client that will be returned in the response
+}
+message ProtoErrorRes {
+    optional ProtoPayloadType payloadType = 1 [default = ERROR_RES];
+    
+    required string errorCode = 2;   // Contains name of ProtoErrorCode or other custom ErrorCodes (e.g. ProtoCHErrorCode)
+    optional string description = 3; // Error description
+    optional uint64 maintenanceEndTimestamp = 4; // CS-10489 Epoch timestamp in second
+}
+
+
+// --- INTENSIVE COMMANDS 1 - 49
+// --- COMMON API 50 - 69
+enum ProtoPayloadType {
+    // common intensive
+    PROTO_MESSAGE = 5;
+    // common commands
+    ERROR_RES = 50;
+    HEARTBEAT_EVENT = 51;
+}
+
+// COMMON error codes 1 - 99
+enum ProtoErrorCode {
+    UNKNOWN_ERROR = 1; // Generic error.
+    UNSUPPORTED_MESSAGE = 2; // Message is not supported. Wrong message.
+    INVALID_REQUEST = 3; // Generic error.  Usually used when input value is not correct.
+    TIMEOUT_ERROR = 5; // Deal execution is reached timeout and rejected.
+    ENTITY_NOT_FOUND = 6; // Generic error for requests by id.
+    CANT_ROUTE_REQUEST = 7; // Connection to Server is lost or not supported.
+    FRAME_TOO_LONG = 8; // Message is too large.
+    MARKET_CLOSED = 9; // Market is closed.
+    CONCURRENT_MODIFICATION = 10; // Order is blocked (e.g. under execution) and change cannot be applied.
+    BLOCKED_PAYLOAD_TYPE = 11; // Message is blocked by server.
+}
