@@ -1,0 +1,199 @@
+syntax="proto2";
+
+package messages;
+
+option go_package = "github.com/Carlosokumu/messages";
+
+import "OpenApiModelMessages.proto";
+
+/** Request for the authorizing an application to work with the cTrader platform Proxies. */
+message ProtoOAApplicationAuthReq {
+
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_APPLICATION_AUTH_REQ];
+
+     required string clientId = 2; //The unique Client ID provided during the registration.
+    required string clientSecret = 3; //The unique Client Secret provided during the registration
+}
+
+
+
+/** Response to the ProtoOAApplicationAuthReq request. */
+message ProtoOAApplicationAuthRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_APPLICATION_AUTH_RES];
+}
+
+
+/** Request for getting Trader's deals historical data (execution details). */
+message ProtoOADealListReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_DEAL_LIST_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required int64 fromTimestamp = 3; // The UNIX time from which the search starts >=0 (1-1-1970). Validation: toTimestamp - fromTimestamp <= 604800000 (1 week).
+    required int64 toTimestamp = 4; // The UNIX time where to stop searching <= 2147483646000 (19-1-2038).
+    optional int32 maxRows = 5; // The maximum number of the deals to return.
+}
+
+/** Generic response when an ERROR occurred. */
+message ProtoOAErrorRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ERROR_RES];
+
+    optional int64 ctidTraderAccountId = 2; //The unique identifier of the trader's account in cTrader platform.
+    required string errorCode = 3; // The name of the ProtoErrorCode or the other custom ErrorCodes (e.g. ProtoCHErrorCode).
+    optional string description = 4; // The error description.
+    optional int64 maintenanceEndTimestamp = 5; // The timestamp in seconds when the current maintenance session will be ended.
+}
+
+/** Request for getting data of Trader's Account. */
+message ProtoOATraderReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_TRADER_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+}
+
+
+/** Response to the ProtoOATraderReq request. */
+message ProtoOATraderRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_TRADER_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required ProtoOATrader trader = 3; // The Trader account information.
+}
+
+
+/** Request for the authorizing trading account session. Requires established authorized connection with the client application using ProtoOAApplicationAuthReq. */
+message ProtoOAAccountAuthReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_REQ];
+
+    required int64 ctidTraderAccountId = 2; // The unique identifier of the trader's account in cTrader platform.
+    required string accessToken = 3; // The Access Token issued for providing access to the Trader's Account.
+}
+
+/** Response to the ProtoOAApplicationAuthRes request. */
+message ProtoOAAccountAuthRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_RES];
+
+    required int64 ctidTraderAccountId = 2; // The unique identifier of the trader's account in cTrader platform.
+}
+
+
+/** Request for getting Trader's current open positions and pending orders data. */
+message ProtoOAReconcileReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_RECONCILE_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+}
+
+/** The response to the ProtoOAReconcileReq request. */
+message ProtoOAReconcileRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_RECONCILE_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOAPosition position = 3; // The list of trader's account open positions.
+    repeated ProtoOAOrder order = 4; // The list of trader's account pending orders.
+}
+
+/** Request for getting a full symbol entity. */
+message ProtoOASymbolByIdReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOL_BY_ID_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated int64 symbolId = 3; // Unique identifier of the symbol in cTrader platform.
+}
+
+
+/** Response to the ProtoOASymbolByIdReq request. */
+message ProtoOASymbolByIdRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOL_BY_ID_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOASymbol symbol = 3; // Symbol entity with the full set of fields.
+}
+
+
+//+------------------------------------------------------------------+
+//|                              Quotes                              |
+//+------------------------------------------------------------------+
+/** Request for subscribing on spot events of the specified symbol. */
+message ProtoOASubscribeSpotsReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SUBSCRIBE_SPOTS_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated int64 symbolId = 3; // Unique identifier of the Symbol in cTrader platform.
+}
+
+
+/** Response to the ProtoOASubscribeSpotsReq request. */
+message ProtoOASubscribeSpotsRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SUBSCRIBE_SPOTS_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+}
+
+
+/** Event that is sent when a new spot event is generated on the server side. Requires subscription on the spot events, see ProtoOASubscribeSpotsReq. */
+message ProtoOASpotEvent {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SPOT_EVENT];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required int64 symbolId = 3; // Unique identifier of the Symbol in cTrader platform.
+    optional uint64 bid = 4; // Bid price. Specified in 1/100_000 of unit of a price. (e.g. 1.23 -> 123_000)
+    optional uint64 ask = 5; // Ask price. Specified in 1/100_000 of unit of a price.
+    repeated ProtoOATrendbar trendbar = 6; // Returns live trend bar. Requires subscription on the trend bars.
+    optional uint64 sessionClose = 7;//Last session close. Specified in 1/100_000 of unit of a price.
+}
+
+/** Request for getting a conversion chain between two assets that consists of several symbols. Use when no direct quote is available */
+message ProtoOASymbolsForConversionReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_FOR_CONVERSION_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required int64 firstAssetId = 3; // The ID of the firs asset in the conversation chain. e.g.: for EUR/USD the firstAssetId is EUR ID and lastAssetId is USD ID.
+    required int64 lastAssetId = 4; // The ID of the last asset in the conversation chain. e.g.: for EUR/USD the firstAssetId is EUR ID and lastAssetId is USD ID.
+}
+
+/** Response to the ProtoOASymbolsForConversionReq request. */
+message ProtoOASymbolsForConversionRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_FOR_CONVERSION_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOALightSymbol symbol = 3; // Conversion chain of the symbols (e.g. EUR/USD, USD/JPY, GBP/JPY -> EUR/GBP).
+}
+
+
+
+
+
+
+
+/** Request for the list of assets available for a trader's account. */
+message ProtoOAAssetListReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ASSET_LIST_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+}
+
+/** Response to the ProtoOAAssetListReq request. */
+message ProtoOAAssetListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ASSET_LIST_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOAAsset asset = 3; // The list of assets.
+}
+
+
+/** Request for a list of symbols available for a trading account. Symbol entries are returned with the limited set of fields. */
+message ProtoOASymbolsListReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+     optional bool includeArchivedSymbols = 3;
+}
+
+/** Response to the ProtoOASymbolsListReq request. */
+message ProtoOASymbolsListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOALightSymbol symbol = 3; // The list of symbols.
+     repeated ProtoOAArchivedSymbol archivedSymbol = 4; // The list of archived symbols.
+}
