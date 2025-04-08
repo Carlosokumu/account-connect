@@ -1,0 +1,4 @@
+#Ctrader server
+server: 
+  endpoint: "demo.ctraderapi.com"
+  port: 5035
