@@ -21,7 +21,7 @@ proto: $(PROTO_FILES)
 	          *.proto
 
 build:
-	go build -o $(APP_NAME) main.go
+	go build -o $(APP_NAME) ./cmd/main.go
 
 run: build
 	./$(APP_NAME)
