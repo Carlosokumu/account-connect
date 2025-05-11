@@ -75,7 +75,7 @@ func (t *Trader) EstablishCtraderConnection(cfg *config.Config) error {
 	return nil
 }
 
-// StartConnectionReade will start a goroutine whose work will be to continously read protobuf messages sent by ctrader
+// StartConnectionReader will start a goroutine whose work will be to continously read protobuf messages sent by ctrader
 func (t *Trader) StartConnectionReader() {
 	defer close(t.authCompleted)
 
@@ -102,7 +102,7 @@ func (t *Trader) StartConnectionReader() {
 	}
 }
 
-// Request for the authorizing an application to work with the cTrader platform Proxies.
+//AuthorizeApplication is request  authorizing an application to work with the cTrader platform Proxies.
 func (t *Trader) AuthorizeApplication() error {
 	if t.ClientId == "" || t.ClientSecret == "" {
 		return errors.New("client credentials not set")
