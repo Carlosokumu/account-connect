@@ -199,8 +199,7 @@ func (t *CTrader) AuthorizeAccount() error {
 }
 
 // GetAccountHistoricalDeals is a request for getting Trader's deals historical data (execution details).
-func (t *CTrader) GetAccountHistoricalDeals() error {
-
+func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) error {
 	if t.AccountId == nil {
 		return errors.New("account id cannot be nil")
 	}
@@ -208,13 +207,11 @@ func (t *CTrader) GetAccountHistoricalDeals() error {
 	if len(strconv.FormatInt(*t.AccountId, 10)) < 8 {
 		return errors.New("invalid account id")
 	}
-	FromTimestamp := int64(1683849600000)
-	ToTimestamp := int64(1715558399000)
 
 	msgReq := &messages.ProtoOADealListReq{
 		CtidTraderAccountId: t.AccountId,
-		FromTimestamp:       &FromTimestamp,
-		ToTimestamp:         &ToTimestamp,
+		FromTimestamp:       &fromTimestamp,
+		ToTimestamp:         &toTimestamp,
 	}
 	msgB, err := proto.Marshal(msgReq)
 	if err != nil {
