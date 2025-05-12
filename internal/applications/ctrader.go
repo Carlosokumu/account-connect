@@ -34,10 +34,11 @@ type CTrader struct {
 }
 
 // NewCTrader creates a new trader instance with the required fields
-func NewCTrader(clientId, clientSecret string) *CTrader {
+func NewCTrader(clientId, clientSecret, accessToken string) *CTrader {
 	return &CTrader{
 		ClientId:      clientId,
 		ClientSecret:  clientSecret,
+		AccessToken:   accessToken,
 		handlers:      make(map[uint32]MessageHandler),
 		authCompleted: make(chan struct{}),
 	}
@@ -52,6 +53,8 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_RES), t.handleApplicationAuthResponse)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES), t.handleAccountAuthResponse)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_ERROR_RES), t.handleErrorReponse)
+	t.RegisterHandler(uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT), t.handleHeartBeatMessage)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
@@ -161,11 +164,11 @@ func (t *CTrader) AuthorizeAccount() error {
 	t.mutex.Unlock()
 
 	if t.AccountId == nil {
-		return errors.New("Account id cannot be nil")
+		return errors.New("account id cannot be nil")
 	}
 
 	if len(strconv.FormatInt(*t.AccountId, 10)) < 8 {
-		return errors.New("Invalid Account id")
+		return errors.New("invalid Account id")
 	}
 
 	msgReq := &messages.ProtoOAAccountAuthReq{
@@ -191,6 +194,45 @@ func (t *CTrader) AuthorizeAccount() error {
 	if err != nil {
 		return fmt.Errorf("failed to send auth request: %w", err)
 	}
+
+	return nil
+}
+
+// GetAccountHistoricalDeals is a request for getting Trader's deals historical data (execution details).
+func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) error {
+	if t.AccountId == nil {
+		return errors.New("account id cannot be nil")
+	}
+
+	if len(strconv.FormatInt(*t.AccountId, 10)) < 8 {
+		return errors.New("invalid account id")
+	}
+
+	msgReq := &messages.ProtoOADealListReq{
+		CtidTraderAccountId: t.AccountId,
+		FromTimestamp:       &fromTimestamp,
+		ToTimestamp:         &toTimestamp,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal auth request: %w", err)
+	}
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.AccountHistoricalDeals,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_ACCOUNT_HISTORICAL_DEALS,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to request account historical trades: %w", err)
+	}
+
 	return nil
 }
 
@@ -210,11 +252,34 @@ func (t *CTrader) handleApplicationAuthResponse(payload []byte) error {
 	return t.AuthorizeAccount()
 }
 
+func (t *CTrader) handleHeartBeatMessage(payload []byte) error {
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.HeartBeatMsgType,
+	}
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send back a heartbeat message: %w", err)
+	}
+	return nil
+}
+
 func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
 	var r messages.ProtoOAAccountAuthRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
 	}
+
+	return nil
+}
+
+func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
+	//TODO:
+	// Handle account historical deals
 	return nil
 }
 
@@ -223,6 +288,6 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal error response: %w", err)
 	}
-	t.conn.Close()
+	log.Printf("Received an error response: %s", string(*r.Description))
 	return nil
 }

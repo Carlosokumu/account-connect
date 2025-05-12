@@ -10,6 +10,7 @@ import (
 type CTraderConfig struct {
 	ClientID     string
 	ClientSecret string
+	AccessToken  string
 	AccountID    int64
 }
 
@@ -17,12 +18,13 @@ func NewCTraderConfig(acountId int64) *CTraderConfig {
 	return &CTraderConfig{
 		ClientID:     viper.GetString("platform.ctrader.client-id"),
 		ClientSecret: viper.GetString("platform.ctrader.client-secret"),
+		AccessToken:  viper.GetString("platform.ctrader.access-token"),
 		AccountID:    acountId,
 	}
 }
 
 func EstablishCTraderConnection(cfg *CTraderConfig) (*applications.CTrader, error) {
-	trader := applications.NewCTrader(cfg.ClientID, cfg.ClientSecret)
+	trader := applications.NewCTrader(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
 	trader.AccountId = &cfg.AccountID
 
 	if err := trader.EstablishCtraderConnection(); err != nil {
