@@ -1,31 +1,21 @@
 package connection
 
 import (
+	"account-connect/config"
 	"account-connect/internal/applications"
+	accdb "account-connect/persistence"
 	"fmt"
-
-	"github.com/spf13/viper"
 )
 
-type CTraderConfig struct {
-	ClientID     string
-	ClientSecret string
-	AccessToken  string
-	AccountID    int64
-}
-
-func NewCTraderConfig(acountId int64) *CTraderConfig {
-	return &CTraderConfig{
-		ClientID:     viper.GetString("platform.ctrader.client-id"),
-		ClientSecret: viper.GetString("platform.ctrader.client-secret"),
-		AccessToken:  viper.GetString("platform.ctrader.access-token"),
-		AccountID:    acountId,
+func EstablishCTraderConnection(ctraderConfig *config.CTraderConfig) (*applications.CTrader, error) {
+	accdb := accdb.AccountConnectDb{}
+	err := accdb.Create()
+	if err != nil {
+		return nil, err
 	}
-}
 
-func EstablishCTraderConnection(cfg *CTraderConfig) (*applications.CTrader, error) {
-	trader := applications.NewCTrader(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
-	trader.AccountId = &cfg.AccountID
+	trader := applications.NewCTrader(accdb, ctraderConfig)
+	trader.AccountId = &ctraderConfig.AccountID
 
 	if err := trader.EstablishCtraderConnection(); err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
@@ -34,6 +24,8 @@ func EstablishCTraderConnection(cfg *CTraderConfig) (*applications.CTrader, erro
 	if err := trader.AuthorizeApplication(); err != nil {
 		return nil, fmt.Errorf("authorization failed: %w", err)
 	}
+
+	defer accdb.Close()
 
 	return trader, nil
 }

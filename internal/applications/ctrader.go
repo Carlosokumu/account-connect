@@ -2,7 +2,9 @@ package applications
 
 import (
 	"account-connect/common"
+	"account-connect/config"
 	messages "account-connect/gen"
+	accdb "account-connect/persistence"
 	"errors"
 	"fmt"
 	"log"
@@ -22,6 +24,7 @@ const (
 type MessageHandler func(payload []byte) error
 
 type CTrader struct {
+	accDb           accdb.AccountConnectDb
 	ClientSecret    string
 	ClientId        string
 	AccountId       *int64
@@ -34,11 +37,12 @@ type CTrader struct {
 }
 
 // NewCTrader creates a new trader instance with the required fields
-func NewCTrader(clientId, clientSecret, accessToken string) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CTrader {
 	return &CTrader{
-		ClientId:      clientId,
-		ClientSecret:  clientSecret,
-		AccessToken:   accessToken,
+		accDb:         accdb,
+		ClientId:      ctraderconfig.ClientID,
+		ClientSecret:  ctraderconfig.ClientSecret,
+		AccessToken:   ctraderconfig.AccessToken,
 		handlers:      make(map[uint32]MessageHandler),
 		authCompleted: make(chan struct{}),
 	}
@@ -55,6 +59,7 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_ERROR_RES), t.handleErrorReponse)
 	t.RegisterHandler(uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT), t.handleHeartBeatMessage)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES), t.handleRefreshTokenResponse)
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
@@ -63,6 +68,11 @@ func (t *CTrader) EstablishCtraderConnection() error {
 	dialer := websocket.DefaultDialer
 	dialer.EnableCompression = true
 	dialer.HandshakeTimeout = 10 * time.Second
+
+	err := t.accDb.RegisterBucket("ctrader")
+	if err != nil {
+		return err
+	}
 
 	endpoint := viper.GetString("platform.ctrader.endpoint")
 	port := viper.GetInt("platform.ctrader.port")
@@ -198,6 +208,38 @@ func (t *CTrader) AuthorizeAccount() error {
 	return nil
 }
 
+// GetRefreshToken is a request to refresh the access token using refresh token of granted trader's account.
+func (t *CTrader) GetRefreshToken() error {
+	refreshToken, err := t.accDb.Get("ctrader", "refresh_token")
+	if err != nil {
+		return err
+	}
+	refreshTokenStr := string(refreshToken)
+	msgReq := &messages.ProtoOARefreshTokenReq{
+		RefreshToken: &refreshTokenStr,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal auth refresh request: %w", err)
+	}
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.RefreshTokenMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_REFRESH_TOKEN,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send refresh token request: %w", err)
+	}
+	return nil
+}
+
 // GetAccountHistoricalDeals is a request for getting Trader's deals historical data (execution details).
 func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) error {
 	if t.AccountId == nil {
@@ -274,6 +316,18 @@ func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
 	}
 
+	return nil
+}
+
+func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
+	var r messages.ProtoOARefreshTokenRes
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal refresh token response: %w", err)
+	}
+	err := t.accDb.Put("ctrader", "refresh_token", *r.AccessToken)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
