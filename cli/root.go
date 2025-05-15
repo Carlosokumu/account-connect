@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"account-connect/config"
 	"account-connect/connection"
 	"log"
 	"os"
@@ -50,13 +51,12 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		switch platform {
 		case "ctrader":
-			cfg := connection.NewCTraderConfig(accountID)
-			_, err := connection.EstablishCTraderConnection(cfg)
+			ctraderCfg := config.NewCTraderConfig(accountID)
+			_, err := connection.EstablishCTraderConnection(ctraderCfg)
 			if err != nil {
 				log.Fatalf("CTrader initialization failed: %v", err)
 			}
 			log.Println("CTrader connection established successfully")
-
 		default:
 			log.Fatalf("Unsupported platform: %s", platform)
 		}
