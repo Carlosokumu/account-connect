@@ -2,7 +2,9 @@ package applications
 
 import (
 	"account-connect/common"
+	"account-connect/config"
 	messages "account-connect/gen"
+	accdb "account-connect/persistence"
 	"errors"
 	"fmt"
 	"log"
@@ -22,6 +24,7 @@ const (
 type MessageHandler func(payload []byte) error
 
 type CTrader struct {
+	accDb           accdb.AccountConnectDb
 	ClientSecret    string
 	ClientId        string
 	AccountId       *int64
@@ -34,11 +37,12 @@ type CTrader struct {
 }
 
 // NewCTrader creates a new trader instance with the required fields
-func NewCTrader(clientId, clientSecret, accessToken string) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CTrader {
 	return &CTrader{
-		ClientId:      clientId,
-		ClientSecret:  clientSecret,
-		AccessToken:   accessToken,
+		accDb:         accdb,
+		ClientId:      ctraderconfig.ClientID,
+		ClientSecret:  ctraderconfig.ClientSecret,
+		AccessToken:   ctraderconfig.AccessToken,
 		handlers:      make(map[uint32]MessageHandler),
 		authCompleted: make(chan struct{}),
 	}
