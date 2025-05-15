@@ -681,6 +681,146 @@ func (x *ProtoOAReconcileRes) GetOrder() []*ProtoOAOrder {
 	return nil
 }
 
+// * Request to refresh the access token using refresh token of granted trader's account.
+type ProtoOARefreshTokenReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2173" json:"payloadType,omitempty"`
+	RefreshToken  *string                `protobuf:"bytes,2,req,name=refreshToken" json:"refreshToken,omitempty"` // The Refresh Token issued for updating Access Token.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOARefreshTokenReq fields.
+const (
+	Default_ProtoOARefreshTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_REQ
+)
+
+func (x *ProtoOARefreshTokenReq) Reset() {
+	*x = ProtoOARefreshTokenReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOARefreshTokenReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOARefreshTokenReq) ProtoMessage() {}
+
+func (x *ProtoOARefreshTokenReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOARefreshTokenReq.ProtoReflect.Descriptor instead.
+func (*ProtoOARefreshTokenReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ProtoOARefreshTokenReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOARefreshTokenReq_PayloadType
+}
+
+func (x *ProtoOARefreshTokenReq) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
+	}
+	return ""
+}
+
+// * Response to the ProtoOARefreshTokenReq request.
+type ProtoOARefreshTokenRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2174" json:"payloadType,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"`   // The Access Token issued for providing access to the Trader's Account.
+	TokenType     *string                `protobuf:"bytes,3,req,name=tokenType" json:"tokenType,omitempty"`       // bearer
+	ExpiresIn     *int64                 `protobuf:"varint,4,req,name=expiresIn" json:"expiresIn,omitempty"`      // Access Token expiration in seconds.
+	RefreshToken  *string                `protobuf:"bytes,5,req,name=refreshToken" json:"refreshToken,omitempty"` // Your new Refresh Token.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOARefreshTokenRes fields.
+const (
+	Default_ProtoOARefreshTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES
+)
+
+func (x *ProtoOARefreshTokenRes) Reset() {
+	*x = ProtoOARefreshTokenRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOARefreshTokenRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOARefreshTokenRes) ProtoMessage() {}
+
+func (x *ProtoOARefreshTokenRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOARefreshTokenRes.ProtoReflect.Descriptor instead.
+func (*ProtoOARefreshTokenRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ProtoOARefreshTokenRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOARefreshTokenRes_PayloadType
+}
+
+func (x *ProtoOARefreshTokenRes) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *ProtoOARefreshTokenRes) GetTokenType() string {
+	if x != nil && x.TokenType != nil {
+		return *x.TokenType
+	}
+	return ""
+}
+
+func (x *ProtoOARefreshTokenRes) GetExpiresIn() int64 {
+	if x != nil && x.ExpiresIn != nil {
+		return *x.ExpiresIn
+	}
+	return 0
+}
+
+func (x *ProtoOARefreshTokenRes) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
+	}
+	return ""
+}
+
 // * Request for getting a full symbol entity.
 type ProtoOASymbolByIdReq struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
@@ -698,7 +838,7 @@ const (
 
 func (x *ProtoOASymbolByIdReq) Reset() {
 	*x = ProtoOASymbolByIdReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[10]
+	mi := &file_OpenApiMessages_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -710,7 +850,7 @@ func (x *ProtoOASymbolByIdReq) String() string {
 func (*ProtoOASymbolByIdReq) ProtoMessage() {}
 
 func (x *ProtoOASymbolByIdReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[10]
+	mi := &file_OpenApiMessages_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -723,7 +863,7 @@ func (x *ProtoOASymbolByIdReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolByIdReq.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolByIdReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{10}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProtoOASymbolByIdReq) GetPayloadType() ProtoOAPayloadType {
@@ -764,7 +904,7 @@ const (
 
 func (x *ProtoOASymbolByIdRes) Reset() {
 	*x = ProtoOASymbolByIdRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[11]
+	mi := &file_OpenApiMessages_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -776,7 +916,7 @@ func (x *ProtoOASymbolByIdRes) String() string {
 func (*ProtoOASymbolByIdRes) ProtoMessage() {}
 
 func (x *ProtoOASymbolByIdRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[11]
+	mi := &file_OpenApiMessages_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -789,7 +929,7 @@ func (x *ProtoOASymbolByIdRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolByIdRes.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolByIdRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{11}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ProtoOASymbolByIdRes) GetPayloadType() ProtoOAPayloadType {
@@ -830,7 +970,7 @@ const (
 
 func (x *ProtoOASubscribeSpotsReq) Reset() {
 	*x = ProtoOASubscribeSpotsReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[12]
+	mi := &file_OpenApiMessages_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -842,7 +982,7 @@ func (x *ProtoOASubscribeSpotsReq) String() string {
 func (*ProtoOASubscribeSpotsReq) ProtoMessage() {}
 
 func (x *ProtoOASubscribeSpotsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[12]
+	mi := &file_OpenApiMessages_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -855,7 +995,7 @@ func (x *ProtoOASubscribeSpotsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASubscribeSpotsReq.ProtoReflect.Descriptor instead.
 func (*ProtoOASubscribeSpotsReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{12}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ProtoOASubscribeSpotsReq) GetPayloadType() ProtoOAPayloadType {
@@ -895,7 +1035,7 @@ const (
 
 func (x *ProtoOASubscribeSpotsRes) Reset() {
 	*x = ProtoOASubscribeSpotsRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[13]
+	mi := &file_OpenApiMessages_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -907,7 +1047,7 @@ func (x *ProtoOASubscribeSpotsRes) String() string {
 func (*ProtoOASubscribeSpotsRes) ProtoMessage() {}
 
 func (x *ProtoOASubscribeSpotsRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[13]
+	mi := &file_OpenApiMessages_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -920,7 +1060,7 @@ func (x *ProtoOASubscribeSpotsRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASubscribeSpotsRes.ProtoReflect.Descriptor instead.
 func (*ProtoOASubscribeSpotsRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{13}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ProtoOASubscribeSpotsRes) GetPayloadType() ProtoOAPayloadType {
@@ -958,7 +1098,7 @@ const (
 
 func (x *ProtoOASpotEvent) Reset() {
 	*x = ProtoOASpotEvent{}
-	mi := &file_OpenApiMessages_proto_msgTypes[14]
+	mi := &file_OpenApiMessages_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -970,7 +1110,7 @@ func (x *ProtoOASpotEvent) String() string {
 func (*ProtoOASpotEvent) ProtoMessage() {}
 
 func (x *ProtoOASpotEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[14]
+	mi := &file_OpenApiMessages_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -983,7 +1123,7 @@ func (x *ProtoOASpotEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASpotEvent.ProtoReflect.Descriptor instead.
 func (*ProtoOASpotEvent) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{14}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ProtoOASpotEvent) GetPayloadType() ProtoOAPayloadType {
@@ -1053,7 +1193,7 @@ const (
 
 func (x *ProtoOASymbolsForConversionReq) Reset() {
 	*x = ProtoOASymbolsForConversionReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[15]
+	mi := &file_OpenApiMessages_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1065,7 +1205,7 @@ func (x *ProtoOASymbolsForConversionReq) String() string {
 func (*ProtoOASymbolsForConversionReq) ProtoMessage() {}
 
 func (x *ProtoOASymbolsForConversionReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[15]
+	mi := &file_OpenApiMessages_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1078,7 +1218,7 @@ func (x *ProtoOASymbolsForConversionReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolsForConversionReq.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolsForConversionReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{15}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ProtoOASymbolsForConversionReq) GetPayloadType() ProtoOAPayloadType {
@@ -1126,7 +1266,7 @@ const (
 
 func (x *ProtoOASymbolsForConversionRes) Reset() {
 	*x = ProtoOASymbolsForConversionRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[16]
+	mi := &file_OpenApiMessages_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1138,7 +1278,7 @@ func (x *ProtoOASymbolsForConversionRes) String() string {
 func (*ProtoOASymbolsForConversionRes) ProtoMessage() {}
 
 func (x *ProtoOASymbolsForConversionRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[16]
+	mi := &file_OpenApiMessages_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1151,7 +1291,7 @@ func (x *ProtoOASymbolsForConversionRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolsForConversionRes.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolsForConversionRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{16}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ProtoOASymbolsForConversionRes) GetPayloadType() ProtoOAPayloadType {
@@ -1191,7 +1331,7 @@ const (
 
 func (x *ProtoOAAssetListReq) Reset() {
 	*x = ProtoOAAssetListReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	mi := &file_OpenApiMessages_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1203,7 +1343,7 @@ func (x *ProtoOAAssetListReq) String() string {
 func (*ProtoOAAssetListReq) ProtoMessage() {}
 
 func (x *ProtoOAAssetListReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	mi := &file_OpenApiMessages_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1216,7 +1356,7 @@ func (x *ProtoOAAssetListReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAAssetListReq.ProtoReflect.Descriptor instead.
 func (*ProtoOAAssetListReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{17}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ProtoOAAssetListReq) GetPayloadType() ProtoOAPayloadType {
@@ -1250,7 +1390,7 @@ const (
 
 func (x *ProtoOAAssetListRes) Reset() {
 	*x = ProtoOAAssetListRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	mi := &file_OpenApiMessages_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +1402,7 @@ func (x *ProtoOAAssetListRes) String() string {
 func (*ProtoOAAssetListRes) ProtoMessage() {}
 
 func (x *ProtoOAAssetListRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	mi := &file_OpenApiMessages_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1275,7 +1415,7 @@ func (x *ProtoOAAssetListRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAAssetListRes.ProtoReflect.Descriptor instead.
 func (*ProtoOAAssetListRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{18}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ProtoOAAssetListRes) GetPayloadType() ProtoOAPayloadType {
@@ -1316,7 +1456,7 @@ const (
 
 func (x *ProtoOASymbolsListReq) Reset() {
 	*x = ProtoOASymbolsListReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[19]
+	mi := &file_OpenApiMessages_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1468,7 @@ func (x *ProtoOASymbolsListReq) String() string {
 func (*ProtoOASymbolsListReq) ProtoMessage() {}
 
 func (x *ProtoOASymbolsListReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[19]
+	mi := &file_OpenApiMessages_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1481,7 @@ func (x *ProtoOASymbolsListReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolsListReq.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolsListReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{19}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ProtoOASymbolsListReq) GetPayloadType() ProtoOAPayloadType {
@@ -1383,7 +1523,7 @@ const (
 
 func (x *ProtoOASymbolsListRes) Reset() {
 	*x = ProtoOASymbolsListRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[20]
+	mi := &file_OpenApiMessages_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1395,7 +1535,7 @@ func (x *ProtoOASymbolsListRes) String() string {
 func (*ProtoOASymbolsListRes) ProtoMessage() {}
 
 func (x *ProtoOASymbolsListRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[20]
+	mi := &file_OpenApiMessages_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1408,7 +1548,7 @@ func (x *ProtoOASymbolsListRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolsListRes.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolsListRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{20}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ProtoOASymbolsListRes) GetPayloadType() ProtoOAPayloadType {
@@ -1483,7 +1623,16 @@ const file_OpenApiMessages_proto_rawDesc = "" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_RECONCILE_RESR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x125\n" +
 	"\bposition\x18\x03 \x03(\v2\x19.messages.ProtoOAPositionR\bposition\x12,\n" +
-	"\x05order\x18\x04 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\"\xbf\x01\n" +
+	"\x05order\x18\x04 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\"\x98\x01\n" +
+	"\x16ProtoOARefreshTokenReq\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_REQR\vpayloadType\x12\"\n" +
+	"\frefreshToken\x18\x02 \x02(\tR\frefreshToken\"\xf6\x01\n" +
+	"\x16ProtoOARefreshTokenRes\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_RESR\vpayloadType\x12 \n" +
+	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\x12\x1c\n" +
+	"\ttokenType\x18\x03 \x02(\tR\ttokenType\x12\x1c\n" +
+	"\texpiresIn\x18\x04 \x02(\x03R\texpiresIn\x12\"\n" +
+	"\frefreshToken\x18\x05 \x02(\tR\frefreshToken\"\xbf\x01\n" +
 	"\x14ProtoOASymbolByIdReq\x12Y\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOL_BY_ID_REQR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
@@ -1545,7 +1694,7 @@ func file_OpenApiMessages_proto_rawDescGZIP() []byte {
 	return file_OpenApiMessages_proto_rawDescData
 }
 
-var file_OpenApiMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_OpenApiMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_OpenApiMessages_proto_goTypes = []any{
 	(*ProtoOAApplicationAuthReq)(nil),      // 0: messages.ProtoOAApplicationAuthReq
 	(*ProtoOAApplicationAuthRes)(nil),      // 1: messages.ProtoOAApplicationAuthRes
@@ -1557,63 +1706,67 @@ var file_OpenApiMessages_proto_goTypes = []any{
 	(*ProtoOAAccountAuthRes)(nil),          // 7: messages.ProtoOAAccountAuthRes
 	(*ProtoOAReconcileReq)(nil),            // 8: messages.ProtoOAReconcileReq
 	(*ProtoOAReconcileRes)(nil),            // 9: messages.ProtoOAReconcileRes
-	(*ProtoOASymbolByIdReq)(nil),           // 10: messages.ProtoOASymbolByIdReq
-	(*ProtoOASymbolByIdRes)(nil),           // 11: messages.ProtoOASymbolByIdRes
-	(*ProtoOASubscribeSpotsReq)(nil),       // 12: messages.ProtoOASubscribeSpotsReq
-	(*ProtoOASubscribeSpotsRes)(nil),       // 13: messages.ProtoOASubscribeSpotsRes
-	(*ProtoOASpotEvent)(nil),               // 14: messages.ProtoOASpotEvent
-	(*ProtoOASymbolsForConversionReq)(nil), // 15: messages.ProtoOASymbolsForConversionReq
-	(*ProtoOASymbolsForConversionRes)(nil), // 16: messages.ProtoOASymbolsForConversionRes
-	(*ProtoOAAssetListReq)(nil),            // 17: messages.ProtoOAAssetListReq
-	(*ProtoOAAssetListRes)(nil),            // 18: messages.ProtoOAAssetListRes
-	(*ProtoOASymbolsListReq)(nil),          // 19: messages.ProtoOASymbolsListReq
-	(*ProtoOASymbolsListRes)(nil),          // 20: messages.ProtoOASymbolsListRes
-	(ProtoOAPayloadType)(0),                // 21: messages.ProtoOAPayloadType
-	(*ProtoOATrader)(nil),                  // 22: messages.ProtoOATrader
-	(*ProtoOAPosition)(nil),                // 23: messages.ProtoOAPosition
-	(*ProtoOAOrder)(nil),                   // 24: messages.ProtoOAOrder
-	(*ProtoOASymbol)(nil),                  // 25: messages.ProtoOASymbol
-	(*ProtoOATrendbar)(nil),                // 26: messages.ProtoOATrendbar
-	(*ProtoOALightSymbol)(nil),             // 27: messages.ProtoOALightSymbol
-	(*ProtoOAAsset)(nil),                   // 28: messages.ProtoOAAsset
-	(*ProtoOAArchivedSymbol)(nil),          // 29: messages.ProtoOAArchivedSymbol
+	(*ProtoOARefreshTokenReq)(nil),         // 10: messages.ProtoOARefreshTokenReq
+	(*ProtoOARefreshTokenRes)(nil),         // 11: messages.ProtoOARefreshTokenRes
+	(*ProtoOASymbolByIdReq)(nil),           // 12: messages.ProtoOASymbolByIdReq
+	(*ProtoOASymbolByIdRes)(nil),           // 13: messages.ProtoOASymbolByIdRes
+	(*ProtoOASubscribeSpotsReq)(nil),       // 14: messages.ProtoOASubscribeSpotsReq
+	(*ProtoOASubscribeSpotsRes)(nil),       // 15: messages.ProtoOASubscribeSpotsRes
+	(*ProtoOASpotEvent)(nil),               // 16: messages.ProtoOASpotEvent
+	(*ProtoOASymbolsForConversionReq)(nil), // 17: messages.ProtoOASymbolsForConversionReq
+	(*ProtoOASymbolsForConversionRes)(nil), // 18: messages.ProtoOASymbolsForConversionRes
+	(*ProtoOAAssetListReq)(nil),            // 19: messages.ProtoOAAssetListReq
+	(*ProtoOAAssetListRes)(nil),            // 20: messages.ProtoOAAssetListRes
+	(*ProtoOASymbolsListReq)(nil),          // 21: messages.ProtoOASymbolsListReq
+	(*ProtoOASymbolsListRes)(nil),          // 22: messages.ProtoOASymbolsListRes
+	(ProtoOAPayloadType)(0),                // 23: messages.ProtoOAPayloadType
+	(*ProtoOATrader)(nil),                  // 24: messages.ProtoOATrader
+	(*ProtoOAPosition)(nil),                // 25: messages.ProtoOAPosition
+	(*ProtoOAOrder)(nil),                   // 26: messages.ProtoOAOrder
+	(*ProtoOASymbol)(nil),                  // 27: messages.ProtoOASymbol
+	(*ProtoOATrendbar)(nil),                // 28: messages.ProtoOATrendbar
+	(*ProtoOALightSymbol)(nil),             // 29: messages.ProtoOALightSymbol
+	(*ProtoOAAsset)(nil),                   // 30: messages.ProtoOAAsset
+	(*ProtoOAArchivedSymbol)(nil),          // 31: messages.ProtoOAArchivedSymbol
 }
 var file_OpenApiMessages_proto_depIdxs = []int32{
-	21, // 0: messages.ProtoOAApplicationAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 1: messages.ProtoOAApplicationAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 2: messages.ProtoOADealListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 3: messages.ProtoOAErrorRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 4: messages.ProtoOATraderReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 5: messages.ProtoOATraderRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	22, // 6: messages.ProtoOATraderRes.trader:type_name -> messages.ProtoOATrader
-	21, // 7: messages.ProtoOAAccountAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 8: messages.ProtoOAAccountAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 9: messages.ProtoOAReconcileReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 10: messages.ProtoOAReconcileRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	23, // 11: messages.ProtoOAReconcileRes.position:type_name -> messages.ProtoOAPosition
-	24, // 12: messages.ProtoOAReconcileRes.order:type_name -> messages.ProtoOAOrder
-	21, // 13: messages.ProtoOASymbolByIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 14: messages.ProtoOASymbolByIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	25, // 15: messages.ProtoOASymbolByIdRes.symbol:type_name -> messages.ProtoOASymbol
-	21, // 16: messages.ProtoOASubscribeSpotsReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 17: messages.ProtoOASubscribeSpotsRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 18: messages.ProtoOASpotEvent.payloadType:type_name -> messages.ProtoOAPayloadType
-	26, // 19: messages.ProtoOASpotEvent.trendbar:type_name -> messages.ProtoOATrendbar
-	21, // 20: messages.ProtoOASymbolsForConversionReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 21: messages.ProtoOASymbolsForConversionRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	27, // 22: messages.ProtoOASymbolsForConversionRes.symbol:type_name -> messages.ProtoOALightSymbol
-	21, // 23: messages.ProtoOAAssetListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 24: messages.ProtoOAAssetListRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 25: messages.ProtoOAAssetListRes.asset:type_name -> messages.ProtoOAAsset
-	21, // 26: messages.ProtoOASymbolsListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	21, // 27: messages.ProtoOASymbolsListRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	27, // 28: messages.ProtoOASymbolsListRes.symbol:type_name -> messages.ProtoOALightSymbol
-	29, // 29: messages.ProtoOASymbolsListRes.archivedSymbol:type_name -> messages.ProtoOAArchivedSymbol
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	23, // 0: messages.ProtoOAApplicationAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 1: messages.ProtoOAApplicationAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 2: messages.ProtoOADealListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 3: messages.ProtoOAErrorRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 4: messages.ProtoOATraderReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 5: messages.ProtoOATraderRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	24, // 6: messages.ProtoOATraderRes.trader:type_name -> messages.ProtoOATrader
+	23, // 7: messages.ProtoOAAccountAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 8: messages.ProtoOAAccountAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 9: messages.ProtoOAReconcileReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 10: messages.ProtoOAReconcileRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	25, // 11: messages.ProtoOAReconcileRes.position:type_name -> messages.ProtoOAPosition
+	26, // 12: messages.ProtoOAReconcileRes.order:type_name -> messages.ProtoOAOrder
+	23, // 13: messages.ProtoOARefreshTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 14: messages.ProtoOARefreshTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 15: messages.ProtoOASymbolByIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 16: messages.ProtoOASymbolByIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	27, // 17: messages.ProtoOASymbolByIdRes.symbol:type_name -> messages.ProtoOASymbol
+	23, // 18: messages.ProtoOASubscribeSpotsReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 19: messages.ProtoOASubscribeSpotsRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 20: messages.ProtoOASpotEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	28, // 21: messages.ProtoOASpotEvent.trendbar:type_name -> messages.ProtoOATrendbar
+	23, // 22: messages.ProtoOASymbolsForConversionReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 23: messages.ProtoOASymbolsForConversionRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	29, // 24: messages.ProtoOASymbolsForConversionRes.symbol:type_name -> messages.ProtoOALightSymbol
+	23, // 25: messages.ProtoOAAssetListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 26: messages.ProtoOAAssetListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	30, // 27: messages.ProtoOAAssetListRes.asset:type_name -> messages.ProtoOAAsset
+	23, // 28: messages.ProtoOASymbolsListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	23, // 29: messages.ProtoOASymbolsListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	29, // 30: messages.ProtoOASymbolsListRes.symbol:type_name -> messages.ProtoOALightSymbol
+	31, // 31: messages.ProtoOASymbolsListRes.archivedSymbol:type_name -> messages.ProtoOAArchivedSymbol
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_OpenApiMessages_proto_init() }
@@ -1628,7 +1781,7 @@ func file_OpenApiMessages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_OpenApiMessages_proto_rawDesc), len(file_OpenApiMessages_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
