@@ -45,9 +45,9 @@ func (blt *AccountConnectDb) Put(bucket string, key string, value string) error 
 	})
 }
 
-func (accountDb *AccountConnectDb) Get(bucket string, key string) ([]byte, error) {
+func (blt *AccountConnectDb) Get(bucket string, key string) ([]byte, error) {
 	var value []byte
-	err := accountDb.Db.View(func(tx *bolt.Tx) error {
+	err := blt.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
 			return fmt.Errorf("bucket %s not found", bucket)
