@@ -7,10 +7,15 @@ import (
 )
 
 type Config struct {
-	Server struct {
-		Endpoint string `yaml:"endpoint"`
-		Port     int32  `yaml:"port"`
-	} `yaml:"server"`
+	Servers struct {
+		Ctrader struct {
+			Endpoint string `yaml:"endpoint"`
+			Port     int32    `yaml:"port"`
+		} `yaml:"ctrader"`
+		AccountConnectServer struct {
+			Port int `yaml:"port"`
+		} `yaml:"account-connect-server"`
+	} `yaml:"servers"`
 }
 
 func LoadConfig() (*Config, error) {
