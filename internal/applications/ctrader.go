@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/spf13/viper"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -63,7 +62,7 @@ func (t *CTrader) registerHandlers() {
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
-func (t *CTrader) EstablishCtraderConnection() error {
+func (t *CTrader) EstablishCtraderConnection(ctraderConfig config.CTraderConfig) error {
 	// Set up a dialer with the desired options
 	dialer := websocket.DefaultDialer
 	dialer.EnableCompression = true
@@ -74,12 +73,11 @@ func (t *CTrader) EstablishCtraderConnection() error {
 		return err
 	}
 
-	endpoint := viper.GetString("platform.ctrader.endpoint")
-	port := viper.GetInt("platform.ctrader.port")
+	endpoint := ctraderConfig.Endpoint
+	port := ctraderConfig.Port
 
 	log.Printf("establishing connection to %s:%d", endpoint, port)
 
-	// Validate required configuration
 	if endpoint == "" {
 		return fmt.Errorf("missing cTrader server endpoint in configuration")
 	}
@@ -87,7 +85,6 @@ func (t *CTrader) EstablishCtraderConnection() error {
 		return fmt.Errorf("missing cTrader server port in configuration")
 	}
 
-	// Connect to the  Ctrader WebSocket endpoint
 	url := fmt.Sprintf("wss://%s:%d", endpoint, port)
 	conn, _, err := dialer.Dial(url, nil)
 	if err != nil {
@@ -128,7 +125,7 @@ func (t *CTrader) StartConnectionReader() {
 	}
 }
 
-// AuthorizeApplication is request  authorizing an application to work with the cTrader platform Proxies.
+// AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
 func (t *CTrader) AuthorizeApplication() error {
 	if t.ClientId == "" || t.ClientSecret == "" {
 		return errors.New("client credentials not set")
@@ -333,7 +330,7 @@ func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
 
 func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
 	//TODO:
-	// Handle account historical deals
+	// Handle account historical deals,maybe store in the db for specified user
 	return nil
 }
 

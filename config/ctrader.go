@@ -1,12 +1,16 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+)
 
 type CTraderConfig struct {
 	ClientID     string
 	ClientSecret string
 	AccessToken  string
 	AccountID    int64
+	Endpoint     string
+	Port         int32
 }
 
 func NewCTraderConfig(acountId int64) *CTraderConfig {

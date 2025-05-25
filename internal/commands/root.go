@@ -1,8 +1,9 @@
-package cli
+package commands
 
 import (
 	"account-connect/config"
 	"account-connect/connection"
+	"account-connect/persistence"
 	"log"
 	"os"
 
@@ -52,7 +53,8 @@ var rootCmd = &cobra.Command{
 		switch platform {
 		case "ctrader":
 			ctraderCfg := config.NewCTraderConfig(accountID)
-			_, err := connection.EstablishCTraderConnection(ctraderCfg)
+			accountDb := persistence.AccountConnectDb{}
+			_, err := connection.EstablishCTraderConnection(ctraderCfg, accountDb)
 			if err != nil {
 				log.Fatalf("CTrader initialization failed: %v", err)
 			}
