@@ -16,8 +16,8 @@ func EstablishCTraderConnection(ctraderConfig *config.CTraderConfig, accdb accdb
 	trader := applications.NewCTrader(accdb, ctraderConfig)
 	trader.AccountId = &ctraderConfig.AccountID
 
-	ctraderConfig.Endpoint = cfg.Server.Endpoint
-	ctraderConfig.Port = cfg.Server.Port
+	ctraderConfig.Endpoint = cfg.Servers.Ctrader.Endpoint
+	ctraderConfig.Port = cfg.Servers.Ctrader.Port
 
 	trader.AccessToken = ctraderConfig.AccessToken
 	trader.ClientSecret = ctraderConfig.ClientSecret
