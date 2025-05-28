@@ -33,6 +33,15 @@ message ProtoOADealListReq {
     optional int32 maxRows = 5; // The maximum number of the deals to return.
 }
 
+/** The response to the ProtoOADealListRes request. */
+message ProtoOADealListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_DEAL_LIST_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOADeal deal = 3; // The list of the deals.
+    required bool hasMore = 4; // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+}
+
 /** Generic response when an ERROR occurred. */
 message ProtoOAErrorRes {
     optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ERROR_RES];

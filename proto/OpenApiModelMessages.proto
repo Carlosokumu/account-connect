@@ -349,6 +349,61 @@ message ProtoOAInterval {
 }
 
 
+/** Execution entity. */
+message ProtoOADeal {
+    required int64 dealId = 1; // The unique ID of the execution deal.
+    required int64 orderId = 2; // Source order of the deal.
+    required int64 positionId = 3; // Source position of the deal.
+    required int64 volume = 4; // Volume sent for execution, in cents.
+    required int64 filledVolume = 5; // Filled volume, in cents.
+    required int64 symbolId = 6; // The unique identifier of the symbol in specific server environment within cTrader platform. Different servers have different IDs.
+    required int64 createTimestamp = 7; // The Unix time in milliseconds when the deal was sent for execution.
+    required int64 executionTimestamp = 8; // The Unix time in milliseconds when the deal was executed.
+    optional int64 utcLastUpdateTimestamp = 9; // The Unix time in milliseconds when the deal was created, executed or rejected.
+    optional double executionPrice = 10; // Execution price.
+    required ProtoOATradeSide tradeSide = 11; // Buy/Sell.
+    required ProtoOADealStatus dealStatus = 12; // Status of the deal.
+    optional double marginRate = 13; // Rate for used margin computation. Represented as Base/Deposit.
+    optional int64 commission = 14; // Amount of trading commission associated with the deal.
+    optional double baseToUsdConversionRate = 15; // Base to USD conversion rate on the time of deal execution.
+    optional ProtoOAClosePositionDetail closePositionDetail = 16; // Closing position detail. Valid only for closing deal.
+    optional uint32 moneyDigits = 17; // Specifies the exponent of the monetary values. E.g. moneyDigits = 8 must be interpret as business value multiplied by 10^8, then real balance would be 10053099944 / 10^8 = 100.53099944. Affects commission.
+}
+
+/** Deal details for ProtoOADealOffsetListReq. */
+message ProtoOADealOffset {
+    required int64 dealId = 1; // The unique ID of the execution Deal.
+    required int64 volume = 2; // Matched volume, in cents.
+    optional int64 executionTimestamp = 3; // The Unix time in milliseconds when the offset Deal was executed.
+    optional double executionPrice = 4; //  Execution price of the offset Deal.
+}
+
+/** Deal status ENUM. */
+enum ProtoOADealStatus {
+    FILLED = 2; // Deal filled.
+    PARTIALLY_FILLED = 3; // Deal is partially filled.
+    REJECTED = 4; // Deal is correct but was rejected by liquidity provider (e.g. no liquidity).
+    INTERNALLY_REJECTED = 5; // Deal rejected by server (e.g. no price quotes).
+    ERROR = 6; // Deal is rejected by LP due to error (e.g. symbol is unknown).
+    MISSED = 7; // Liquidity provider did not sent response on the deal during specified execution time period.
+}
+
+/** Trading details for closing deal. */
+message ProtoOAClosePositionDetail {
+    required double entryPrice = 1; // Position price at the moment of filling the closing order.
+    required int64 grossProfit = 2; // Amount of realized gross profit after closing deal execution.
+    required int64 swap = 3; // Amount of realized swap related to closed volume.
+    required int64 commission = 4; // Amount of realized commission related to closed volume.
+    required int64 balance = 5; // Account balance after closing deal execution.
+    optional double quoteToDepositConversionRate = 6; // Quote/Deposit currency conversion rate on the time of closing deal execution.
+    optional int64 closedVolume = 7; // Closed volume in cents.
+    optional int64 balanceVersion = 8; // Balance version of the account related to closing deal operation.
+    optional uint32 moneyDigits = 9; // Specifies the exponent of the monetary values. E.g. moneyDigits = 8 must be interpret as business value multiplied by 10^8, then real balance would be 10053099944 / 10^8 = 100.53099944. Affects grossProfit, swap, commission, balance, pnlConversionFee.
+    optional int64 pnlConversionFee = 10; // Fee for conversion applied to the Deal in account's ccy when trader symbol's quote asset id <> ProtoOATrader.depositAssetId.
+}
+
+
+
 /** Enum for specifying SWAP calculation type for symbol. */
 enum ProtoOASwapCalculationType {
     POINTS = 0; //Specifies type of SWAP computation as points (0)
