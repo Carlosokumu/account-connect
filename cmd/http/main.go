@@ -2,15 +2,14 @@ package main
 
 import (
 	"account-connect/config"
+	"account-connect/internal/clients"
+	"account-connect/internal/models"
 	db "account-connect/persistence"
-	"account-connect/router"
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
-
-	"account-connect/messages"
 
 	"github.com/gorilla/websocket"
 )
@@ -19,15 +18,11 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func startWsService(accDb db.AccountConnectDb) {
+func startWsService(clientManager *clients.AccountConnectClientManager, accDb db.AccountConnectDb) {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-
-	r := router.NewRouter()
-	r.Handle("connect", router.HandleConnect)
-	r.Handle("historical_deals", router.HandleHistoricalDeals)
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
 		ws, err := upgrader.Upgrade(w, req, nil)
@@ -36,7 +31,17 @@ func startWsService(accDb db.AccountConnectDb) {
 			return
 		}
 
+		clientID := req.URL.Query().Get("account-connect-client-id")
+
 		defer ws.Close()
+
+		client := &models.AccountConnectClient{
+			ID:   clientID,
+			Conn: ws,
+			Send: make(chan []byte, 256),
+		}
+
+		clientManager.Register <- client
 
 		for {
 			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -46,21 +51,7 @@ func startWsService(accDb db.AccountConnectDb) {
 				log.Printf("Error received while reading: %v", err)
 				break
 			}
-
-			var msg messages.AccountConnectMsg
-			if err := json.Unmarshal(rawMsg, &msg); err != nil {
-				_ = ws.WriteJSON(map[string]string{
-					"status":  "error",
-					"message": "Invalid message format",
-				})
-				log.Printf("Invalid message format %v:", err)
-				continue
-			}
-
-			if err := r.Route(ws, &accDb, msg); err != nil {
-				log.Printf("Failed to route  message type %s: with error: %v", msg.Type, err)
-				continue
-			}
+			clientManager.IncomingClientMessages <- rawMsg
 		}
 	})
 	port := cfg.Servers.AccountConnectServer.Port
@@ -76,5 +67,10 @@ func main() {
 	}
 	defer accdb.Close()
 
-	startWsService(accdb)
+	clientManager := clients.NewClientManager(accdb)
+
+	ctx := context.Background()
+	go clientManager.StartClientManagement(ctx)
+
+	startWsService(clientManager, accdb)
 }
