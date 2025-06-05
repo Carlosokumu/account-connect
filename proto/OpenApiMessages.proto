@@ -33,6 +33,15 @@ message ProtoOADealListReq {
     optional int32 maxRows = 5; // The maximum number of the deals to return.
 }
 
+/** The response to the ProtoOADealListRes request. */
+message ProtoOADealListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_DEAL_LIST_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOADeal deal = 3; // The list of the deals.
+    required bool hasMore = 4; // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+}
+
 /** Generic response when an ERROR occurred. */
 message ProtoOAErrorRes {
     optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ERROR_RES];
@@ -57,6 +66,31 @@ message ProtoOATraderRes {
 
     required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
     required ProtoOATrader trader = 3; // The Trader account information.
+}
+
+
+/** Request for getting historical trend bars for the symbol. */
+message ProtoOAGetTrendbarsReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TRENDBARS_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    optional int64 fromTimestamp = 3; // The Unix time in milliseconds from which the search starts. Must be bigger or equal to zero (1st Jan 1970).
+    optional int64 toTimestamp = 4; // The Unix time in milliseconds of finishing the search. Smaller or equal to 2147483646000 (19th Jan 2038).
+    required ProtoOATrendbarPeriod period = 5; // Specifies period of trend bar series (e.g. M1, M10, etc.).
+    required int64 symbolId = 6; // Unique identifier of the Symbol in cTrader platform.
+    optional uint32 count = 7; // Limit number of trend bars in response back from toTimestamp.
+}
+
+/** Response to the ProtoOAGetTrendbarsReq request. */
+message ProtoOAGetTrendbarsRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TRENDBARS_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required ProtoOATrendbarPeriod period = 3; // Specifies period of trend bar series (e.g. M1, M10, etc.).
+    optional int64 timestamp = 4 [deprecated = true]; // Simply don't use this field, as your original request already contains toTimestamp.
+    repeated ProtoOATrendbar trendbar = 5; // The list of trend bars.
+    optional int64 symbolId = 6; // Unique identifier of the Symbol in cTrader platform.
+    optional bool hasMore = 7; // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
 }
 
 

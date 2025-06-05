@@ -4,7 +4,9 @@ import (
 	"account-connect/common"
 	"account-connect/config"
 	messages "account-connect/gen"
+	"account-connect/internal/mappers"
 	accdb "account-connect/persistence"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -20,30 +22,49 @@ const (
 	MESSAGE_TYPE = websocket.BinaryMessage
 )
 
+// Global channel registry
+var (
+	ChannelRegistry = make(map[string]chan []byte)
+	RegistryLock    sync.RWMutex
+)
+
 type MessageHandler func(payload []byte) error
 
 type CTrader struct {
-	accDb           accdb.AccountConnectDb
-	ClientSecret    string
-	ClientId        string
-	AccountId       *int64
-	AccessToken     string
-	conn            *websocket.Conn
-	handlers        map[uint32]MessageHandler
-	authCompleted   chan struct{}
-	readyForAccount bool
-	mutex           sync.Mutex
+	accDb               accdb.AccountConnectDb
+	ClientSecret        string
+	ClientId            string
+	AccountId           *int64
+	AccessToken         string
+	PlatformConn        *websocket.Conn
+	handlers            map[uint32]MessageHandler
+	authCompleted       chan bool
+	closeAuthOnce       sync.Once
+	UserChannelRegistry map[string]chan []byte
+	readyForAccount     bool
+	mutex               sync.Mutex
 }
 
 // NewCTrader creates a new trader instance with the required fields
 func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CTrader {
+	RegistryLock.Lock()
+	defer RegistryLock.Unlock()
+
+	ChannelRegistry["historical_deals"] = make(chan []byte)
+	ChannelRegistry["trader_info"] = make(chan []byte)
+	ChannelRegistry["trend_bars"] = make(chan []byte)
+	ChannelRegistry["errors"] = make(chan []byte)
+	ChannelRegistry["platform_connect_status"] = make(chan []byte)
+	ChannelRegistry["account_symbols"] = make(chan []byte)
+
 	return &CTrader{
-		accDb:         accdb,
-		ClientId:      ctraderconfig.ClientID,
-		ClientSecret:  ctraderconfig.ClientSecret,
-		AccessToken:   ctraderconfig.AccessToken,
-		handlers:      make(map[uint32]MessageHandler),
-		authCompleted: make(chan struct{}),
+		accDb:               accdb,
+		ClientId:            ctraderconfig.ClientID,
+		ClientSecret:        ctraderconfig.ClientSecret,
+		AccessToken:         ctraderconfig.AccessToken,
+		handlers:            make(map[uint32]MessageHandler),
+		authCompleted:       make(chan bool, 1),
+		UserChannelRegistry: make(map[string]chan []byte),
 	}
 }
 
@@ -59,6 +80,9 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT), t.handleHeartBeatMessage)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES), t.handleRefreshTokenResponse)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_TRADER_RES), t.handleTraderInfoResponse)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES), t.handleTrendBars)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES), t.handleSymbolListResponse)
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
@@ -90,7 +114,7 @@ func (t *CTrader) EstablishCtraderConnection(ctraderConfig config.CTraderConfig)
 	if err != nil {
 		return err
 	}
-	t.conn = conn
+	t.PlatformConn = conn
 
 	t.registerHandlers()
 	go t.StartConnectionReader()
@@ -98,12 +122,15 @@ func (t *CTrader) EstablishCtraderConnection(ctraderConfig config.CTraderConfig)
 	return nil
 }
 
-// StartConnectionReader will start a goroutine whose work will be to continously read protobuf messages sent by ctrader
+// StartConnectionReader will start a goroutine whose work will be to continously read protobuf messages sent by ctrader through
+// the PlatformConn
 func (t *CTrader) StartConnectionReader() {
-	defer close(t.authCompleted)
+	defer func() {
+		close(t.authCompleted)
+	}()
 
 	for {
-		_, msgB, err := t.conn.ReadMessage()
+		_, msgB, err := t.PlatformConn.ReadMessage()
 		if err != nil {
 			log.Printf("WebSocket read error: %v", err)
 			return
@@ -150,7 +177,7 @@ func (t *CTrader) AuthorizeApplication() error {
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to send auth request: %w", err)
 	}
@@ -197,7 +224,7 @@ func (t *CTrader) AuthorizeAccount() error {
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to send auth request: %w", err)
 	}
@@ -230,9 +257,100 @@ func (t *CTrader) GetRefreshToken() error {
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to send refresh token request: %w", err)
+	}
+	return nil
+}
+
+// GetAccountTraderInfo will retrieve the trader information for a certain ctidTraderAccountId
+func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
+	msgReq := &messages.ProtoOATraderReq{
+		CtidTraderAccountId: ctidTraderAccountId,
+	}
+
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal prototrader  request: %w", err)
+	}
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.TraderInfoMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_TRADER_INFO,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send refresh token request: %w", err)
+	}
+	return nil
+
+}
+
+func (t *CTrader) GetAccountTradingSymbols(ctId *int64) error {
+	msgReq := &messages.ProtoOASymbolsListReq{
+		CtidTraderAccountId: ctId,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal symbol list  request: %w", err)
+	}
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.AccountSymbolListMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_SYMBOL_LIST,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protobuf message: %w", err)
+	}
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send trend bars request: %w", err)
+	}
+	return nil
+}
+
+// GetChartTrendBars will request trend bar series data as  requested by [trendbarsArgs]
+func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBars) error {
+	trendPeriod, err := mappers.PeriodStrToBarPeriod(trendbarsArgs.Period)
+	if err != nil {
+		return fmt.Errorf("invalid trend period: %w", err)
+	}
+	msgReq := &messages.ProtoOAGetTrendbarsReq{
+		CtidTraderAccountId: trendbarsArgs.CtidTraderAccountId,
+		Period:              &trendPeriod,
+		SymbolId:            &trendbarsArgs.SymbolId,
+		FromTimestamp:       trendbarsArgs.FromTimestamp,
+		ToTimestamp:         trendbarsArgs.ToTimestamp,
+	}
+
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal trend bars  request: %w", err)
+	}
+	msgP := &messages.ProtoMessage{
+		PayloadType: &common.TrendBarsMsyType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_TREND_BARS,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protobuf message: %w", err)
+	}
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send trend bars request: %w", err)
 	}
 	return nil
 }
@@ -267,7 +385,7 @@ func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) er
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to request account historical trades: %w", err)
 	}
@@ -300,7 +418,7 @@ func (t *CTrader) handleHeartBeatMessage(payload []byte) error {
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.conn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to send back a heartbeat message: %w", err)
 	}
@@ -312,6 +430,12 @@ func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
 	}
+	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve platform_connect_status channel from registry")
+	}
+
+	close(platformConnectStatusCh)
 
 	return nil
 }
@@ -328,9 +452,84 @@ func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
 	return nil
 }
 
+func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
+	traderInfoCh, ok := ChannelRegistry["trader_info"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve trader info channel from registry")
+	}
+	var r messages.ProtoOATraderRes
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal trader info response: %w", err)
+	}
+	traderInfo := mappers.ProtoOATraderToaccountConnectTrader(&r)
+	traderInfoB, err := json.Marshal(traderInfo)
+	if err != nil {
+		log.Printf("Failed to marshal trader info: %v", err)
+	}
+	traderInfoCh <- traderInfoB
+
+	return nil
+}
+
+func (t *CTrader) handleTrendBars(payload []byte) error {
+	trendBarsCh, ok := ChannelRegistry["trend_bars"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve trend_bars channel from registry")
+	}
+
+	var r messages.ProtoOAGetTrendbarsRes
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal trend bars: %w", err)
+	}
+	trendBars := mappers.ProotoOAToTrendBars(&r)
+
+	trendBarsB, err := json.Marshal(trendBars)
+	if err != nil {
+		log.Printf("Failed to marshal trend bar data info: %v", err)
+	}
+	trendBarsCh <- trendBarsB
+
+	return nil
+}
+
+func (t *CTrader) handleSymbolListResponse(payload []byte) error {
+	var r messages.ProtoOASymbolsListRes
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal symbol list: %w", err)
+	}
+
+	accountSymbolsCh, ok := ChannelRegistry["account_symbols"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve aacount symbols channel from registry")
+	}
+	syms := mappers.ProtoSymbolListResponseToAccountConnectSymbol(&r)
+	symsB, err := json.Marshal(syms)
+	if err != nil {
+		log.Printf("Failed to marshal trend bar data info: %v", err)
+	}
+	accountSymbolsCh <- symsB
+
+	return nil
+}
+
 func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
-	//TODO:
-	// Handle account historical deals,maybe store in the db for specified user
+	historicalDealsCh, ok := ChannelRegistry["historical_deals"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve historical deals from registry")
+	}
+	var r messages.ProtoOADealListRes
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal historical deals: %w", err)
+	}
+
+	deals := mappers.ProtoOADealToAccountConnectDeal(&r)
+	dealsB, err := json.Marshal(deals)
+	if err != nil {
+		return fmt.Errorf("Failed to marshal deal: %s", err)
+	}
+
+	historicalDealsCh <- dealsB
+
 	return nil
 }
 
@@ -339,6 +538,29 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal error response: %w", err)
 	}
-	log.Printf("Received an error response: %s", string(*r.Description))
+
+	errorsCh, ok := ChannelRegistry["errors"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve errors channnel from registry")
+	}
+	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve platform_connect_status channel from registry")
+	}
+
+	log.Printf("Received an error response: %s  with error code: %s", string(*r.Description), r.GetErrorCode())
+	if r.GetErrorCode() == common.REQ_CLIENT_FAILURE {
+		close(platformConnectStatusCh)
+		close(t.authCompleted)
+	}
+
+	pErr := mappers.ProtoOAErrorResToError(&r)
+	pErrB, err := json.Marshal(pErr)
+	if err != nil {
+		return fmt.Errorf("Failed to marshal error response: %s", err)
+	}
+
+	errorsCh <- pErrB
+
 	return nil
 }
