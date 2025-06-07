@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+
 func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []AccountConnectDeal {
 	var deals []AccountConnectDeal
 
@@ -12,6 +13,8 @@ func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []AccountConnectD
 		deal := AccountConnectDeal{
 			ExecutionPrice: deal.ExecutionPrice,
 			Commission:     deal.Commission,
+			Direction:      deal.TradeSide.String(),
+			Symbol:         deal.SymbolId,
 		}
 		deals = append(deals, deal)
 	}
