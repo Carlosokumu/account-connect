@@ -293,6 +293,7 @@ func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
 
 }
 
+// GetAccountTradingSymbols will retrieve a list of trading symbols(trading pairs e.g EUR/USD) for a certain trading account
 func (t *CTrader) GetAccountTradingSymbols(ctId *int64) error {
 	msgReq := &messages.ProtoOASymbolsListReq{
 		CtidTraderAccountId: ctId,
@@ -326,7 +327,7 @@ func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBar
 		return fmt.Errorf("invalid trend period: %w", err)
 	}
 	msgReq := &messages.ProtoOAGetTrendbarsReq{
-		CtidTraderAccountId: trendbarsArgs.CtidTraderAccountId,
+		CtidTraderAccountId: trendbarsArgs.Ctid,
 		Period:              &trendPeriod,
 		SymbolId:            &trendbarsArgs.SymbolId,
 		FromTimestamp:       trendbarsArgs.FromTimestamp,
