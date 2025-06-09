@@ -40,7 +40,7 @@ func CreateSuccessResponse(msgType MessageType, clientID string, payload []byte)
 }
 
 type AccountConnectMsg struct {
-	Type     string          `json:"type"`
+	Type     MessageType     `json:"type"`
 	ClientId string          `json:"client_id"`
 	Payload  json.RawMessage `json:"payload"`
 }
