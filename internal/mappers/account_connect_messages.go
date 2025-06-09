@@ -11,6 +11,7 @@ const (
 	TypeAccountSymbols MessageType = "account_symbols"
 	TypeTrendBars      MessageType = "trend_bars"
 	TypeError          MessageType = "error"
+	TypeDisconnect     MessageType = "disconnect"
 )
 
 type MessageStatus string
