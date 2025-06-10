@@ -31,18 +31,16 @@ var (
 type MessageHandler func(payload []byte) error
 
 type CTrader struct {
-	accDb               accdb.AccountConnectDb
-	ClientSecret        string
-	ClientId            string
-	AccountId           *int64
-	AccessToken         string
-	PlatformConn        *websocket.Conn
-	handlers            map[uint32]MessageHandler
-	authCompleted       chan bool
-	closeAuthOnce       sync.Once
-	UserChannelRegistry map[string]chan []byte
-	readyForAccount     bool
-	mutex               sync.Mutex
+	accDb           accdb.AccountConnectDb
+	ClientSecret    string
+	ClientId        string
+	AccountId       *int64
+	AccessToken     string
+	PlatformConn    *websocket.Conn
+	handlers        map[uint32]MessageHandler
+	authCompleted   chan bool
+	readyForAccount bool
+	mutex           sync.Mutex
 }
 
 // NewCTrader creates a new trader instance with the required fields
@@ -58,13 +56,12 @@ func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfi
 	ChannelRegistry["account_symbols"] = make(chan []byte)
 
 	return &CTrader{
-		accDb:               accdb,
-		ClientId:            ctraderconfig.ClientID,
-		ClientSecret:        ctraderconfig.ClientSecret,
-		AccessToken:         ctraderconfig.AccessToken,
-		handlers:            make(map[uint32]MessageHandler),
-		authCompleted:       make(chan bool, 1),
-		UserChannelRegistry: make(map[string]chan []byte),
+		accDb:         accdb,
+		ClientId:      ctraderconfig.ClientID,
+		ClientSecret:  ctraderconfig.ClientSecret,
+		AccessToken:   ctraderconfig.AccessToken,
+		handlers:      make(map[uint32]MessageHandler),
+		authCompleted: make(chan bool, 1),
 	}
 }
 
@@ -125,9 +122,6 @@ func (t *CTrader) EstablishCtraderConnection(ctraderConfig config.CTraderConfig)
 // StartConnectionReader will start a goroutine whose work will be to continously read protobuf messages sent by ctrader through
 // the PlatformConn
 func (t *CTrader) StartConnectionReader() {
-	defer func() {
-		close(t.authCompleted)
-	}()
 
 	for {
 		_, msgB, err := t.PlatformConn.ReadMessage()
@@ -186,6 +180,14 @@ func (t *CTrader) AuthorizeApplication() error {
 
 	return nil
 
+}
+
+// DisconnectPlatformConn will close the existing platform connection for the client
+func (t *CTrader) DisconnectPlatformConn() error {
+	if t.PlatformConn != nil {
+		return t.PlatformConn.Close()
+	}
+	return fmt.Errorf("Close failed for nil platform connection")
 }
 
 // AuthorizeAccount sends a request to authorize specified ctrader account id

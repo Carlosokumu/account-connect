@@ -55,6 +55,12 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 		case client := <-m.Unregister:
 			m.Lock()
 			if _, ok := m.clients[client.ID]; ok {
+				disconnectMsg := messages.AccountConnectMsg{
+					Type:     messages.TypeDisconnect,
+					Payload:  nil,
+					ClientId: client.ID,
+				}
+				m.msgRouter.Route(client, disconnectMsg)
 				close(client.Send)
 				delete(m.clients, client.ID)
 			}
@@ -118,6 +124,8 @@ func (m *AccountConnectClientManager) handleClientMessages(client *models.Accoun
 	log.Printf("Stopped listening to client %s (channel closed)\n", client.ID)
 }
 
+// handlePlatformMessages will process all of the messages sent via the platform channels.
+// All platform messages received  are written to associated client.
 func (m *AccountConnectClientManager) handlePlatformMessages(ctx context.Context, client *models.AccountConnectClient, ctrader *applications.CTrader) {
 	platformMessages := []string{
 		"historical_deals",

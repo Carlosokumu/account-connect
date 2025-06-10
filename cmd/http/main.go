@@ -33,7 +33,6 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 
 		clientID := req.URL.Query().Get("account-connect-client-id")
 
-		defer ws.Close()
 
 		client := &models.AccountConnectClient{
 			ID:   clientID,
@@ -42,6 +41,13 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 		}
 
 		clientManager.Register <- client
+
+		
+		defer func() {
+			clientManager.Unregister <- client
+			ws.Close()
+			log.Printf("Client %s disconnected", clientID)
+		}()
 
 		for {
 			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
