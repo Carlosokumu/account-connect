@@ -57,6 +57,8 @@ func (r *Router) Route(client *models.AccountConnectClient, msg messages.Account
 		return handler.handleTrendBars(msg.Payload)
 	case messages.TypeAccountSymbols:
 		return handler.handleAccountSymbols(msg.Payload)
+	case messages.TypeDisconnect:
+		return handler.handleClientDisconnect(*client)
 	default:
 		return fmt.Errorf("unknown message type: %s", msg.Type)
 	}
@@ -140,6 +142,7 @@ func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, acc
 	err = trader.GetAccountHistoricalDeals(*frmTimeStamp, *toTimestamp)
 	if err != nil {
 		log.Printf("Failed to fetch account historical deals: %v", err)
+		return err
 	}
 	return nil
 }
@@ -222,6 +225,15 @@ func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *pe
 	return nil
 }
 
+func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClient) error {
+	trader, ok := r.Clients[client.ID]
+	if !ok {
+		log.Printf("Client with id: %s not found", client.ID)
+		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
+	}
+	return trader.DisconnectPlatformConn()
+}
+
 func (h *messageHandler) handleConnect(payload json.RawMessage) error {
 	var ctconnectmsg messages.CtConnectMsg
 	if err := json.Unmarshal(payload, &ctconnectmsg); err != nil {
@@ -252,9 +264,17 @@ func (h *messageHandler) handleConnect(payload json.RawMessage) error {
 	return h.writeClientMessage(response)
 }
 
+func (h *messageHandler) handleClientDisconnect(client models.AccountConnectClient) error {
+	_, ok := h.router.Clients[client.ID]
+	if !ok {
+		log.Printf("Client with id: %s not found when disconnecting", client.ID)
+		return fmt.Errorf("Could not handle disconnect for client with id: %s as was client not found", client.ID)
+	}
+	return h.router.DisconnectPlatformConnection(&client)
+}
+
 func (h *messageHandler) handleHistorical(payload json.RawMessage) error {
-	h.router.RequestHistoricalDeals(h.client, &h.router.db, payload)
-	return nil
+	return h.router.RequestHistoricalDeals(h.client, &h.router.db, payload)
 }
 
 func (h *messageHandler) handleTraderInfo(payload json.RawMessage) error {
