@@ -6,6 +6,7 @@ import (
 	messages "account-connect/gen"
 	"account-connect/internal/mappers"
 	accdb "account-connect/persistence"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,12 +21,6 @@ import (
 
 const (
 	MESSAGE_TYPE = websocket.BinaryMessage
-)
-
-// Global channel registry
-var (
-	ChannelRegistry = make(map[string]chan []byte)
-	RegistryLock    sync.RWMutex
 )
 
 type MessageHandler func(payload []byte) error
@@ -43,21 +38,22 @@ type CTrader struct {
 	mutex           sync.Mutex
 }
 
-// NewCTrader creates a new trader instance with the required fields
+type CtraderAdapter struct {
+	ctrader CTrader
+}
+
+func NewCtraderAdapter(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CtraderAdapter {
+	return &CtraderAdapter{
+		ctrader: *NewCTrader(accdb, ctraderconfig),
+	}
+}
+
+// NewCTrader creates a new trader instance with the required fields to establish a ctrader connection
 func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CTrader {
-	RegistryLock.Lock()
-	defer RegistryLock.Unlock()
-
-	ChannelRegistry["historical_deals"] = make(chan []byte)
-	ChannelRegistry["trader_info"] = make(chan []byte)
-	ChannelRegistry["trend_bars"] = make(chan []byte)
-	ChannelRegistry["errors"] = make(chan []byte)
-	ChannelRegistry["platform_connect_status"] = make(chan []byte)
-	ChannelRegistry["account_symbols"] = make(chan []byte)
-
 	return &CTrader{
 		accDb:         accdb,
 		ClientId:      ctraderconfig.ClientID,
+		AccountId:     &ctraderconfig.AccountID,
 		ClientSecret:  ctraderconfig.ClientSecret,
 		AccessToken:   ctraderconfig.AccessToken,
 		handlers:      make(map[uint32]MessageHandler),
@@ -78,8 +74,56 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES), t.handleRefreshTokenResponse)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_TRADER_RES), t.handleTraderInfoResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES), t.handleTrendBars)
+	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES), t.handleTrendBarsResponse)
 	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES), t.handleSymbolListResponse)
+}
+
+func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
+	srvCfg, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Failed to load configs in route: %v", err)
+		return err
+	}
+
+	err = cta.ctrader.EstablishCtraderConnection(config.CTraderConfig{
+		ClientID:     cfg.ClientId,
+		ClientSecret: cfg.SecretKey,
+		Endpoint:     srvCfg.Servers.Ctrader.Endpoint,
+		Port:         srvCfg.Servers.Ctrader.Port,
+		AccountID:    *cfg.AccountId,
+	})
+	if err != nil {
+		log.Printf("Connection establishment to ctrader fail:%v", err)
+		return err
+	}
+	err = cta.ctrader.AuthorizeApplication()
+	if err != nil {
+		log.Printf("Failed to authorize application: %v", err)
+		return err
+	}
+	return err
+}
+
+func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload mappers.AccountConnectSymbolsPayload) error {
+	//Add additional check if the ctid a valid ctid
+	return cta.ctrader.GetAccountTradingSymbols(payload.Ctid)
+}
+
+func (cta *CtraderAdapter) GetHistoricalTrades(ctx context.Context, payload mappers.AccountConnectHistoricalDealsPayload) error {
+	//Add a check for  validity of the to and from timestamps
+	return cta.ctrader.GetAccountHistoricalDeals(*payload.FromTimestamp, *payload.ToTimestamp)
+}
+
+func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload mappers.AccountConnectTraderInfoPayload) error {
+	return cta.ctrader.GetAccountTraderInfo(payload.Ctid)
+}
+
+func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload mappers.AccountConnectTrendBarsPayload) error {
+	return cta.ctrader.GetChartTrendBars(payload)
+}
+
+func (cta *CtraderAdapter) Disconnect() error {
+	return cta.ctrader.DisconnectPlatformConn()
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
@@ -148,6 +192,11 @@ func (t *CTrader) StartConnectionReader() {
 
 // AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
 func (t *CTrader) AuthorizeApplication() error {
+	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
+	if !ok {
+		return fmt.Errorf("Failed to retrieve platform_connect_status channel from registry")
+	}
+
 	if t.ClientId == "" || t.ClientSecret == "" {
 		return errors.New("client credentials not set")
 	}
@@ -176,18 +225,18 @@ func (t *CTrader) AuthorizeApplication() error {
 		return fmt.Errorf("failed to send auth request: %w", err)
 	}
 
-	<-t.authCompleted
+	<-platformConnectStatusCh
 
 	return nil
 
 }
 
-// DisconnectPlatformConn will close the existing platform connection for the client
+// DisconnectPlatformConn will close the existing ctrader connection for the client
 func (t *CTrader) DisconnectPlatformConn() error {
 	if t.PlatformConn != nil {
 		return t.PlatformConn.Close()
 	}
-	return fmt.Errorf("Close failed for nil platform connection")
+	return fmt.Errorf("Close failed for nil ctrader platform connection")
 }
 
 // AuthorizeAccount sends a request to authorize specified ctrader account id
@@ -266,7 +315,7 @@ func (t *CTrader) GetRefreshToken() error {
 	return nil
 }
 
-// GetAccountTraderInfo will retrieve the trader information for a certain ctidTraderAccountId
+// GetAccountTraderInfo will retrieve the trader's information for a certain ctidTraderAccountId
 func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
 	msgReq := &messages.ProtoOATraderReq{
 		CtidTraderAccountId: ctidTraderAccountId,
@@ -289,7 +338,7 @@ func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
 
 	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
-		return fmt.Errorf("failed to send refresh token request: %w", err)
+		return fmt.Errorf("failed to get trader info: %w", err)
 	}
 	return nil
 
@@ -323,7 +372,7 @@ func (t *CTrader) GetAccountTradingSymbols(ctId *int64) error {
 }
 
 // GetChartTrendBars will request trend bar series data as  requested by [trendbarsArgs]
-func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBars) error {
+func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBarsPayload) error {
 	trendPeriod, err := mappers.PeriodStrToBarPeriod(trendbarsArgs.Period)
 	if err != nil {
 		return fmt.Errorf("invalid trend period: %w", err)
@@ -406,9 +455,6 @@ func (t *CTrader) handleApplicationAuthResponse(payload []byte) error {
 	t.readyForAccount = true
 	t.mutex.Unlock()
 
-	// Signal that app auth is complete
-	close(t.authCompleted)
-
 	return t.AuthorizeAccount()
 }
 
@@ -438,7 +484,13 @@ func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
 		return fmt.Errorf("Failed to retrieve platform_connect_status channel from registry")
 	}
 
-	close(platformConnectStatusCh)
+	connectStatusB, err := json.Marshal(PlatformConnectionStatus{
+		Authorized: false,
+	})
+	if err != nil {
+		return err
+	}
+	platformConnectStatusCh <- connectStatusB
 
 	return nil
 }
@@ -474,7 +526,7 @@ func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
 	return nil
 }
 
-func (t *CTrader) handleTrendBars(payload []byte) error {
+func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
 	trendBarsCh, ok := ChannelRegistry["trend_bars"]
 	if !ok {
 		return fmt.Errorf("Failed to retrieve trend_bars channel from registry")
@@ -553,8 +605,10 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 
 	log.Printf("Received an error response: %s  with error code: %s", string(*r.Description), r.GetErrorCode())
 	if r.GetErrorCode() == common.REQ_CLIENT_FAILURE {
-		close(platformConnectStatusCh)
-		close(t.authCompleted)
+		connectStatusB, _ := json.Marshal(PlatformConnectionStatus{
+			Authorized: true,
+		})
+		platformConnectStatusCh <- connectStatusB
 	}
 
 	pErr := mappers.ProtoOAErrorResToError(&r)
