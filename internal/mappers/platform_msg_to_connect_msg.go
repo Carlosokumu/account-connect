@@ -3,6 +3,8 @@ package mappers
 import (
 	pb "account-connect/gen"
 	"fmt"
+
+	"github.com/adshao/go-binance/v2"
 )
 
 
@@ -118,4 +120,17 @@ func PeriodStrToBarPeriod(periodStr string) (pb.ProtoOATrendbarPeriod, error) {
 	default:
 		return 0, fmt.Errorf("invalid period: %s", periodStr)
 	}
+}
+func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []AccountConnectSymbol {
+	var accsyms []AccountConnectSymbol
+
+	for _, sym := range binancesyms {
+		//The symbol from binance will be used as an id and symbol name
+		accsym := AccountConnectSymbol{
+			SymbolName: &sym.Symbol,
+			SymbolId:   sym.Symbol,
+		}
+		accsyms = append(accsyms, accsym)
+	}
+	return accsyms
 }

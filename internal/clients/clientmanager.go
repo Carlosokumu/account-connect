@@ -2,6 +2,7 @@ package clients
 
 import (
 	"account-connect/internal/applications"
+	"account-connect/internal/mappers"
 	messages "account-connect/internal/mappers"
 	"account-connect/internal/models"
 	"account-connect/router"
@@ -56,11 +57,11 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.Lock()
 			if _, ok := m.clients[client.ID]; ok {
 				disconnectMsg := messages.AccountConnectMsg{
-					Type:     messages.TypeDisconnect,
-					Payload:  nil,
-					ClientId: client.ID,
+					Type:               messages.TypeDisconnect,
+					Payload:            nil,
+					TradeshareClientId: client.ID,
 				}
-				m.msgRouter.Route(client, disconnectMsg)
+				m.msgRouter.Route(ctx, client, disconnectMsg)
 				close(client.Send)
 				delete(m.clients, client.ID)
 			}
@@ -84,15 +85,22 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 				continue
 			}
 			m.RLock()
-			client, exists := m.clients[msg.ClientId]
+			client, exists := m.clients[msg.TradeshareClientId]
 			if !exists {
 				m.RUnlock()
-				log.Printf("Client id: %s not found", msg.ClientId)
+				log.Printf("Client id: %s not found", msg.TradeshareClientId)
 				continue
 			}
 			m.RUnlock()
-			m.msgRouter.Route(client, msg)
-
+			err := m.msgRouter.Route(ctx, client, msg)
+			if err != nil {
+				errmsg := mappers.CreateErrorResponse(client.ID, []byte(err.Error()))
+				errmsgB, err := json.Marshal(errmsg)
+				if err != nil {
+					log.Printf("Failed to marshal response for incoming message client: %v", err)
+				}
+				client.Send <- errmsgB
+			}
 		}
 	}
 }
@@ -147,7 +155,6 @@ func (m *AccountConnectClientManager) handlePlatformMessages(ctx context.Context
 
 	defer func() {
 		client.Conn.Close()
-		close(client.Send)
 		log.Printf("Client %s connection closed", client.ID)
 	}()
 

@@ -22,6 +22,7 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+		return
 	}
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
@@ -31,8 +32,7 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 			return
 		}
 
-		clientID := req.URL.Query().Get("account-connect-client-id")
-
+		clientID := req.URL.Query().Get("tradeshare_client_id")
 
 		client := &models.AccountConnectClient{
 			ID:   clientID,
@@ -42,7 +42,6 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 
 		clientManager.Register <- client
 
-		
 		defer func() {
 			clientManager.Unregister <- client
 			ws.Close()

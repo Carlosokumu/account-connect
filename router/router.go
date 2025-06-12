@@ -8,23 +8,24 @@ import (
 	"account-connect/internal/models"
 	"account-connect/persistence"
 	db "account-connect/persistence"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 )
 
 type Router struct {
-	db       persistence.AccountConnectDb
-	Clients  map[string]*applications.CTrader
-	handlers map[string]func(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error
+	db             persistence.AccountConnectDb
+	ClientPlatform map[string]applications.Platform
+	handlers       map[string]func(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error
 }
 
 // NewRouter creates a new Router instance
 func NewRouter(accdb db.AccountConnectDb) *Router {
 	return &Router{
-		Clients:  map[string]*applications.CTrader{},
-		db:       accdb,
-		handlers: make(map[string]func(*models.AccountConnectClient, *persistence.AccountConnectDb, json.RawMessage) error),
+		ClientPlatform: map[string]applications.Platform{},
+		db:             accdb,
+		handlers:       make(map[string]func(*models.AccountConnectClient, *persistence.AccountConnectDb, json.RawMessage) error),
 	}
 }
 
@@ -33,7 +34,7 @@ func (r *Router) Handle(messageType string, handler func(*models.AccountConnectC
 	r.handlers[messageType] = handler
 }
 
-func (r *Router) Route(client *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
+func (r *Router) Route(ctxt context.Context, client *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Printf("Failed to load configs in route: %v", err)
@@ -48,7 +49,7 @@ func (r *Router) Route(client *models.AccountConnectClient, msg messages.Account
 
 	switch msg.Type {
 	case mappers.TypeConnect:
-		return handler.handleConnect(msg.Payload)
+		return handler.handleConnect(ctxt, msg)
 	case messages.TypeHistorical:
 		return handler.handleHistorical(msg.Payload)
 	case messages.TypeTraderInfo:
@@ -75,71 +76,21 @@ func (r *Router) handlePlatformConnectionStatus(client *models.AccountConnectCli
 
 }
 
-// HandleConnect will trigger a connection to ctrader when a new client connection is established
-func (r *Router) HandleConnect(client *models.AccountConnectClient, ctraderConfig config.CTraderConfig) error {
-	var accountConnectMsgRes messages.AccountConnectMsgRes
-
-	trader, ok := r.Clients[client.ID]
-	if !ok {
-		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
-	}
-	if err := trader.EstablishCtraderConnection(ctraderConfig); err != nil {
-		accErr := messages.AccountConnectError{
-			Description: err.Error(),
-		}
-		accErrB, err := json.Marshal(accErr)
-		if err != nil {
-			log.Printf("Failed to marshal acc err response: %v", err)
-			return err
-		}
-		accountConnectMsgRes = messages.AccountConnectMsgRes{
-			Type:    "connect",
-			Status:  "failure",
-			Payload: accErrB,
-		}
-		accountConnectMsgResB, err := json.Marshal(accountConnectMsgRes)
-		if err != nil {
-			log.Printf("Failed to marshal acc err response: %w", err)
-			return err
-		}
-
-		client.Send <- accountConnectMsgResB
-
-		return fmt.Errorf("connection failed: %w", err)
-	}
-
-	if err := trader.AuthorizeApplication(); err != nil {
-		accErr := messages.AccountConnectError{
-			Description: err.Error(),
-		}
-		v, err := json.Marshal(accErr)
-		if err != nil {
-			log.Printf("Failed to marshal acc err response: %v", err)
-		}
-		client.Send <- v
-		return fmt.Errorf("authorization failed: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectHistoricalDeals
+	var res mappers.AccountConnectHistoricalDealsPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
 		log.Printf("Failed to unmarshal trader info payload request: %v", err)
 		return err
 	}
-	frmTimeStamp := res.FromTimestamp
-	toTimestamp := res.ToTimestamp
 
-	trader, ok := r.Clients[client.ID]
+	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
 		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
 	}
 
-	err = trader.GetAccountHistoricalDeals(*frmTimeStamp, *toTimestamp)
+	err = cp.GetHistoricalTrades(context.Background(), res)
 	if err != nil {
 		log.Printf("Failed to fetch account historical deals: %v", err)
 		return err
@@ -147,8 +98,9 @@ func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, acc
 	return nil
 }
 
+// RequestTraderInfo will request the trader's information if  supported by the trading platform's api
 func (r *Router) RequestTraderInfo(accclient *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectCtId
+	var res mappers.AccountConnectTraderInfoPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
@@ -156,13 +108,12 @@ func (r *Router) RequestTraderInfo(accclient *models.AccountConnectClient, accDb
 		return err
 	}
 
-	client, ok := r.Clients[accclient.ID]
+	cp, ok := r.ClientPlatform[accclient.ID]
 	if !ok {
 		return fmt.Errorf("Failed to find router client with id: %s", accclient.ID)
 	}
 
-	cid := res.Ctid
-	err = client.GetAccountTraderInfo(cid)
+	err = cp.GetTraderInfo(context.Background(), res)
 	if err != nil {
 		log.Printf("Failed to retreive trader info: %v", err)
 		return err
@@ -171,21 +122,21 @@ func (r *Router) RequestTraderInfo(accclient *models.AccountConnectClient, accDb
 	return nil
 }
 
+// RequestAccountSymbols will fetch all of the available trading symbols for a given trading platform
 func (r *Router) RequestAccountSymbols(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectCtId
+	var res mappers.AccountConnectSymbolsPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
 		return err
 	}
 
-	trader, ok := r.Clients[client.ID]
+	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
 		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
 	}
 
-	cid := res.Ctid
-	err = trader.GetAccountTradingSymbols(cid)
+	err = cp.GetTradingSymbols(context.Background(), res)
 	if err != nil {
 		log.Printf("Failed to retrieve account symbols: %v", err)
 		return err
@@ -196,20 +147,20 @@ func (r *Router) RequestAccountSymbols(client *models.AccountConnectClient, accD
 
 // RequestTrendBars will request trendbars for a particular symbol(trading pair)
 func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectTrendBars
+	var res mappers.AccountConnectTrendBarsPayload
 
-	trader, ok := r.Clients[client.ID]
+	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
 		log.Printf("Client with id: %s not found", client.ID)
 		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
 	}
 
-	err := json.Unmarshal(payload, res)
+	err := json.Unmarshal(payload, &res)
 	if err != nil {
 		log.Printf("Failed to unmarshal account connect trend bars requests: %v", err)
 		return fmt.Errorf("Failed to unmarshal account connect trend bars requests: %w", err)
 	}
-	trendBarArgs := mappers.AccountConnectTrendBars{
+	trendBarArgs := mappers.AccountConnectTrendBarsPayload{
 		SymbolId:      res.SymbolId,
 		Ctid:          res.Ctid,
 		Period:        res.Period,
@@ -217,55 +168,83 @@ func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *pe
 		ToTimestamp:   res.ToTimestamp,
 	}
 
-	err = trader.GetChartTrendBars(trendBarArgs)
+	err = cp.GetSymbolTrendBars(context.Background(), trendBarArgs)
 	if err != nil {
 		log.Printf("Failed to retrieve chart trend bar: %v", err)
+		return err
 	}
 
 	return nil
 }
 
 func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClient) error {
-	trader, ok := r.Clients[client.ID]
+	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
 		log.Printf("Client with id: %s not found", client.ID)
 		return fmt.Errorf("Failed to find router client with id: %s", client.ID)
 	}
-	return trader.DisconnectPlatformConn()
+	return cp.Disconnect()
 }
 
-func (h *messageHandler) handleConnect(payload json.RawMessage) error {
-	var ctconnectmsg messages.CtConnectMsg
-	if err := json.Unmarshal(payload, &ctconnectmsg); err != nil {
-		return fmt.Errorf("invalid connect message format: %w", err)
+func (h *messageHandler) handleConnect(ctx context.Context, msg messages.AccountConnectMsg) error {
+	switch msg.Platform {
+	case mappers.Binance:
+		var binanceconnectmsg messages.BinanceConnectPayload
+		if err := json.Unmarshal(msg.Payload, &binanceconnectmsg); err != nil {
+			return fmt.Errorf("invalid connect message format: %w", err)
+		}
+
+		binanceAdapter := applications.NewBinanceAdapter(binanceconnectmsg.APIKey, binanceconnectmsg.APISecret)
+		h.router.ClientPlatform[h.client.ID] = binanceAdapter
+
+		err := binanceAdapter.EstablishConnection(ctx, applications.PlatformConfigs{})
+		if err != nil {
+			return err
+		}
+		msgR := messages.CreateSuccessResponse(mappers.TypeConnect, h.client.ID, nil)
+		return h.writeClientMessage(msgR)
+	case mappers.Ctrader:
+		var ctconnectmsg messages.CTraderConnectPayload
+		if err := json.Unmarshal(msg.Payload, &ctconnectmsg); err != nil {
+			return fmt.Errorf("invalid connect message format: %w", err)
+		}
+
+		ctraderCfg := config.NewCTraderConfig(ctconnectmsg.AccountId)
+		ctraderCfg.Endpoint = h.cfg.Servers.Ctrader.Endpoint
+		ctraderCfg.Port = h.cfg.Servers.Ctrader.Port
+
+		ctraderCfg.ClientID = ctconnectmsg.ClientId
+		ctraderCfg.ClientSecret = ctconnectmsg.ClientSecret
+		ctraderCfg.AccessToken = ctconnectmsg.AccessToken
+
+		trader := applications.NewCTrader(h.router.db, ctraderCfg)
+		trader.AccountId = &ctraderCfg.AccountID
+		ctraderAdapter := applications.NewCtraderAdapter(h.router.db, ctraderCfg)
+
+		err := ctraderAdapter.EstablishConnection(ctx, applications.PlatformConfigs{
+			AccountId:    &ctconnectmsg.AccountId,
+			ClientId:     ctconnectmsg.ClientId,
+			ClientSecret: ctconnectmsg.ClientSecret,
+			AccessToken:  ctconnectmsg.AccessToken,
+		})
+		if err != nil {
+			return err
+		}
+		response := messages.AccountConnectMsgRes{
+			Type:    mappers.TypeConnect,
+			Status:  messages.StatusSuccess,
+			Payload: nil,
+		}
+		h.router.ClientPlatform[h.client.ID] = ctraderAdapter
+		return h.writeClientMessage(response)
+	default:
+		return fmt.Errorf("Attempting connection to unsupported platform: %s", msg.Platform)
+
 	}
-
-	ctraderCfg := config.NewCTraderConfig(ctconnectmsg.AccountId)
-	ctraderCfg.Endpoint = h.cfg.Servers.Ctrader.Endpoint
-	ctraderCfg.Port = h.cfg.Servers.Ctrader.Port
-	ctraderCfg.ClientID = ctconnectmsg.ClientId
-	ctraderCfg.ClientSecret = ctconnectmsg.ClientSecret
-	ctraderCfg.AccessToken = ctconnectmsg.AccessToken
-
-	trader := applications.NewCTrader(h.router.db, ctraderCfg)
-	trader.AccountId = &ctraderCfg.AccountID
-	h.router.Clients[h.client.ID] = trader
-
-	if err := h.router.HandleConnect(h.client, *ctraderCfg); err != nil {
-		h.router.logError("connection", h.client.ID, err)
-		return err
-	}
-
-	response := messages.AccountConnectMsgRes{
-		Type:    mappers.TypeConnect,
-		Status:  messages.StatusSuccess,
-		Payload: nil,
-	}
-	return h.writeClientMessage(response)
 }
 
 func (h *messageHandler) handleClientDisconnect(client models.AccountConnectClient) error {
-	_, ok := h.router.Clients[client.ID]
+	_, ok := h.router.ClientPlatform[client.ID]
 	if !ok {
 		log.Printf("Client with id: %s not found when disconnecting", client.ID)
 		return fmt.Errorf("Could not handle disconnect for client with id: %s as was client not found", client.ID)
