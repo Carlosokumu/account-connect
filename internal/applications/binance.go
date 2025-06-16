@@ -3,6 +3,7 @@ package applications
 import (
 	"account-connect/internal/mappers"
 	messages "account-connect/internal/mappers"
+	"account-connect/internal/models"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,12 +13,14 @@ import (
 )
 
 type BinanceConnection struct {
-	Client *binance.Client
+	Client            *binance.Client
+	AccountConnClient *models.AccountConnectClient
 }
 
-func NewBinanceConnection(apiKey, secretKey string) *BinanceConnection {
+func NewBinanceConnection(apiKey, secretKey string, accountConnClient *models.AccountConnectClient) *BinanceConnection {
 	return &BinanceConnection{
-		Client: binance.NewClient(apiKey, secretKey),
+		Client:            binance.NewClient(apiKey, secretKey),
+		AccountConnClient: accountConnClient,
 	}
 
 }
@@ -58,9 +61,9 @@ type BinanceAdapter struct {
 	binanceConn *BinanceConnection
 }
 
-func NewBinanceAdapter(apiKey, secretKey string) *BinanceAdapter {
+func NewBinanceAdapter(apiKey, secretKey string, accountConnClient *models.AccountConnectClient) *BinanceAdapter {
 	return &BinanceAdapter{
-		binanceConn: NewBinanceConnection(apiKey, secretKey),
+		binanceConn: NewBinanceConnection(apiKey, secretKey, accountConnClient),
 	}
 }
 
@@ -72,16 +75,17 @@ func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg PlatformCo
 }
 
 func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error {
-	accountSymbolsCh, ok := ChannelRegistry["account_symbols"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve aacount symbols channel from registry")
-	}
-
 	binanceSyms, err := b.binanceConn.GetBinanceTradingSymbols(ctx)
 	if err != nil {
 		return err
 	}
-	accountSymbolsCh <- binanceSyms
+	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
+
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	b.binanceConn.AccountConnClient.Send <- msgB
 	return nil
 }
 

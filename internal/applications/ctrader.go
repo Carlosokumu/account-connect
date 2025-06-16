@@ -5,6 +5,7 @@ import (
 	"account-connect/config"
 	messages "account-connect/gen"
 	"account-connect/internal/mappers"
+	"account-connect/internal/models"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -26,38 +27,40 @@ const (
 type MessageHandler func(payload []byte) error
 
 type CTrader struct {
-	accDb           accdb.AccountConnectDb
-	ClientSecret    string
-	ClientId        string
-	AccountId       *int64
-	AccessToken     string
-	PlatformConn    *websocket.Conn
-	handlers        map[uint32]MessageHandler
-	authCompleted   chan bool
-	readyForAccount bool
-	mutex           sync.Mutex
+	accDb             accdb.AccountConnectDb
+	ClientSecret      string
+	AccountConnClient *models.AccountConnectClient
+	ClientId          string
+	AccountId         *int64
+	AccessToken       string
+	PlatformConn      *websocket.Conn
+	handlers          map[uint32]MessageHandler
+	authCompleted     chan bool
+	readyForAccount   bool
+	mutex             sync.Mutex
 }
 
 type CtraderAdapter struct {
 	ctrader CTrader
 }
 
-func NewCtraderAdapter(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CtraderAdapter {
+func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *config.CTraderConfig) *CtraderAdapter {
 	return &CtraderAdapter{
-		ctrader: *NewCTrader(accdb, ctraderconfig),
+		ctrader: *NewCTrader(accdb, accountConnClient, ctraderconfig),
 	}
 }
 
 // NewCTrader creates a new trader instance with the required fields to establish a ctrader connection
-func NewCTrader(accdb accdb.AccountConnectDb, ctraderconfig *config.CTraderConfig) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *config.CTraderConfig) *CTrader {
 	return &CTrader{
-		accDb:         accdb,
-		ClientId:      ctraderconfig.ClientID,
-		AccountId:     &ctraderconfig.AccountID,
-		ClientSecret:  ctraderconfig.ClientSecret,
-		AccessToken:   ctraderconfig.AccessToken,
-		handlers:      make(map[uint32]MessageHandler),
-		authCompleted: make(chan bool, 1),
+		accDb:             accdb,
+		ClientId:          ctraderconfig.ClientID,
+		AccountId:         &ctraderconfig.AccountID,
+		ClientSecret:      ctraderconfig.ClientSecret,
+		AccountConnClient: accountConnClient,
+		AccessToken:       ctraderconfig.AccessToken,
+		handlers:          make(map[uint32]MessageHandler),
+		authCompleted:     make(chan bool, 1),
 	}
 }
 
@@ -508,10 +511,6 @@ func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
-	traderInfoCh, ok := ChannelRegistry["trader_info"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve trader info channel from registry")
-	}
 	var r messages.ProtoOATraderRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal trader info response: %w", err)
@@ -520,29 +519,40 @@ func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
 	traderInfoB, err := json.Marshal(traderInfo)
 	if err != nil {
 		log.Printf("Failed to marshal trader info: %v", err)
+		return err
 	}
-	traderInfoCh <- traderInfoB
+
+	msg := mappers.CreateSuccessResponse(mappers.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
 
 func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
-	trendBarsCh, ok := ChannelRegistry["trend_bars"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve trend_bars channel from registry")
-	}
-
 	var r messages.ProtoOAGetTrendbarsRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal trend bars: %w", err)
 	}
-	trendBars := mappers.ProotoOAToTrendBars(&r)
 
+	trendBars := mappers.ProotoOAToTrendBars(&r)
 	trendBarsB, err := json.Marshal(trendBars)
 	if err != nil {
 		log.Printf("Failed to marshal trend bar data info: %v", err)
+		return err
 	}
-	trendBarsCh <- trendBarsB
+
+	msg := mappers.CreateSuccessResponse(mappers.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
@@ -553,25 +563,25 @@ func (t *CTrader) handleSymbolListResponse(payload []byte) error {
 		return fmt.Errorf("failed to unmarshal symbol list: %w", err)
 	}
 
-	accountSymbolsCh, ok := ChannelRegistry["account_symbols"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve aacount symbols channel from registry")
-	}
 	syms := mappers.ProtoSymbolListResponseToAccountConnectSymbol(&r)
 	symsB, err := json.Marshal(syms)
 	if err != nil {
-		log.Printf("Failed to marshal trend bar data info: %v", err)
+		log.Printf("Failed to marshal symbol list data: %v", err)
+		return err
 	}
-	accountSymbolsCh <- symsB
+
+	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
 
 func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
-	historicalDealsCh, ok := ChannelRegistry["historical_deals"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve historical deals from registry")
-	}
 	var r messages.ProtoOADealListRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal historical deals: %w", err)
@@ -582,8 +592,13 @@ func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal deal: %s", err)
 	}
+	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, t.AccountConnClient.ID, dealsB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 
-	historicalDealsCh <- dealsB
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
@@ -594,21 +609,15 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 		return fmt.Errorf("failed to unmarshal error response: %w", err)
 	}
 
-	errorsCh, ok := ChannelRegistry["errors"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve errors channnel from registry")
-	}
-	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
-	if !ok {
-		return fmt.Errorf("Failed to retrieve platform_connect_status channel from registry")
-	}
-
 	log.Printf("Received an error response: %s  with error code: %s", string(*r.Description), r.GetErrorCode())
 	if r.GetErrorCode() == common.REQ_CLIENT_FAILURE {
-		connectStatusB, _ := json.Marshal(PlatformConnectionStatus{
-			Authorized: true,
+		connectStatusB, err := json.Marshal(PlatformConnectionStatus{
+			Authorized: false,
 		})
-		platformConnectStatusCh <- connectStatusB
+		if err != nil {
+			return err
+		}
+		t.AccountConnClient.Send <- connectStatusB
 	}
 
 	pErr := mappers.ProtoOAErrorResToError(&r)
@@ -616,8 +625,13 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal error response: %s", err)
 	}
+	msg := mappers.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 
-	errorsCh <- pErrB
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
