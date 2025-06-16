@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -18,11 +21,20 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func startWsService(clientManager *clients.AccountConnectClientManager, accDb db.AccountConnectDb) {
+const (
+	ClientSendBufferSize = 50
+)
+
+func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, accDb db.AccountConnectDb) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
-		return
+		return err
+	}
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Servers.AccountConnectServer.Port),
+		Handler: nil,
 	}
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
@@ -37,7 +49,7 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 		client := &models.AccountConnectClient{
 			ID:   clientID,
 			Conn: ws,
-			Send: make(chan []byte, 256),
+			Send: make(chan []byte, ClientSendBufferSize),
 		}
 
 		clientManager.Register <- client
@@ -59,9 +71,26 @@ func startWsService(clientManager *clients.AccountConnectClientManager, accDb db
 			clientManager.IncomingClientMessages <- rawMsg
 		}
 	})
-	port := cfg.Servers.AccountConnectServer.Port
-	addr := fmt.Sprintf(":%d", port)
-	log.Fatal(http.ListenAndServe(addr, nil))
+
+	go func() {
+		<-ctx.Done()
+		log.Println("Shutting down WebSocket server...")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("WebSocket server shutdown error: %v", err)
+		}
+	}()
+
+	log.Printf("WebSocket server starting on %s", srv.Addr)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("WebSocket server failed: %v", err)
+	}
+
+	log.Println("WebSocket server stopped gracefully")
+	return nil
 }
 
 func main() {
@@ -72,10 +101,28 @@ func main() {
 	}
 	defer accdb.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stop := make(chan os.Signal)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-stop
+		log.Println("Received shutdown signal")
+		cancel()
+	}()
+
 	clientManager := clients.NewClientManager(accdb)
 
-	ctx := context.Background()
 	go clientManager.StartClientManagement(ctx)
 
-	startWsService(clientManager, accdb)
+	go func() {
+		if err := startWsService(ctx, clientManager, accdb); err != nil {
+			log.Printf("WebSocket service error: %v", err)
+			cancel()
+		}
+	}()
+
+	<-ctx.Done()
+
 }
