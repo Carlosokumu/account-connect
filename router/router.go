@@ -49,7 +49,7 @@ func (r *Router) Route(ctxt context.Context, client *models.AccountConnectClient
 
 	switch msg.Type {
 	case mappers.TypeConnect:
-		return handler.handleConnect(ctxt, msg)
+		return handler.handleConnect(ctxt, client, msg)
 	case messages.TypeHistorical:
 		return handler.handleHistorical(msg.Payload)
 	case messages.TypeTraderInfo:
@@ -76,6 +76,7 @@ func (r *Router) handlePlatformConnectionStatus(client *models.AccountConnectCli
 
 }
 
+// RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
 func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
 	var res mappers.AccountConnectHistoricalDealsPayload
 
@@ -186,7 +187,7 @@ func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClien
 	return cp.Disconnect()
 }
 
-func (h *messageHandler) handleConnect(ctx context.Context, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	switch msg.Platform {
 	case mappers.Binance:
 		var binanceconnectmsg messages.BinanceConnectPayload
@@ -194,7 +195,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, msg messages.Account
 			return fmt.Errorf("invalid connect message format: %w", err)
 		}
 
-		binanceAdapter := applications.NewBinanceAdapter(binanceconnectmsg.APIKey, binanceconnectmsg.APISecret)
+		binanceAdapter := applications.NewBinanceAdapter(binanceconnectmsg.APIKey, binanceconnectmsg.APISecret, accountConnClient)
 		h.router.ClientPlatform[h.client.ID] = binanceAdapter
 
 		err := binanceAdapter.EstablishConnection(ctx, applications.PlatformConfigs{})
@@ -217,9 +218,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, msg messages.Account
 		ctraderCfg.ClientSecret = ctconnectmsg.ClientSecret
 		ctraderCfg.AccessToken = ctconnectmsg.AccessToken
 
-		trader := applications.NewCTrader(h.router.db, ctraderCfg)
-		trader.AccountId = &ctraderCfg.AccountID
-		ctraderAdapter := applications.NewCtraderAdapter(h.router.db, ctraderCfg)
+		ctraderAdapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, ctraderCfg)
 
 		err := ctraderAdapter.EstablishConnection(ctx, applications.PlatformConfigs{
 			AccountId:    &ctconnectmsg.AccountId,
