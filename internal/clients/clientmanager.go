@@ -20,7 +20,6 @@ import (
 
 type AccountConnectClientManager struct {
 	clients                map[string]*models.AccountConnectClient
-	Broadcast              chan []byte
 	IncomingClientMessages chan []byte
 	Register               chan *models.AccountConnectClient
 	Unregister             chan *models.AccountConnectClient
@@ -34,7 +33,6 @@ func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
 
 	return &AccountConnectClientManager{
 		clients:                make(map[string]*models.AccountConnectClient),
-		Broadcast:              make(chan []byte),
 		IncomingClientMessages: make(chan []byte),
 		Register:               make(chan *models.AccountConnectClient),
 		Unregister:             make(chan *models.AccountConnectClient),
@@ -47,6 +45,20 @@ func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
 func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			m.Lock()
+			for _, client := range m.clients {
+				disconnectMsg := messages.AccountConnectMsg{
+					Type:               messages.TypeDisconnect,
+					Payload:            nil,
+					TradeshareClientId: client.ID,
+				}
+				m.msgRouter.Route(context.Background(), client, disconnectMsg)
+				close(client.Send)
+			}
+			m.clients = make(map[string]*models.AccountConnectClient)
+			m.Unlock()
+			return
 		case client := <-m.Register:
 			m.Lock()
 			m.clients[client.ID] = client
@@ -67,17 +79,6 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			}
 			m.Unlock()
 
-		case message := <-m.Broadcast:
-			m.RLock()
-			for _, client := range m.clients {
-				select {
-				case client.Send <- message:
-				default:
-					close(client.Send)
-					delete(m.clients, client.ID)
-				}
-			}
-			m.RUnlock()
 		case incomingMsg := <-m.IncomingClientMessages:
 			var msg messages.AccountConnectMsg
 			if err := json.Unmarshal(incomingMsg, &msg); err != nil {
@@ -107,91 +108,42 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 
 // handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the send channel of the client
 func (m *AccountConnectClientManager) handleClientMessages(client *models.AccountConnectClient) {
-	ctx := context.Background()
+	var (
+		err                  error
+		accountConnectMsgRes messages.AccountConnectMsgRes
+	)
+
 	for msg := range client.Send {
 		log.Printf("Message to the client %s: %s\n", client.ID, string(msg))
-		var accountConnectMsgRes messages.AccountConnectMsgRes
 
-		err := json.Unmarshal(msg, &accountConnectMsgRes)
+		err = json.Unmarshal(msg, &accountConnectMsgRes)
 		if err != nil {
 			log.Printf("Failed to unmarshal account connect message: %v", err)
 			return
 		}
 		if accountConnectMsgRes.Type == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
 			var trader applications.CTrader
-			err := json.Unmarshal(accountConnectMsgRes.Payload, &trader)
+			err = json.Unmarshal(accountConnectMsgRes.Payload, &trader)
 			if err != nil {
-				log.Println("Failed to unmarshal ctrader %v", err)
+				log.Printf("Failed to unmarshal ctrader %v", err)
+				return
 			}
-			m.writeClientConnMessage(client, messages.TypeConnect, nil)
-			go m.handlePlatformMessages(ctx, client, &trader)
+			err = m.writeClientConnMessage(client, messages.TypeConnect, nil)
+			if err != nil {
+				log.Printf("Client: %s message write fail: %v", client.ID, err)
+				return
+			}
 		} else if accountConnectMsgRes.Status == messages.StatusFailure {
 			m.handlePlatformError(client, accountConnectMsgRes.Payload)
+		} else if accountConnectMsgRes.Status != messages.StatusFailure {
+			err = m.writeClientConnMessage(client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
+			if err != nil {
+				log.Printf("Client: %s message write fail: %v", client.ID, err)
+				return
+			}
 		}
 	}
 	log.Printf("Stopped listening to client %s (channel closed)\n", client.ID)
-}
-
-// handlePlatformMessages will process all of the messages sent via the platform channels.
-// All platform messages received  are written to associated client.
-func (m *AccountConnectClientManager) handlePlatformMessages(ctx context.Context, client *models.AccountConnectClient, ctrader *applications.CTrader) {
-	platformMessages := []string{
-		"historical_deals",
-		"trader_info",
-		"trend_bars",
-		"errors",
-		"account_symbols",
-	}
-
-	platformMessagesChans := make(map[string]chan []byte)
-	for _, name := range platformMessages {
-		ch, ok := applications.ChannelRegistry[name]
-		if !ok {
-			log.Printf("Failed to retrieve %s channel for client %s", name, client.ID)
-			return
-		}
-		platformMessagesChans[name] = ch
-	}
-
-	defer func() {
-		client.Conn.Close()
-		log.Printf("Client %s connection closed", client.ID)
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("Client %s: context cancelled", client.ID)
-			return
-
-		case deals := <-platformMessagesChans["historical_deals"]:
-			if err := m.writeClientConnMessage(client, messages.TypeHistorical, deals); err != nil {
-				return
-			}
-
-		case traderInfo := <-platformMessagesChans["trader_info"]:
-			if err := m.writeClientConnMessage(client, messages.TypeTraderInfo, traderInfo); err != nil {
-				return
-			}
-
-		case trendsBar := <-platformMessagesChans["trend_bars"]:
-			if err := m.writeClientConnMessage(client, messages.TypeTrendBars, trendsBar); err != nil {
-				return
-			}
-
-		case symbols := <-platformMessagesChans["account_symbols"]:
-			if err := m.writeClientConnMessage(client, messages.TypeAccountSymbols, symbols); err != nil {
-				return
-			}
-		case err := <-platformMessagesChans["errors"]:
-			if err := m.handlePlatformError(client, err); err != nil {
-				return
-			}
-
-		}
-
-	}
-
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
@@ -219,6 +171,9 @@ func (m *AccountConnectClientManager) handlePlatformError(client *models.Account
 }
 
 func (m *AccountConnectClientManager) writeJSONWithTimeout(client *models.AccountConnectClient, v interface{}) error {
+	//allow larger messages to complete writing to the connection.
+	client.Conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+
 	err := client.Conn.WriteJSON(v)
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
