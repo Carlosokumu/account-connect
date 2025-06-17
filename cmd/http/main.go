@@ -28,7 +28,7 @@ const (
 func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, accDb db.AccountConnectDb) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Printf("Failed to load config: %v", err)
 		return err
 	}
 
