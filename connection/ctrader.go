@@ -13,7 +13,7 @@ func EstablishCTraderConnection(ctraderConfig *config.CTraderConfig, accdb accdb
 		return nil, err
 	}
 
-	trader := applications.NewCTrader(accdb, ctraderConfig)
+	trader := applications.NewCTrader(accdb, nil, ctraderConfig)
 	trader.AccountId = &ctraderConfig.AccountID
 
 	ctraderConfig.Endpoint = cfg.Servers.Ctrader.Endpoint

@@ -1,7 +1,7 @@
 package applications
 
 import (
-	messages "account-connect/internal/mappers"
+	messages "account-connect/internal/messages"
 	"context"
 )
 

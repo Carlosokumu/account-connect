@@ -1,6 +1,23 @@
-package mappers
+package messages
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
+
+type Platform string
+
+const (
+	Ctrader Platform = "ctrader"
+	Binance Platform = "binance"
+)
+
+type MessageStatus string
+
+const (
+	StatusSuccess MessageStatus = "success"
+	StatusFailure MessageStatus = "failure"
+	StatusPending MessageStatus = "pending"
+)
 
 type MessageType string
 
@@ -14,42 +31,9 @@ const (
 	TypeDisconnect     MessageType = "disconnect"
 )
 
-type MessageStatus string
-
-const (
-	StatusSuccess MessageStatus = "success"
-	StatusFailure MessageStatus = "failure"
-	StatusPending MessageStatus = "pending"
-)
-
-type Platform string
-
-const (
-	Ctrader Platform = "ctrader"
-	Binance Platform = "binance"
-)
-
-func CreateErrorResponse(clientID string, errData []byte) AccountConnectMsgRes {
-	return AccountConnectMsgRes{
-		Type:     TypeError,
-		Status:   StatusFailure,
-		ClientId: clientID,
-		Payload:  errData,
-	}
-}
-
-func CreateSuccessResponse(msgType MessageType, clientID string, payload []byte) AccountConnectMsgRes {
-	return AccountConnectMsgRes{
-		Type:     msgType,
-		Status:   StatusSuccess,
-		ClientId: clientID,
-		Payload:  payload,
-	}
-}
-
 // All incoming client messages are expected to have this payload structure.
 type AccountConnectMsg struct {
-	Type               MessageType     `json:"type"` // e.g connect,historical_deals....
+	Type               MessageType     `json:"type" validate:"required"`
 	TradeshareClientId string          `json:"tradeshare_client_id"`
 	Platform           Platform        `json:"platform"`
 	Payload            json.RawMessage `json:"payload"`
@@ -57,10 +41,10 @@ type AccountConnectMsg struct {
 
 // All outgoing client messages should have this payload structure
 type AccountConnectMsgRes struct {
-	Type     MessageType     `json:"type"`
-	Status   MessageStatus   `json:"status"`
-	ClientId string          `json:"client-id"`
-	Payload  json.RawMessage `json:"payload"`
+	Type               MessageType     `json:"type"`
+	Status             MessageStatus   `json:"status"`
+	TradeShareClientId string          `json:"tradeshare_client_id"`
+	Payload            json.RawMessage `json:"payload"`
 }
 
 // Payload that should be contained in the  payload field of AccountConnectMsg struct for ctrader connection.
@@ -84,22 +68,6 @@ type AccountConnectTrendBarsPayload struct {
 	FromTimestamp *int64 `json:"fromTimestamp"`
 	ToTimestamp   *int64 `json:"toTimestamp"`
 	Period        string `json:"period"`
-}
-
-// AccountConnectSymbolsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request trading symbols
-type AccountConnectSymbolsPayload struct {
-	Ctid *int64 `json:"ctid"`
-}
-
-// AccountConnectHistoricalDealsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request past account trades.
-type AccountConnectHistoricalDealsPayload struct {
-	FromTimestamp *int64 `json:"fromTimestamp"`
-	ToTimestamp   *int64 `json:"toTimestamp"`
-}
-
-// AccountConnectTraderInfoPayload is wrapper payload containing all of the possible fields  required by each of the supported platforms to request a trader's information.
-type AccountConnectTraderInfoPayload struct {
-	Ctid *int64 `json:"ctid"`
 }
 
 // AccountConnectCtId is wrapper payload containing all of the possible fields required  by  each of the supported platforms  to request a trader's information.
@@ -147,3 +115,18 @@ type AccountConnectSymbol struct {
 	SymbolId   any     `json:"id"`
 }
 
+// AccountConnectHistoricalDealsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request past account trades.
+type AccountConnectHistoricalDealsPayload struct {
+	FromTimestamp *int64 `json:"fromTimestamp"`
+	ToTimestamp   *int64 `json:"toTimestamp"`
+}
+
+// AccountConnectTraderInfoPayload is wrapper payload containing all of the possible fields  required by each of the supported platforms to request a trader's information.
+type AccountConnectTraderInfoPayload struct {
+	Ctid *int64 `json:"ctid"`
+}
+
+// AccountConnectSymbolsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request trading symbols
+type AccountConnectSymbolsPayload struct {
+	Ctid *int64 `json:"ctid"`
+}

@@ -2,17 +2,17 @@ package mappers
 
 import (
 	pb "account-connect/gen"
+	"account-connect/internal/messages"
 	"fmt"
 
 	"github.com/adshao/go-binance/v2"
 )
 
-
-func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []AccountConnectDeal {
-	var deals []AccountConnectDeal
+func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []messages.AccountConnectDeal {
+	var deals []messages.AccountConnectDeal
 
 	for _, deal := range r.Deal {
-		deal := AccountConnectDeal{
+		deal := messages.AccountConnectDeal{
 			ExecutionPrice: deal.ExecutionPrice,
 			Commission:     deal.Commission,
 			Direction:      deal.TradeSide.String(),
@@ -23,8 +23,8 @@ func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []AccountConnectD
 	return deals
 }
 
-func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) AccountConnectTraderInfo {
-	return AccountConnectTraderInfo{
+func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) messages.AccountConnectTraderInfo {
+	return messages.AccountConnectTraderInfo{
 		CtidTraderAccountId: r.CtidTraderAccountId,
 		Login:               r.Trader.TraderLogin,
 		DepositAssetId:      r.Trader.DepositAssetId,
@@ -32,8 +32,8 @@ func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) AccountConnectT
 	}
 }
 
-func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []AccountConnectTrendBar {
-	var trendBars []AccountConnectTrendBar
+func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnectTrendBar {
+	var trendBars []messages.AccountConnectTrendBar
 	for _, trendBar := range r.Trendbar {
 		low := int64(0)
 		if trendBar.Low != nil {
@@ -55,7 +55,7 @@ func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []AccountConnectTrendBar 
 			deltaClose = *trendBar.DeltaClose
 		}
 
-		tBar := AccountConnectTrendBar{
+		tBar := messages.AccountConnectTrendBar{
 			Low:                   low,
 			High:                  low + int64(deltaHigh),
 			Open:                  low + int64(deltaOpen),
@@ -68,17 +68,17 @@ func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []AccountConnectTrendBar 
 	return trendBars
 }
 
-func ProtoOAErrorResToError(r *pb.ProtoOAErrorRes) *AccountConnectError {
-	return &AccountConnectError{
+func ProtoOAErrorResToError(r *pb.ProtoOAErrorRes) *messages.AccountConnectError {
+	return &messages.AccountConnectError{
 		Description: *r.Description,
 	}
 }
 
-func ProtoSymbolListResponseToAccountConnectSymbol(r *pb.ProtoOASymbolsListRes) []AccountConnectSymbol {
-	var symList []AccountConnectSymbol
+func ProtoSymbolListResponseToAccountConnectSymbol(r *pb.ProtoOASymbolsListRes) []messages.AccountConnectSymbol {
+	var symList []messages.AccountConnectSymbol
 
 	for _, sym := range r.Symbol {
-		accsym := AccountConnectSymbol{
+		accsym := messages.AccountConnectSymbol{
 			SymbolName: sym.SymbolName,
 			SymbolId:   sym.SymbolId,
 		}
@@ -121,12 +121,12 @@ func PeriodStrToBarPeriod(periodStr string) (pb.ProtoOATrendbarPeriod, error) {
 		return 0, fmt.Errorf("invalid period: %s", periodStr)
 	}
 }
-func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []AccountConnectSymbol {
-	var accsyms []AccountConnectSymbol
+func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []messages.AccountConnectSymbol {
+	var accsyms []messages.AccountConnectSymbol
 
 	for _, sym := range binancesyms {
 		//The symbol from binance will be used as an id and symbol name
-		accsym := AccountConnectSymbol{
+		accsym := messages.AccountConnectSymbol{
 			SymbolName: &sym.Symbol,
 			SymbolId:   sym.Symbol,
 		}

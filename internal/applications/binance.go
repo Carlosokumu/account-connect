@@ -2,8 +2,9 @@ package applications
 
 import (
 	"account-connect/internal/mappers"
-	messages "account-connect/internal/mappers"
+	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
+	"account-connect/internal/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -79,7 +80,7 @@ func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages
 	if err != nil {
 		return err
 	}
-	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
+	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
 
 	msgB, err := json.Marshal(msg)
 	if err != nil {
