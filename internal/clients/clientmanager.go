@@ -53,7 +53,7 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 					Payload:            nil,
 					TradeshareClientId: client.ID,
 				}
-				m.msgRouter.Route(context.Background(), client, disconnectMsg)
+				m.msgRouter.Route(ctx, client, disconnectMsg)
 				close(client.Send)
 			}
 			m.clients = make(map[string]*models.AccountConnectClient)
@@ -95,12 +95,17 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.RUnlock()
 			err := m.msgRouter.Route(ctx, client, msg)
 			if err != nil {
-				errmsg := mappers.CreateErrorResponse(client.ID, []byte(err.Error()))
-				errmsgB, err := json.Marshal(errmsg)
-				if err != nil {
-					log.Printf("Failed to marshal response for incoming message client: %v", err)
+				errR := mappers.CreateErrorResponse(client.ID, []byte(err.Error()))
+				errRB, marshalErr := json.Marshal(errR)
+				if marshalErr != nil {
+					log.Printf("Failed to marshal error response for client %s: %v", client.ID, marshalErr)
+					return
 				}
-				client.Send <- errmsgB
+				select {
+				case client.Send <- errRB:
+				default:
+					log.Printf("Failed to send error to client %s: channel blocked", client.ID)
+				}
 			}
 		}
 	}
