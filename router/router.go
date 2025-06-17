@@ -3,9 +3,9 @@ package router
 import (
 	"account-connect/config"
 	"account-connect/internal/applications"
-	"account-connect/internal/mappers"
-	messages "account-connect/internal/mappers"
+	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
+	"account-connect/internal/utils"
 	"account-connect/persistence"
 	db "account-connect/persistence"
 	"context"
@@ -34,6 +34,7 @@ func (r *Router) Handle(messageType string, handler func(*models.AccountConnectC
 	r.handlers[messageType] = handler
 }
 
+// Route  routes the different message types from clients to the right handler function
 func (r *Router) Route(ctxt context.Context, client *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -48,7 +49,7 @@ func (r *Router) Route(ctxt context.Context, client *models.AccountConnectClient
 	}
 
 	switch msg.Type {
-	case mappers.TypeConnect:
+	case messages.TypeConnect:
 		return handler.handleConnect(ctxt, client, msg)
 	case messages.TypeHistorical:
 		return handler.handleHistorical(msg.Payload)
@@ -78,7 +79,7 @@ func (r *Router) handlePlatformConnectionStatus(client *models.AccountConnectCli
 
 // RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
 func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectHistoricalDealsPayload
+	var res messages.AccountConnectHistoricalDealsPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
@@ -101,7 +102,7 @@ func (r *Router) RequestHistoricalDeals(client *models.AccountConnectClient, acc
 
 // RequestTraderInfo will request the trader's information if  supported by the trading platform's api
 func (r *Router) RequestTraderInfo(accclient *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectTraderInfoPayload
+	var res messages.AccountConnectTraderInfoPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
@@ -125,7 +126,7 @@ func (r *Router) RequestTraderInfo(accclient *models.AccountConnectClient, accDb
 
 // RequestAccountSymbols will fetch all of the available trading symbols for a given trading platform
 func (r *Router) RequestAccountSymbols(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectSymbolsPayload
+	var res messages.AccountConnectSymbolsPayload
 
 	err := json.Unmarshal(payload, &res)
 	if err != nil {
@@ -148,7 +149,7 @@ func (r *Router) RequestAccountSymbols(client *models.AccountConnectClient, accD
 
 // RequestTrendBars will request trendbars for a particular symbol(trading pair)
 func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *persistence.AccountConnectDb, payload json.RawMessage) error {
-	var res mappers.AccountConnectTrendBarsPayload
+	var res messages.AccountConnectTrendBarsPayload
 
 	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
@@ -161,7 +162,7 @@ func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *pe
 		log.Printf("Failed to unmarshal account connect trend bars requests: %v", err)
 		return fmt.Errorf("Failed to unmarshal account connect trend bars requests: %w", err)
 	}
-	trendBarArgs := mappers.AccountConnectTrendBarsPayload{
+	trendBarArgs := messages.AccountConnectTrendBarsPayload{
 		SymbolId:      res.SymbolId,
 		Ctid:          res.Ctid,
 		Period:        res.Period,
@@ -178,6 +179,7 @@ func (r *Router) RequestTrendBars(client *models.AccountConnectClient, accDb *pe
 	return nil
 }
 
+// DisconnectPlatformConnection  handles disconnection to underlying platform connection for the client
 func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClient) error {
 	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
@@ -189,7 +191,7 @@ func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClien
 
 func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	switch msg.Platform {
-	case mappers.Binance:
+	case messages.Binance:
 		var binanceconnectmsg messages.BinanceConnectPayload
 		if err := json.Unmarshal(msg.Payload, &binanceconnectmsg); err != nil {
 			return fmt.Errorf("invalid connect message format: %w", err)
@@ -202,9 +204,9 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 		if err != nil {
 			return err
 		}
-		msgR := messages.CreateSuccessResponse(mappers.TypeConnect, h.client.ID, nil)
+		msgR := utils.CreateSuccessResponse(messages.TypeConnect, h.client.ID, nil)
 		return h.writeClientMessage(msgR)
-	case mappers.Ctrader:
+	case messages.Ctrader:
 		var ctconnectmsg messages.CTraderConnectPayload
 		if err := json.Unmarshal(msg.Payload, &ctconnectmsg); err != nil {
 			return fmt.Errorf("invalid connect message format: %w", err)
@@ -230,7 +232,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 			return err
 		}
 		response := messages.AccountConnectMsgRes{
-			Type:    mappers.TypeConnect,
+			Type:    messages.TypeConnect,
 			Status:  messages.StatusSuccess,
 			Payload: nil,
 		}

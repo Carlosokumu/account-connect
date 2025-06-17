@@ -1,6 +1,23 @@
-package mappers
+package messages
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
+
+type Platform string
+
+const (
+	Ctrader Platform = "ctrader"
+	Binance Platform = "binance"
+)
+
+type MessageStatus string
+
+const (
+	StatusSuccess MessageStatus = "success"
+	StatusFailure MessageStatus = "failure"
+	StatusPending MessageStatus = "pending"
+)
 
 type MessageType string
 
@@ -14,51 +31,9 @@ const (
 	TypeDisconnect     MessageType = "disconnect"
 )
 
-type MessageStatus string
-
-const (
-	StatusSuccess MessageStatus = "success"
-	StatusFailure MessageStatus = "failure"
-	StatusPending MessageStatus = "pending"
-)
-
-type Platform string
-
-const (
-	Ctrader Platform = "ctrader"
-	Binance Platform = "binance"
-)
-
-func CreateErrorResponse(clientID string, errData []byte) AccountConnectMsgRes {
-	errRes := AccountConnectError{
-		Description: string(errData),
-	}
-
-	errResB, err := json.Marshal(errRes)
-	if err != nil {
-		errResB = []byte(`{"description":"failed to process error message"}`)
-	}
-
-	return AccountConnectMsgRes{
-		Type:               TypeError,
-		Status:             StatusFailure,
-		TradeShareClientId: clientID,
-		Payload:            errResB,
-	}
-}
-
-func CreateSuccessResponse(msgType MessageType, clientID string, payload []byte) AccountConnectMsgRes {
-	return AccountConnectMsgRes{
-		Type:               msgType,
-		Status:             StatusSuccess,
-		TradeShareClientId: clientID,
-		Payload:            payload,
-	}
-}
-
 // All incoming client messages are expected to have this payload structure.
 type AccountConnectMsg struct {
-	Type               MessageType     `json:"type"` // e.g connect,historical_deals....
+	Type               MessageType     `json:"type" validate:"required"`
 	TradeshareClientId string          `json:"tradeshare_client_id"`
 	Platform           Platform        `json:"platform"`
 	Payload            json.RawMessage `json:"payload"`
@@ -93,22 +68,6 @@ type AccountConnectTrendBarsPayload struct {
 	FromTimestamp *int64 `json:"fromTimestamp"`
 	ToTimestamp   *int64 `json:"toTimestamp"`
 	Period        string `json:"period"`
-}
-
-// AccountConnectSymbolsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request trading symbols
-type AccountConnectSymbolsPayload struct {
-	Ctid *int64 `json:"ctid"`
-}
-
-// AccountConnectHistoricalDealsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request past account trades.
-type AccountConnectHistoricalDealsPayload struct {
-	FromTimestamp *int64 `json:"fromTimestamp"`
-	ToTimestamp   *int64 `json:"toTimestamp"`
-}
-
-// AccountConnectTraderInfoPayload is wrapper payload containing all of the possible fields  required by each of the supported platforms to request a trader's information.
-type AccountConnectTraderInfoPayload struct {
-	Ctid *int64 `json:"ctid"`
 }
 
 // AccountConnectCtId is wrapper payload containing all of the possible fields required  by  each of the supported platforms  to request a trader's information.
@@ -154,4 +113,20 @@ type AccountConnectTrendBar struct {
 type AccountConnectSymbol struct {
 	SymbolName *string `json:"name"` //E.g EUR/USD
 	SymbolId   any     `json:"id"`
+}
+
+// AccountConnectHistoricalDealsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request past account trades.
+type AccountConnectHistoricalDealsPayload struct {
+	FromTimestamp *int64 `json:"fromTimestamp"`
+	ToTimestamp   *int64 `json:"toTimestamp"`
+}
+
+// AccountConnectTraderInfoPayload is wrapper payload containing all of the possible fields  required by each of the supported platforms to request a trader's information.
+type AccountConnectTraderInfoPayload struct {
+	Ctid *int64 `json:"ctid"`
+}
+
+// AccountConnectSymbolsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request trading symbols
+type AccountConnectSymbolsPayload struct {
+	Ctid *int64 `json:"ctid"`
 }

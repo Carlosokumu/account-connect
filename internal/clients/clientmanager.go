@@ -2,9 +2,9 @@ package clients
 
 import (
 	"account-connect/internal/applications"
-	"account-connect/internal/mappers"
-	messages "account-connect/internal/mappers"
+	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
+	"account-connect/internal/utils"
 	"account-connect/router"
 	"context"
 	"encoding/json"
@@ -95,7 +95,7 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.RUnlock()
 			err := m.msgRouter.Route(ctx, client, msg)
 			if err != nil {
-				errR := mappers.CreateErrorResponse(client.ID, []byte(err.Error()))
+				errR := utils.CreateErrorResponse(client.ID, []byte(err.Error()))
 				errRB, marshalErr := json.Marshal(errR)
 				if marshalErr != nil {
 					log.Printf("Failed to marshal error response for client %s: %v", client.ID, marshalErr)
@@ -153,7 +153,7 @@ func (m *AccountConnectClientManager) handleClientMessages(client *models.Accoun
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
 func (m *AccountConnectClientManager) writeClientConnMessage(client *models.AccountConnectClient, msgType messages.MessageType, payload []byte) error {
-	msg := messages.CreateSuccessResponse(
+	msg := utils.CreateSuccessResponse(
 		msgType,
 		client.ID,
 		payload,
@@ -162,7 +162,7 @@ func (m *AccountConnectClientManager) writeClientConnMessage(client *models.Acco
 }
 
 func (m *AccountConnectClientManager) handlePlatformError(client *models.AccountConnectClient, errData []byte) error {
-	msg := messages.CreateErrorResponse(client.ID, errData)
+	msg := utils.CreateErrorResponse(client.ID, errData)
 
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
 		return err

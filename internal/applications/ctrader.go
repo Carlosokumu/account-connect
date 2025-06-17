@@ -3,9 +3,11 @@ package applications
 import (
 	"account-connect/common"
 	"account-connect/config"
-	messages "account-connect/gen"
+	gen_messages "account-connect/gen"
 	"account-connect/internal/mappers"
+	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
+	"account-connect/internal/utils"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -15,6 +17,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	acount_connect_messages "account-connect/internal/messages"
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
@@ -50,7 +54,7 @@ func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *models.A
 	}
 }
 
-// NewCTrader creates a new trader instance with the required fields to establish a ctrader connection
+// NewCTrader creates a new ctrader instance with the required fields to establish a ctrader connection
 func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *config.CTraderConfig) *CTrader {
 	return &CTrader{
 		accDb:             accdb,
@@ -70,15 +74,15 @@ func (t *CTrader) RegisterHandler(msgType uint32, handler MessageHandler) {
 }
 
 func (t *CTrader) registerHandlers() {
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_RES), t.handleApplicationAuthResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES), t.handleAccountAuthResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_ERROR_RES), t.handleErrorReponse)
-	t.RegisterHandler(uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT), t.handleHeartBeatMessage)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES), t.handleRefreshTokenResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_TRADER_RES), t.handleTraderInfoResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES), t.handleTrendBarsResponse)
-	t.RegisterHandler(uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES), t.handleSymbolListResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_RES), t.handleApplicationAuthResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES), t.handleAccountAuthResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_ERROR_RES), t.handleErrorReponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoPayloadType_HEARTBEAT_EVENT), t.handleHeartBeatMessage)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES), t.handleAccountHistoricalDeals)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES), t.handleRefreshTokenResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_TRADER_RES), t.handleTraderInfoResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES), t.handleTrendBarsResponse)
+	t.RegisterHandler(uint32(gen_messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES), t.handleSymbolListResponse)
 }
 
 func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
@@ -96,7 +100,7 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 		AccountID:    *cfg.AccountId,
 	})
 	if err != nil {
-		log.Printf("Connection establishment to ctrader fail:%v", err)
+		log.Printf("Connection establishment to ctrader fail: %v", err)
 		return err
 	}
 	err = cta.ctrader.AuthorizeApplication()
@@ -107,21 +111,21 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 	return err
 }
 
-func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload mappers.AccountConnectSymbolsPayload) error {
-	//Add additional check if the ctid a valid ctid
+func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload acount_connect_messages.AccountConnectSymbolsPayload) error {
+	//Add additional check if the ctid is a valid ctid
 	return cta.ctrader.GetAccountTradingSymbols(payload.Ctid)
 }
 
-func (cta *CtraderAdapter) GetHistoricalTrades(ctx context.Context, payload mappers.AccountConnectHistoricalDealsPayload) error {
+func (cta *CtraderAdapter) GetHistoricalTrades(ctx context.Context, payload acount_connect_messages.AccountConnectHistoricalDealsPayload) error {
 	//Add a check for  validity of the to and from timestamps
 	return cta.ctrader.GetAccountHistoricalDeals(*payload.FromTimestamp, *payload.ToTimestamp)
 }
 
-func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload mappers.AccountConnectTraderInfoPayload) error {
+func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload acount_connect_messages.AccountConnectTraderInfoPayload) error {
 	return cta.ctrader.GetAccountTraderInfo(payload.Ctid)
 }
 
-func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload mappers.AccountConnectTrendBarsPayload) error {
+func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acount_connect_messages.AccountConnectTrendBarsPayload) error {
 	return cta.ctrader.GetChartTrendBars(payload)
 }
 
@@ -177,7 +181,7 @@ func (t *CTrader) StartConnectionReader() {
 			return
 		}
 
-		var msgP messages.ProtoMessage
+		var msgP gen_messages.ProtoMessage
 		if err := proto.Unmarshal(msgB, &msgP); err != nil {
 			log.Printf("Failed to unmarshal protocol message: %v", err)
 			continue
@@ -204,7 +208,7 @@ func (t *CTrader) AuthorizeApplication() error {
 		return errors.New("client credentials not set")
 	}
 
-	msgReq := &messages.ProtoOAApplicationAuthReq{
+	msgReq := &gen_messages.ProtoOAApplicationAuthReq{
 		ClientId:     &t.ClientId,
 		ClientSecret: &t.ClientSecret,
 	}
@@ -212,7 +216,7 @@ func (t *CTrader) AuthorizeApplication() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.AppAuthMsgType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_APP_AUTH,
@@ -259,7 +263,7 @@ func (t *CTrader) AuthorizeAccount() error {
 		return errors.New("invalid Account id")
 	}
 
-	msgReq := &messages.ProtoOAAccountAuthReq{
+	msgReq := &gen_messages.ProtoOAAccountAuthReq{
 		CtidTraderAccountId: t.AccountId,
 		AccessToken:         &t.AccessToken,
 	}
@@ -267,7 +271,7 @@ func (t *CTrader) AuthorizeAccount() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.AccountAuthMsgType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_ACCOUNT_AUTH,
@@ -293,14 +297,14 @@ func (t *CTrader) GetRefreshToken() error {
 		return err
 	}
 	refreshTokenStr := string(refreshToken)
-	msgReq := &messages.ProtoOARefreshTokenReq{
+	msgReq := &gen_messages.ProtoOARefreshTokenReq{
 		RefreshToken: &refreshTokenStr,
 	}
 	msgB, err := proto.Marshal(msgReq)
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth refresh request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.RefreshTokenMsgType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_REFRESH_TOKEN,
@@ -320,7 +324,7 @@ func (t *CTrader) GetRefreshToken() error {
 
 // GetAccountTraderInfo will retrieve the trader's information for a certain ctidTraderAccountId
 func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
-	msgReq := &messages.ProtoOATraderReq{
+	msgReq := &gen_messages.ProtoOATraderReq{
 		CtidTraderAccountId: ctidTraderAccountId,
 	}
 
@@ -328,7 +332,7 @@ func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal prototrader  request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.TraderInfoMsgType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_TRADER_INFO,
@@ -349,14 +353,14 @@ func (t *CTrader) GetAccountTraderInfo(ctidTraderAccountId *int64) error {
 
 // GetAccountTradingSymbols will retrieve a list of trading symbols(trading pairs e.g EUR/USD) for a certain trading account
 func (t *CTrader) GetAccountTradingSymbols(ctId *int64) error {
-	msgReq := &messages.ProtoOASymbolsListReq{
+	msgReq := &gen_messages.ProtoOASymbolsListReq{
 		CtidTraderAccountId: ctId,
 	}
 	msgB, err := proto.Marshal(msgReq)
 	if err != nil {
 		return fmt.Errorf("failed to marshal symbol list  request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.AccountSymbolListMsgType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_SYMBOL_LIST,
@@ -375,12 +379,12 @@ func (t *CTrader) GetAccountTradingSymbols(ctId *int64) error {
 }
 
 // GetChartTrendBars will request trend bar series data as  requested by [trendbarsArgs]
-func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBarsPayload) error {
+func (t *CTrader) GetChartTrendBars(trendbarsArgs acount_connect_messages.AccountConnectTrendBarsPayload) error {
 	trendPeriod, err := mappers.PeriodStrToBarPeriod(trendbarsArgs.Period)
 	if err != nil {
 		return fmt.Errorf("invalid trend period: %w", err)
 	}
-	msgReq := &messages.ProtoOAGetTrendbarsReq{
+	msgReq := &gen_messages.ProtoOAGetTrendbarsReq{
 		CtidTraderAccountId: trendbarsArgs.Ctid,
 		Period:              &trendPeriod,
 		SymbolId:            &trendbarsArgs.SymbolId,
@@ -392,7 +396,7 @@ func (t *CTrader) GetChartTrendBars(trendbarsArgs mappers.AccountConnectTrendBar
 	if err != nil {
 		return fmt.Errorf("failed to marshal trend bars  request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.TrendBarsMsyType,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_TREND_BARS,
@@ -420,7 +424,7 @@ func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) er
 		return errors.New("invalid account id")
 	}
 
-	msgReq := &messages.ProtoOADealListReq{
+	msgReq := &gen_messages.ProtoOADealListReq{
 		CtidTraderAccountId: t.AccountId,
 		FromTimestamp:       &fromTimestamp,
 		ToTimestamp:         &toTimestamp,
@@ -429,7 +433,7 @@ func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) er
 	if err != nil {
 		return fmt.Errorf("failed to marshal auth request: %w", err)
 	}
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.AccountHistoricalDeals,
 		Payload:     msgB,
 		ClientMsgId: &common.REQ_ACCOUNT_HISTORICAL_DEALS,
@@ -449,7 +453,7 @@ func (t *CTrader) GetAccountHistoricalDeals(fromTimestamp, toTimestamp int64) er
 }
 
 func (t *CTrader) handleApplicationAuthResponse(payload []byte) error {
-	var r messages.ProtoOAApplicationAuthRes
+	var r gen_messages.ProtoOAApplicationAuthRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal auth response: %w", err)
 	}
@@ -462,7 +466,7 @@ func (t *CTrader) handleApplicationAuthResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleHeartBeatMessage(payload []byte) error {
-	msgP := &messages.ProtoMessage{
+	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.HeartBeatMsgType,
 	}
 	protoMessage, err := proto.Marshal(msgP)
@@ -478,7 +482,7 @@ func (t *CTrader) handleHeartBeatMessage(payload []byte) error {
 }
 
 func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
-	var r messages.ProtoOAAccountAuthRes
+	var r gen_messages.ProtoOAAccountAuthRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
 	}
@@ -499,7 +503,7 @@ func (t *CTrader) handleAccountAuthResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
-	var r messages.ProtoOARefreshTokenRes
+	var r gen_messages.ProtoOARefreshTokenRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal refresh token response: %w", err)
 	}
@@ -511,7 +515,7 @@ func (t *CTrader) handleRefreshTokenResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
-	var r messages.ProtoOATraderRes
+	var r gen_messages.ProtoOATraderRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal trader info response: %w", err)
 	}
@@ -522,7 +526,7 @@ func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
 		return err
 	}
 
-	msg := mappers.CreateSuccessResponse(mappers.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
+	msg := utils.CreateSuccessResponse(messages.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -534,7 +538,7 @@ func (t *CTrader) handleTraderInfoResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
-	var r messages.ProtoOAGetTrendbarsRes
+	var r gen_messages.ProtoOAGetTrendbarsRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal trend bars: %w", err)
 	}
@@ -546,7 +550,7 @@ func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
 		return err
 	}
 
-	msg := mappers.CreateSuccessResponse(mappers.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
+	msg := utils.CreateSuccessResponse(messages.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -558,7 +562,7 @@ func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleSymbolListResponse(payload []byte) error {
-	var r messages.ProtoOASymbolsListRes
+	var r gen_messages.ProtoOASymbolsListRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal symbol list: %w", err)
 	}
@@ -570,7 +574,7 @@ func (t *CTrader) handleSymbolListResponse(payload []byte) error {
 		return err
 	}
 
-	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
+	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -582,7 +586,7 @@ func (t *CTrader) handleSymbolListResponse(payload []byte) error {
 }
 
 func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
-	var r messages.ProtoOADealListRes
+	var r gen_messages.ProtoOADealListRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal historical deals: %w", err)
 	}
@@ -592,7 +596,7 @@ func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal deal: %s", err)
 	}
-	msg := mappers.CreateSuccessResponse(mappers.TypeAccountSymbols, t.AccountConnClient.ID, dealsB)
+	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, t.AccountConnClient.ID, dealsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -604,7 +608,7 @@ func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
 }
 
 func (t *CTrader) handleErrorReponse(payload []byte) error {
-	var r messages.ProtoOAErrorRes
+	var r gen_messages.ProtoOAErrorRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal error response: %w", err)
 	}
@@ -625,7 +629,7 @@ func (t *CTrader) handleErrorReponse(payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("Failed to marshal error response: %s", err)
 	}
-	msg := mappers.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
+	msg := utils.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
