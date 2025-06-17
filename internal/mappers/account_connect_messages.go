@@ -30,20 +30,29 @@ const (
 )
 
 func CreateErrorResponse(clientID string, errData []byte) AccountConnectMsgRes {
+	errRes := AccountConnectError{
+		Description: string(errData),
+	}
+
+	errResB, err := json.Marshal(errRes)
+	if err != nil {
+		errResB = []byte(`{"description":"failed to process error message"}`)
+	}
+
 	return AccountConnectMsgRes{
-		Type:     TypeError,
-		Status:   StatusFailure,
-		ClientId: clientID,
-		Payload:  errData,
+		Type:               TypeError,
+		Status:             StatusFailure,
+		TradeShareClientId: clientID,
+		Payload:            errResB,
 	}
 }
 
 func CreateSuccessResponse(msgType MessageType, clientID string, payload []byte) AccountConnectMsgRes {
 	return AccountConnectMsgRes{
-		Type:     msgType,
-		Status:   StatusSuccess,
-		ClientId: clientID,
-		Payload:  payload,
+		Type:               msgType,
+		Status:             StatusSuccess,
+		TradeShareClientId: clientID,
+		Payload:            payload,
 	}
 }
 
@@ -57,10 +66,10 @@ type AccountConnectMsg struct {
 
 // All outgoing client messages should have this payload structure
 type AccountConnectMsgRes struct {
-	Type     MessageType     `json:"type"`
-	Status   MessageStatus   `json:"status"`
-	ClientId string          `json:"client-id"`
-	Payload  json.RawMessage `json:"payload"`
+	Type               MessageType     `json:"type"`
+	Status             MessageStatus   `json:"status"`
+	TradeShareClientId string          `json:"tradeshare_client_id"`
+	Payload            json.RawMessage `json:"payload"`
 }
 
 // Payload that should be contained in the  payload field of AccountConnectMsg struct for ctrader connection.
@@ -146,4 +155,3 @@ type AccountConnectSymbol struct {
 	SymbolName *string `json:"name"` //E.g EUR/USD
 	SymbolId   any     `json:"id"`
 }
-
