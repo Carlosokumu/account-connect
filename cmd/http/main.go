@@ -25,7 +25,7 @@ const (
 	ClientSendBufferSize = 50
 )
 
-func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, accDb db.AccountConnectDb) error {
+func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, _ db.AccountConnectDb) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Printf("Failed to load config: %v", err)
@@ -97,14 +97,15 @@ func main() {
 	accdb := db.AccountConnectDb{}
 	err := accdb.Create()
 	if err != nil {
-		log.Fatal("Failed to initialize account db: %v", err)
+		log.Printf("Failed to initialize account db: %v", err)
+		os.Exit(1)
 	}
 	defer accdb.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stop := make(chan os.Signal)
+	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-stop
