@@ -9,4 +9,5 @@ var (
 	REQ_TREND_BARS               = "REQ_TREND_BARS"
 	REQ_CLIENT_FAILURE           = "CH_CLIENT_AUTH_FAILURE"
 	REQ_SYMBOL_LIST              = "REQ_SYMBOL_LIST"
+	REQ_SYMBOL_INFO              = "REQ_SYMBOL_INFO"
 )
