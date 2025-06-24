@@ -61,7 +61,7 @@ type BinanceConnectPayload struct {
 	APISecret string `json:"api_secret"`
 }
 
-// Wrapper payload containing all of the possible fields for each of the supported platforms required to request a symbol's trend bars
+// AccountConnectTrendBarsPayload  is a wrapper payload containing all of the possible fields for each of the supported platforms required to request a symbol's trend bars
 type AccountConnectTrendBarsPayload struct {
 	SymbolId      int64  `json:"symbol_id"`
 	Ctid          *int64 `json:"ctid"`
@@ -102,11 +102,12 @@ type AccountConnectTraderInfo struct {
 
 // AccountConnectTrendBar  is model message providing the  OHLC values
 type AccountConnectTrendBar struct {
-	High                  int64 `json:"high"`
-	Open                  int64 `json:"open"`
-	Close                 int64 `json:"close"`
-	Low                   int64 `json:"low"`
-	UtcTimestampInMinutes int64 `json:"utcTimeStampInMinutes"`
+	High                  float64 `json:"high"`
+	Open                  float64 `json:"open"`
+	Close                 float64 `json:"close"`
+	Low                   float64 `json:"low"`
+	UtcTimestampInMinutes float64 `json:"utcTimeStampInMinutes"`
+	Volume                int64   `json:"volume"`
 }
 
 // AccountConnectSymbol  is model message containing trading pairs information
@@ -129,4 +130,10 @@ type AccountConnectTraderInfoPayload struct {
 // AccountConnectSymbolsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request trading symbols
 type AccountConnectSymbolsPayload struct {
 	Ctid *int64 `json:"ctid"`
+}
+
+// AccountConnectSymbolInfoPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request additional symbol information
+type AccountConnectSymbolInfoPayload struct {
+	Ctid     *int64  `json:"ctid"`
+	SymbolId []int64 `json:"symbol_id"`
 }
