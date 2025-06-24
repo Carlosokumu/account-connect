@@ -35,32 +35,38 @@ func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) messages.Accoun
 func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnectTrendBar {
 	var trendBars []messages.AccountConnectTrendBar
 	for _, trendBar := range r.Trendbar {
-		low := int64(0)
+		low := float64(0)
 		if trendBar.Low != nil {
-			low = *trendBar.Low
+			low = float64(*trendBar.Low)
 		}
 
-		deltaHigh := uint64(0)
+		deltaHigh := float64(0)
 		if trendBar.DeltaHigh != nil {
-			deltaHigh = *trendBar.DeltaHigh
+			deltaHigh = float64(*trendBar.DeltaHigh)
 		}
 
-		deltaOpen := uint64(0)
+		deltaOpen := float64(0)
 		if trendBar.DeltaOpen != nil {
-			deltaOpen = *trendBar.DeltaOpen
+			deltaOpen = float64(*trendBar.DeltaOpen)
 		}
 
-		deltaClose := uint64(0)
+		deltaClose := float64(0)
 		if trendBar.DeltaClose != nil {
-			deltaClose = *trendBar.DeltaClose
+			deltaClose = float64(*trendBar.DeltaClose)
+		}
+
+		volume := int64(0)
+		if trendBar.Volume != nil {
+			volume = *trendBar.Volume
 		}
 
 		tBar := messages.AccountConnectTrendBar{
 			Low:                   low,
-			High:                  low + int64(deltaHigh),
-			Open:                  low + int64(deltaOpen),
-			Close:                 low + int64(deltaClose),
-			UtcTimestampInMinutes: int64(*trendBar.UtcTimestampInMinutes),
+			High:                  low + float64(deltaHigh),
+			Open:                  low + float64(deltaOpen),
+			Close:                 low + float64(deltaClose),
+			UtcTimestampInMinutes: float64(*trendBar.UtcTimestampInMinutes),
+			Volume:                volume,
 		}
 		trendBars = append(trendBars, tBar)
 	}
