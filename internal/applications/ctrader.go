@@ -591,7 +591,7 @@ func (t *CTrader) handleTrendBarsResponse(payload []byte) error {
 
 	trendBars := mappers.ProotoOAToTrendBars(&res)
 	if err := t.getSymbolListInformation(acount_connect_messages.AccountConnectSymbolInfoPayload{
-		SymbolId: []int64{1},
+		SymbolId: []int64{*res.SymbolId},
 		Ctid:     t.AccountId,
 	}); err != nil {
 		return err
