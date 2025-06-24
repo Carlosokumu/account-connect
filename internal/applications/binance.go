@@ -40,7 +40,7 @@ func (b *BinanceConnection) GetTraderInfo(ctx context.Context) error {
 }
 
 func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) error {
-	return fmt.Errorf("GetSymbolTrendBars not implemented for binance...")
+	return fmt.Errorf("GetSymbolTrendBars not implemented for binance")
 }
 
 func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]byte, error) {
@@ -99,7 +99,7 @@ func (b *BinanceAdapter) GetTraderInfo(ctx context.Context, payload messages.Acc
 }
 
 func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error {
-	return fmt.Errorf("GetSymbolTrendBars not implemented for binance...")
+	return fmt.Errorf("GetSymbolTrendBars not implemented for binance")
 }
 
 func (b *BinanceAdapter) Disconnect() error {
