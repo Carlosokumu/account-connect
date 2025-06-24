@@ -64,6 +64,7 @@ type BinanceConnectPayload struct {
 // AccountConnectTrendBarsPayload  is a wrapper payload containing all of the possible fields for each of the supported platforms required to request a symbol's trend bars
 type AccountConnectTrendBarsPayload struct {
 	SymbolId      int64  `json:"symbol_id"`
+	SymbolName    string `json:"symbol_name"`
 	Ctid          *int64 `json:"ctid"`
 	FromTimestamp *int64 `json:"fromTimestamp"`
 	ToTimestamp   *int64 `json:"toTimestamp"`
@@ -106,7 +107,7 @@ type AccountConnectTrendBar struct {
 	Open                  float64 `json:"open"`
 	Close                 float64 `json:"close"`
 	Low                   float64 `json:"low"`
-	UtcTimestampInMinutes float64 `json:"utcTimeStampInMinutes"`
+	UtcTimestampInMinutes uint32  `json:"utcTimeStampInMinutes"`
 	Volume                int64   `json:"volume"`
 }
 
