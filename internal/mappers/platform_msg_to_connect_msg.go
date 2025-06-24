@@ -4,6 +4,7 @@ import (
 	pb "account-connect/gen"
 	"account-connect/internal/messages"
 	"fmt"
+	"strconv"
 
 	"github.com/adshao/go-binance/v2"
 )
@@ -65,7 +66,7 @@ func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnect
 			High:                  low + float64(deltaHigh),
 			Open:                  low + float64(deltaOpen),
 			Close:                 low + float64(deltaClose),
-			UtcTimestampInMinutes: float64(*trendBar.UtcTimestampInMinutes),
+			UtcTimestampInMinutes: *trendBar.UtcTimestampInMinutes,
 			Volume:                volume,
 		}
 		trendBars = append(trendBars, tBar)
@@ -139,4 +140,47 @@ func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []message
 		accsyms = append(accsyms, accsym)
 	}
 	return accsyms
+}
+
+func BinanceKlineDataToAccountConnectTrendBar(ohlc []*binance.Kline) ([]messages.AccountConnectTrendBar, error) {
+	var acctrendbars []messages.AccountConnectTrendBar
+
+	for _, kline := range ohlc {
+		high, err := strconv.ParseFloat(kline.High, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse High: %v", err)
+		}
+
+		low, err := strconv.ParseFloat(kline.Low, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Low: %v", err)
+		}
+
+		close, err := strconv.ParseFloat(kline.Close, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Close: %v", err)
+		}
+
+		open, err := strconv.ParseFloat(kline.Open, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Open: %v", err)
+		}
+
+		volume, err := strconv.ParseFloat(kline.Volume, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Volume: %v", err)
+		}
+		openTimeMinutes := kline.OpenTime / (1000 * 60)
+
+		acctrendbars = append(acctrendbars, messages.AccountConnectTrendBar{
+			High:                  high,
+			Low:                   low,
+			Close:                 close,
+			UtcTimestampInMinutes: uint32(openTimeMinutes),
+			Open:                  open,
+			Volume:                int64(volume),
+		})
+	}
+
+	return acctrendbars, nil
 }

@@ -39,8 +39,23 @@ func (b *BinanceConnection) GetTraderInfo(ctx context.Context) error {
 	return fmt.Errorf("GetTraderInfo not implemented for binance")
 }
 
-func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) error {
-	return fmt.Errorf("GetSymbolTrendBars not implemented for binance")
+func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) ([]byte, error) {
+	kservice := b.Client.NewKlinesService()
+	ohlc, err := kservice.Symbol(trendbarsArgs.SymbolName).Interval(trendbarsArgs.Period).StartTime(*trendbarsArgs.FromTimestamp).EndTime(*trendbarsArgs.ToTimestamp).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	acctrendbars, err := mappers.BinanceKlineDataToAccountConnectTrendBar(ohlc)
+	if err != nil {
+		return nil, err
+	}
+	acctrendbarsB, err := json.Marshal(acctrendbars)
+	if err != nil {
+		log.Printf("Failed to marshal acctrendbars data : %v", err)
+		return nil, err
+	}
+
+	return acctrendbarsB, nil
 }
 
 func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]byte, error) {
@@ -99,7 +114,19 @@ func (b *BinanceAdapter) GetTraderInfo(ctx context.Context, payload messages.Acc
 }
 
 func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error {
-	return fmt.Errorf("GetSymbolTrendBars not implemented for binance")
+	trendbars, err := b.binanceConn.GetSymbolTrendBars(ctx, payload)
+	if err != nil {
+		log.Printf("Failed to retrieve binance ohlc data: %v", err)
+		return err
+	}
+	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, trendbars)
+
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	b.binanceConn.AccountConnClient.Send <- msgB
+	return nil
 }
 
 func (b *BinanceAdapter) Disconnect() error {
