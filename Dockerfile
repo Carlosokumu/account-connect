@@ -1,20 +1,18 @@
-# Use an official Golang runtime as a parent image
-FROM golang:latest
+FROM golang:latest AS build
 
-# Set the working directory to /app
-WORKDIR /app
+WORKDIR /build
+COPY . .
 
-# Copy the current directory contents into the container at /app
-COPY . /app
-
-# Download and install any required dependencies
 RUN go mod download
-
-# Build the Go app
 RUN go build -o main ./cmd/http/main.go
 
-# Expose port 8080 for incoming traffic
-EXPOSE 8080
+FROM debian:bullseye-slim
 
-# Define the command to run the app when the container starts
-CMD ["/app/main"]
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /service
+COPY --from=build /build/main .
+
+EXPOSE 8080
+CMD ["./main"]
