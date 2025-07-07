@@ -692,7 +692,7 @@ func (t *CTrader) handleAccountHistoricalDeals(payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal deal: %s", err)
 	}
-	msg := utils.CreateSuccessResponse(acount_connect_messages.TypeAccountSymbols, t.AccountConnClient.ID, dealsB)
+	msg := utils.CreateSuccessResponse(acount_connect_messages.TypeHistorical, t.AccountConnClient.ID, dealsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
