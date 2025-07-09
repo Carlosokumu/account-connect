@@ -95,7 +95,7 @@ func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages
 	if err != nil {
 		return err
 	}
-	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
+	msg := utils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
 
 	msgB, err := json.Marshal(msg)
 	if err != nil {
@@ -119,7 +119,7 @@ func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload message
 		log.Printf("Failed to retrieve binance ohlc data: %v", err)
 		return err
 	}
-	msg := utils.CreateSuccessResponse(messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, trendbars)
+	msg := utils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, trendbars)
 
 	msgB, err := json.Marshal(msg)
 	if err != nil {
