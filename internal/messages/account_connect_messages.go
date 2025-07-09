@@ -31,19 +31,21 @@ const (
 	TypeDisconnect     MessageType = "disconnect"
 )
 
-// All incoming client messages are expected to have this payload structure.
+// AccountConnectMsg all incoming client messages are expected to have this payload structure.
 type AccountConnectMsg struct {
 	Type               MessageType     `json:"type" validate:"required"`
 	TradeshareClientId string          `json:"tradeshare_client_id"`
 	Platform           Platform        `json:"platform"`
+	RequestId          string          `json:"request_id"`
 	Payload            json.RawMessage `json:"payload"`
 }
 
-// All outgoing client messages should have this payload structure
+// AccountConnectMsgRes all outgoing client messages should have this payload structure
 type AccountConnectMsgRes struct {
 	Type               MessageType     `json:"type"`
 	Status             MessageStatus   `json:"status"`
 	TradeShareClientId string          `json:"tradeshare_client_id"`
+	RequestId          string          `json:"request_id"`
 	Payload            json.RawMessage `json:"payload"`
 }
 
