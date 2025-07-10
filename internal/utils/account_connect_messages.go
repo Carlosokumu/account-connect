@@ -2,6 +2,7 @@ package utils
 
 import (
 	"account-connect/internal/messages"
+	"context"
 	"encoding/json"
 )
 
@@ -23,8 +24,13 @@ func CreateErrorResponse(clientID string, errData []byte) messages.AccountConnec
 	}
 }
 
-func CreateSuccessResponse(msgType messages.MessageType, clientID string, payload []byte) messages.AccountConnectMsgRes {
+func CreateSuccessResponse(ctx context.Context, msgType messages.MessageType, clientID string, payload []byte) messages.AccountConnectMsgRes {
+	v, ok := ctx.Value(REQUEST_ID).(string)
+	if !ok {
+		v = ""
+	}
 	return messages.AccountConnectMsgRes{
+		RequestId:          v,
 		Type:               msgType,
 		Status:             messages.StatusSuccess,
 		TradeShareClientId: clientID,
