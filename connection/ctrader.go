@@ -4,6 +4,7 @@ import (
 	"account-connect/config"
 	"account-connect/internal/applications"
 	accdb "account-connect/persistence"
+	"context"
 	"fmt"
 )
 
@@ -23,7 +24,7 @@ func EstablishCTraderConnection(ctraderConfig *config.CTraderConfig, accdb accdb
 	trader.ClientSecret = ctraderConfig.ClientSecret
 	trader.ClientId = ctraderConfig.ClientID
 
-	if err := trader.EstablishCtraderConnection(*ctraderConfig); err != nil {
+	if err := trader.EstablishCtraderConnection(context.Background(), *ctraderConfig); err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}
 
