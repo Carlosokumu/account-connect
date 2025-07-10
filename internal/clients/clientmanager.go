@@ -63,7 +63,7 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.Lock()
 			m.clients[client.ID] = client
 			m.Unlock()
-			go m.handleClientMessages(client)
+			go m.handleClientMessages(ctx, client)
 
 		case client := <-m.Unregister:
 			m.Lock()
@@ -96,9 +96,9 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			err := m.msgRouter.Route(ctx, client, msg)
 			if err != nil {
 				errR := utils.CreateErrorResponse(client.ID, []byte(err.Error()))
-				errRB, marshalErr := json.Marshal(errR)
-				if marshalErr != nil {
-					log.Printf("Failed to marshal error response for client %s: %v", client.ID, marshalErr)
+				errRB, err := json.Marshal(errR)
+				if err != nil {
+					log.Printf("Failed to marshal error response for client %s: %v", client.ID, err)
 					return
 				}
 				select {
@@ -111,8 +111,8 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 	}
 }
 
-// handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the send channel of the client
-func (m *AccountConnectClientManager) handleClientMessages(client *models.AccountConnectClient) {
+// handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the [Send] channel of the client
+func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, client *models.AccountConnectClient) {
 	var (
 		err                  error
 		accountConnectMsgRes messages.AccountConnectMsgRes
@@ -133,15 +133,20 @@ func (m *AccountConnectClientManager) handleClientMessages(client *models.Accoun
 				log.Printf("Failed to unmarshal ctrader %v", err)
 				return
 			}
-			err = m.writeClientConnMessage(client, messages.TypeConnect, nil)
+			ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
+			err = m.writeClientConnMessage(ctx, client, messages.TypeConnect, nil)
 			if err != nil {
 				log.Printf("Client: %s message write fail: %v", client.ID, err)
 				return
 			}
 		} else if accountConnectMsgRes.Status == messages.StatusFailure {
-			m.handlePlatformError(client, accountConnectMsgRes.Payload)
+			err = m.handleClientError(client, accountConnectMsgRes.Payload)
+			if err != nil {
+				return
+			}
 		} else if accountConnectMsgRes.Status != messages.StatusFailure {
-			err = m.writeClientConnMessage(client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
+			ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
+			err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
 			if err != nil {
 				log.Printf("Client: %s message write fail: %v", client.ID, err)
 				return
@@ -152,8 +157,9 @@ func (m *AccountConnectClientManager) handleClientMessages(client *models.Accoun
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
-func (m *AccountConnectClientManager) writeClientConnMessage(client *models.AccountConnectClient, msgType messages.MessageType, payload []byte) error {
+func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *models.AccountConnectClient, msgType messages.MessageType, payload []byte) error {
 	msg := utils.CreateSuccessResponse(
+		ctx,
 		msgType,
 		client.ID,
 		payload,
@@ -161,17 +167,12 @@ func (m *AccountConnectClientManager) writeClientConnMessage(client *models.Acco
 	return m.writeJSONWithTimeout(client, msg)
 }
 
-func (m *AccountConnectClientManager) handlePlatformError(client *models.AccountConnectClient, errData []byte) error {
+func (m *AccountConnectClientManager) handleClientError(client *models.AccountConnectClient, errData []byte) error {
 	msg := utils.CreateErrorResponse(client.ID, errData)
 
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
 		return err
 	}
-
-	// Close connection on error
-	closeMsg := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "server error")
-	deadline := time.Now().Add(5 * time.Second)
-	_ = client.Conn.WriteControl(websocket.CloseMessage, closeMsg, deadline)
 	return fmt.Errorf("error condition, closing connection")
 }
 
