@@ -57,7 +57,7 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 	case messages.TypeTrendBars:
 		return handler.handleTrendBars(ctx, msg)
 	case messages.TypeAccountSymbols:
-		return handler.handleAccountSymbols(ctx, msg.Payload)
+		return handler.handleAccountSymbols(ctx, msg)
 	case messages.TypeDisconnect:
 		return handler.handleClientDisconnect(*client)
 	default:
@@ -264,7 +264,9 @@ func (h *messageHandler) handleTrendBars(ctx context.Context, msg messages.Accou
 	return nil
 }
 
-func (h *messageHandler) handleAccountSymbols(ctx context.Context, payload json.RawMessage) error {
+func (h *messageHandler) handleAccountSymbols(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
 	if err := h.router.RequestAccountSymbols(ctx, h.client, &h.router.db, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeAccountSymbols, err)
 	}
