@@ -29,5 +29,6 @@ type Platform interface {
 	GetTraderInfo(ctx context.Context, payload messages.AccountConnectTraderInfoPayload) error
 	GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error
 	GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error
+	InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error
 	Disconnect() error
 }
