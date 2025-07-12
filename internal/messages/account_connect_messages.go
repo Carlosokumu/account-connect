@@ -29,6 +29,7 @@ const (
 	TypeTrendBars      MessageType = "trend_bars"
 	TypeError          MessageType = "error"
 	TypeDisconnect     MessageType = "disconnect"
+	TypeStream         MessageType = "stream_subscribe"
 )
 
 // AccountConnectMsg all incoming client messages are expected to have this payload structure.
@@ -71,6 +72,12 @@ type AccountConnectTrendBarsPayload struct {
 	FromTimestamp *int64 `json:"fromTimestamp"`
 	ToTimestamp   *int64 `json:"toTimestamp"`
 	Period        string `json:"period"`
+}
+
+// AccountConnectStreamPayload wrapper payload required to initialize a stream of messages.
+type AccountConnectStreamPayload struct {
+	StreamId string `json:"stream_id"`
+	SymbolId string `json:"symbol_id"`
 }
 
 // AccountConnectCtId is wrapper payload containing all of the possible fields required  by  each of the supported platforms  to request a trader's information.
@@ -139,4 +146,9 @@ type AccountConnectSymbolsPayload struct {
 type AccountConnectSymbolInfoPayload struct {
 	Ctid     *int64  `json:"ctid"`
 	SymbolId []int64 `json:"symbol_id"`
+}
+
+type AccountConnectCryptoPrice struct {
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
 }

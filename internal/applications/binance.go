@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/adshao/go-binance/v2"
 )
@@ -16,12 +17,15 @@ import (
 type BinanceConnection struct {
 	Client            *binance.Client
 	AccountConnClient *models.AccountConnectClient
+	wsServeMux        sync.Mutex
+	doneChans         map[string]chan struct{}
 }
 
 func NewBinanceConnection(apiKey, secretKey string, accountConnClient *models.AccountConnectClient) *BinanceConnection {
 	return &BinanceConnection{
 		Client:            binance.NewClient(apiKey, secretKey),
 		AccountConnClient: accountConnClient,
+		doneChans:         make(map[string]chan struct{}),
 	}
 
 }
@@ -33,6 +37,85 @@ func (b *BinanceConnection) EstablishBinanceConnection(apiKey, secretKey string)
 
 func (b *BinanceConnection) GetHistoricalTrades(ctx context.Context) error {
 	return fmt.Errorf("GetHistoricalTrades not implemented for  binance")
+}
+
+// StartSymbolPriceStream starts a real-time price stream for a symbol(trading pair)
+func (b *BinanceConnection) StartSymbolPriceStream(ctx context.Context, symbol string, strm chan []byte) error {
+	b.wsServeMux.Lock()
+	defer b.wsServeMux.Unlock()
+
+	doneChan := make(chan struct{})
+	b.doneChans[symbol] = doneChan
+
+	wsHandler := func(event *binance.WsAggTradeEvent) {
+		msg := messages.AccountConnectCryptoPrice{
+			Symbol: event.Symbol,
+			Price:  event.Price,
+		}
+		msgB, err := json.Marshal(msg)
+		if err != nil {
+			log.Printf("Failed to unmarshal crypto price: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			b.StopSymbolPriceStream(symbol)
+			return
+		case strm <- msgB:
+		default:
+			log.Printf("Stream channel full for %s, dropping update", symbol)
+		}
+
+	}
+
+	errHandler := func(err error) {
+		log.Printf("Error in price stream for %s: %v\n", symbol, err)
+		b.StopSymbolPriceStream(symbol)
+	}
+
+	doneC, stopC, err := binance.WsAggTradeServe(symbol, wsHandler, errHandler)
+	if err != nil {
+		delete(b.doneChans, symbol)
+		close(doneChan)
+		return fmt.Errorf("failed to start websocket: %v", err)
+	}
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			stopC <- struct{}{}
+			delete(b.doneChans, symbol)
+			close(doneChan)
+		case <-doneC:
+			delete(b.doneChans, symbol)
+			close(doneChan)
+		}
+	}()
+
+	return nil
+}
+
+// StopSymbolPriceStream stops a running price stream
+func (b *BinanceConnection) StopSymbolPriceStream(symbol string) {
+	b.wsServeMux.Lock()
+	defer b.wsServeMux.Unlock()
+
+	if doneChan, exists := b.doneChans[symbol]; exists {
+		close(doneChan)
+		delete(b.doneChans, symbol)
+	}
+}
+
+// startMarketPriceStream will start a realtime market price stream for a given symbol(trading pair) for the specified stream id
+func (b *BinanceConnection) startMarketPriceStream(ctx context.Context, sym string, streamID string) error {
+	if stream, exists := b.AccountConnClient.Streams[streamID]; exists {
+		err := b.StartSymbolPriceStream(ctx, sym, stream)
+		if err != nil {
+			log.Printf("Failed to start stream for symbol: %s and stream id: %s", sym, streamID)
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("stream ID %s not found", streamID)
 }
 
 func (b *BinanceConnection) GetTraderInfo(ctx context.Context) error {
@@ -58,6 +141,7 @@ func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArg
 	return acctrendbarsB, nil
 }
 
+// GetBinanceTradingSymbols will retrieve all the available tradable symbols from binance
 func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]byte, error) {
 	exchangeInfo, err := b.Client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
@@ -126,6 +210,26 @@ func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload message
 		return err
 	}
 	b.binanceConn.AccountConnClient.Send <- msgB
+	return nil
+}
+
+// InitializeClientStream will initialize a stream of real time market prices for the specified stream id for a particular symbol
+func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error {
+	err := b.binanceConn.AccountConnClient.AddStream(payload.StreamId)
+	if err != nil {
+		return err
+	}
+	log.Printf("Initialized a new stream with id: %s stream len now: %d", payload.StreamId, len(b.binanceConn.AccountConnClient.Streams))
+	msg := utils.CreateSuccessResponse(ctx, messages.TypeStream, b.binanceConn.AccountConnClient.ID, nil)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	b.binanceConn.AccountConnClient.Send <- msgB
+	err = b.binanceConn.startMarketPriceStream(ctx, payload.SymbolId, payload.StreamId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

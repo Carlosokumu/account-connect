@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -47,9 +48,10 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 		clientID := req.URL.Query().Get("tradeshare_client_id")
 
 		client := &models.AccountConnectClient{
-			ID:   clientID,
-			Conn: ws,
-			Send: make(chan []byte, ClientSendBufferSize),
+			ID:      clientID,
+			Conn:    ws,
+			Send:    make(chan []byte, ClientSendBufferSize),
+			Streams: make(map[string]chan []byte, ClientSendBufferSize),
 		}
 
 		clientManager.Register <- client
@@ -94,6 +96,8 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 }
 
 func main() {
+	var wg sync.WaitGroup
+
 	accdb := db.AccountConnectDb{}
 	err := accdb.Create()
 	if err != nil {
@@ -115,9 +119,15 @@ func main() {
 
 	clientManager := clients.NewClientManager(accdb)
 
-	go clientManager.StartClientManagement(ctx)
-
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		clientManager.StartClientManagement(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		if err := startWsService(ctx, clientManager, accdb); err != nil {
 			log.Printf("WebSocket service error: %v", err)
 			cancel()
@@ -125,5 +135,8 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	log.Println("Main: context canceled, waiting for goroutines to finish...")
 
+	wg.Wait()
+	log.Println("Graceful shutdown done")
 }

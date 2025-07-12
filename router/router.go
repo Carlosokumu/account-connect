@@ -59,7 +59,10 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 	case messages.TypeAccountSymbols:
 		return handler.handleAccountSymbols(ctx, msg)
 	case messages.TypeDisconnect:
-		return handler.handleClientDisconnect(*client)
+		return handler.handleClientDisconnect(ctx, *client)
+	case messages.TypeStream:
+		return handler.handleClientSubcribeToStream(ctx, msg)
+
 	default:
 		return fmt.Errorf("unknown message type: %s", msg.Type)
 	}
@@ -168,7 +171,30 @@ func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountCon
 	return nil
 }
 
-// DisconnectPlatformConnection  handles disconnection to underlying platform connection for the client
+func (r *Router) InitializeClientStream(ctx context.Context, client *models.AccountConnectClient, payload json.RawMessage) error {
+	var req messages.AccountConnectStreamPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal account-connect stream request: %v", err)
+		return fmt.Errorf("failed to unmarshal account connect trend bars requests: %w", err)
+	}
+
+	cp, ok := r.ClientPlatform[client.ID]
+	if !ok {
+		log.Printf("Client with id: %s not found", client.ID)
+		return fmt.Errorf("failed to find router client with id: %s", client.ID)
+	}
+
+	err = cp.InitializeClientStream(ctx, req)
+	if err != nil {
+		log.Printf("Failed to initialize client's stream: %v", err)
+		return err
+	}
+	return nil
+}
+
+// DisconnectPlatformConnection  handles graceful disconnection  of the to underlying platform connection for the client
 func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClient) error {
 	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
@@ -231,11 +257,11 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 	}
 }
 
-func (h *messageHandler) handleClientDisconnect(client models.AccountConnectClient) error {
+func (h *messageHandler) handleClientDisconnect(ctx context.Context, client models.AccountConnectClient) error {
 	_, ok := h.router.ClientPlatform[client.ID]
 	if !ok {
 		log.Printf("Client with id: %s not found when disconnecting", client.ID)
-		return fmt.Errorf("could not handle disconnect for client with id: %s as was client not found", client.ID)
+		return fmt.Errorf("could not handle disconnect for client with id: %s as client has no active connections", client.ID)
 	}
 	return h.router.DisconnectPlatformConnection(&client)
 }
@@ -250,6 +276,15 @@ func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.Acco
 	payload := msg.Payload
 	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
 	if err := h.router.RequestTraderInfo(ctx, h.client, &h.router.db, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeTraderInfo, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleClientSubcribeToStream(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	if err := h.router.InitializeClientStream(ctx, h.client, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeTraderInfo, err)
 	}
 	return nil
