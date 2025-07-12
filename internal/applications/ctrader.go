@@ -143,6 +143,10 @@ func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acoun
 	return cta.ctrader.GetChartTrendBars(ctx, payload)
 }
 
+func (cta *CtraderAdapter) InitializeClientStream(ctx context.Context, payload acount_connect_messages.AccountConnectStreamPayload) error {
+	return nil
+}
+
 func (cta *CtraderAdapter) Disconnect() error {
 	return cta.ctrader.DisconnectPlatformConn()
 }
