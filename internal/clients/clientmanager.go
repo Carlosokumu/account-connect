@@ -18,8 +18,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type clientContext struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
 type AccountConnectClientManager struct {
 	clients                map[string]*models.AccountConnectClient
+	clientContexts         map[string]clientContext
 	IncomingClientMessages chan []byte
 	Register               chan *models.AccountConnectClient
 	Unregister             chan *models.AccountConnectClient
@@ -33,6 +39,7 @@ func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
 
 	return &AccountConnectClientManager{
 		clients:                make(map[string]*models.AccountConnectClient),
+		clientContexts:         make(map[string]clientContext),
 		IncomingClientMessages: make(chan []byte),
 		Register:               make(chan *models.AccountConnectClient),
 		Unregister:             make(chan *models.AccountConnectClient),
@@ -43,9 +50,21 @@ func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
 // StartClientManagement  is responsible for handling client activities,
 // from registering,unregistering clients and routing messages to the [Router.]
 func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context) {
+
+	mgrCtx, cancelMgr := context.WithCancel(ctx)
+	defer cancelMgr()
+
+	defer func() {
+		for _, cctx := range m.clientContexts {
+			//cancel all client contexts
+			cctx.cancel()
+		}
+	}()
+
 	for {
 		select {
-		case <-ctx.Done():
+		case <-mgrCtx.Done():
+			log.Printf("Canceling signal received from app level")
 			m.Lock()
 			for _, client := range m.clients {
 				disconnectMsg := messages.AccountConnectMsg{
@@ -53,7 +72,11 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 					Payload:            nil,
 					TradeshareClientId: client.ID,
 				}
-				m.msgRouter.Route(ctx, client, disconnectMsg)
+				if clientCtx, ok := m.clientContexts[client.ID]; ok {
+					m.msgRouter.Route(clientCtx.ctx, client, disconnectMsg)
+					clientCtx.cancel()
+					delete(m.clientContexts, client.ID)
+				}
 				close(client.Send)
 			}
 			m.clients = make(map[string]*models.AccountConnectClient)
@@ -62,8 +85,12 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 		case client := <-m.Register:
 			m.Lock()
 			m.clients[client.ID] = client
+			//create client specific ctx
+			cctx, cancel := context.WithCancel(mgrCtx)
+			m.clientContexts[client.ID] = clientContext{ctx: cctx, cancel: cancel}
+
 			m.Unlock()
-			go m.handleClientMessages(ctx, client)
+			go m.handleClientMessages(cctx, client)
 
 		case client := <-m.Unregister:
 			m.Lock()
@@ -73,7 +100,13 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 					Payload:            nil,
 					TradeshareClientId: client.ID,
 				}
-				m.msgRouter.Route(ctx, client, disconnectMsg)
+				if clientCtx, ok := m.clientContexts[client.ID]; ok {
+					log.Printf("Canceling ctx for client id: %v via unregister", client.ID)
+					m.msgRouter.Route(clientCtx.ctx, client, disconnectMsg)
+					clientCtx.cancel()
+					delete(m.clientContexts, client.ID)
+				}
+
 				close(client.Send)
 				delete(m.clients, client.ID)
 			}
@@ -83,17 +116,17 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			var msg messages.AccountConnectMsg
 			if err := json.Unmarshal(incomingMsg, &msg); err != nil {
 				log.Printf("Invalid account-connect message %v:", err)
-				continue
+				return
 			}
 			m.RLock()
 			client, exists := m.clients[msg.TradeshareClientId]
 			if !exists {
 				m.RUnlock()
 				log.Printf("Client id: %s not found", msg.TradeshareClientId)
-				continue
+				return
 			}
 			m.RUnlock()
-			err := m.msgRouter.Route(ctx, client, msg)
+			err := m.msgRouter.Route(m.clientContexts[client.ID].ctx, client, msg)
 			if err != nil {
 				errR := utils.CreateErrorResponse(client.ID, []byte(err.Error()))
 				errRB, err := json.Marshal(errR)
@@ -118,42 +151,76 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 		accountConnectMsgRes messages.AccountConnectMsgRes
 	)
 
-	for msg := range client.Send {
-		log.Printf("Message to the client %s: %s\n", client.ID, string(msg))
-
-		err = json.Unmarshal(msg, &accountConnectMsgRes)
-		if err != nil {
-			log.Printf("Failed to unmarshal account connect message: %v", err)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("Ctx canceled for client: %s", client.ID)
 			return
+		case msg, ok := <-client.Send:
+			if !ok {
+				log.Print("client msg read via send  error")
+				return
+			}
+			log.Printf("Message to the client %s: %s\n", client.ID, string(msg))
+			err = json.Unmarshal(msg, &accountConnectMsgRes)
+			if err != nil {
+				log.Printf("Failed to unmarshal account connect message: %v", err)
+				return
+			}
+			if accountConnectMsgRes.Type == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
+				var trader applications.CTrader
+				err = json.Unmarshal(accountConnectMsgRes.Payload, &trader)
+				if err != nil {
+					log.Printf("Failed to unmarshal ctrader %v", err)
+					return
+				}
+				ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
+				err = m.writeClientConnMessage(ctx, client, messages.TypeConnect, nil)
+				if err != nil {
+					log.Printf("Client: %s message write fail: %v", client.ID, err)
+					return
+				}
+			} else if accountConnectMsgRes.Status == messages.StatusFailure {
+				err = m.handleClientError(client, accountConnectMsgRes.Payload)
+				if err != nil {
+					return
+				}
+			} else if accountConnectMsgRes.Status != messages.StatusFailure {
+				ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
+				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
+				if err != nil {
+					log.Printf("Client: %s message write fail: %v", client.ID, err)
+					return
+				}
+			}
+		default:
+			client.StreamsMutex.Lock()
+			streams := make([]chan []byte, 0, len(client.Streams))
+			for _, stream := range client.Streams {
+				streams = append(streams, stream)
+			}
+			client.StreamsMutex.Unlock()
+
+			// Check each stream for messages
+			for _, stream := range streams {
+				select {
+				case msg, ok := <-stream:
+					if !ok {
+						continue
+					}
+					ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
+					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, msg)
+					if err != nil {
+						log.Printf("Client: %s message write fail: %v", client.ID, err)
+						return
+					}
+				default:
+				}
+			}
+
 		}
-		if accountConnectMsgRes.Type == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
-			var trader applications.CTrader
-			err = json.Unmarshal(accountConnectMsgRes.Payload, &trader)
-			if err != nil {
-				log.Printf("Failed to unmarshal ctrader %v", err)
-				return
-			}
-			ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
-			err = m.writeClientConnMessage(ctx, client, messages.TypeConnect, nil)
-			if err != nil {
-				log.Printf("Client: %s message write fail: %v", client.ID, err)
-				return
-			}
-		} else if accountConnectMsgRes.Status == messages.StatusFailure {
-			err = m.handleClientError(client, accountConnectMsgRes.Payload)
-			if err != nil {
-				return
-			}
-		} else if accountConnectMsgRes.Status != messages.StatusFailure {
-			ctx = context.WithValue(ctx, utils.REQUEST_ID, accountConnectMsgRes.RequestId)
-			err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
-			if err != nil {
-				log.Printf("Client: %s message write fail: %v", client.ID, err)
-				return
-			}
-		}
+
 	}
-	log.Printf("Stopped listening to client %s (channel closed)\n", client.ID)
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
