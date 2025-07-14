@@ -21,16 +21,14 @@ type BinanceConnection struct {
 	doneChans         map[string]chan struct{}
 }
 
-func NewBinanceConnection(apiKey, secretKey string, accountConnClient *models.AccountConnectClient) *BinanceConnection {
+func NewBinanceConnection(accountConnClient *models.AccountConnectClient) *BinanceConnection {
 	return &BinanceConnection{
-		Client:            binance.NewClient(apiKey, secretKey),
 		AccountConnClient: accountConnClient,
 		doneChans:         make(map[string]chan struct{}),
 	}
-
 }
 
-func (b *BinanceConnection) EstablishBinanceConnection(apiKey, secretKey string) error {
+func (b *BinanceConnection) Connect(apiKey, secretKey string) error {
 	b.Client = binance.NewClient(apiKey, secretKey)
 	return nil
 }
@@ -161,9 +159,9 @@ type BinanceAdapter struct {
 	binanceConn *BinanceConnection
 }
 
-func NewBinanceAdapter(apiKey, secretKey string, accountConnClient *models.AccountConnectClient) *BinanceAdapter {
+func NewBinanceAdapter(accountConnClient *models.AccountConnectClient) *BinanceAdapter {
 	return &BinanceAdapter{
-		binanceConn: NewBinanceConnection(apiKey, secretKey, accountConnClient),
+		binanceConn: NewBinanceConnection(accountConnClient),
 	}
 }
 
@@ -171,7 +169,15 @@ func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg PlatformCo
 	apiKey := cfg.ApiKey
 	secretKey := cfg.SecretKey
 
-	return b.binanceConn.EstablishBinanceConnection(apiKey, secretKey)
+	conn := NewBinanceConnection(b.binanceConn.AccountConnClient)
+	err := conn.Connect(apiKey, secretKey)
+
+	if err != nil {
+		return err
+	}
+	b.binanceConn = conn
+
+	return nil
 }
 
 func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error {

@@ -205,7 +205,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 			return fmt.Errorf("invalid connect message format: %w", err)
 		}
 
-		binanceAdapter := applications.NewBinanceAdapter(binanceconnectmsg.APIKey, binanceconnectmsg.APISecret, accountConnClient)
+		binanceAdapter := applications.NewBinanceAdapter(accountConnClient)
 		h.router.ClientPlatform[h.client.ID] = binanceAdapter
 
 		ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
