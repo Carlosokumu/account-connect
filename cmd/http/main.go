@@ -27,14 +27,8 @@ const (
 )
 
 func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, _ db.AccountConnectDb) error {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Printf("Failed to load config: %v", err)
-		return err
-	}
-
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Servers.AccountConnectServer.Port),
+		Addr:    fmt.Sprintf(":%d", config.AccountConnectPort),
 		Handler: nil,
 	}
 
@@ -98,8 +92,14 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 func main() {
 	var wg sync.WaitGroup
 
+	err := config.LoadConfigs()
+	if err != nil {
+		log.Printf("Failed to read config file correctly: %v", err)
+		os.Exit(1)
+	}
+
 	accdb := db.AccountConnectDb{}
-	err := accdb.Create()
+	err = accdb.Create()
 	if err != nil {
 		log.Printf("Failed to initialize account db: %v", err)
 		os.Exit(1)
