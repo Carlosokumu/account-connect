@@ -100,17 +100,18 @@ func (t *CTrader) registerHandlers() {
 }
 
 func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
-	srvCfg, err := config.LoadConfig()
-	if err != nil {
-		log.Printf("Failed to load configs in route: %v", err)
-		return err
+	cendpoint := config.CtraderEndpoint
+	cport := config.CtraderPort
+
+	if cendpoint == "" || cport == 0 {
+		return fmt.Errorf("missing required ctrader port or endpoint")
 	}
 
-	err = cta.ctrader.EstablishCtraderConnection(ctx, config.CTraderConfig{
+	err := cta.ctrader.EstablishCtraderConnection(ctx, config.CTraderConfig{
 		ClientID:     cfg.ClientId,
 		ClientSecret: cfg.SecretKey,
-		Endpoint:     srvCfg.Servers.Ctrader.Endpoint,
-		Port:         srvCfg.Servers.Ctrader.Port,
+		Endpoint:     cendpoint,
+		Port:         cport,
 		AccountID:    *cfg.AccountId,
 	})
 	if err != nil {

@@ -35,16 +35,9 @@ func (r *Router) Handle(messageType string, handler func(*models.AccountConnectC
 
 // Route  routes the different message types from clients to the right handler function
 func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Printf("Failed to load configs in route: %v", err)
-		return err
-	}
-
 	handler := messageHandler{
 		router: r,
 		client: client,
-		cfg:    cfg,
 	}
 
 	switch msg.Type {
@@ -229,8 +222,8 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 		}
 
 		ctraderCfg := config.NewCTraderConfig(ctconnectmsg.AccountId)
-		ctraderCfg.Endpoint = h.cfg.Servers.Ctrader.Endpoint
-		ctraderCfg.Port = h.cfg.Servers.Ctrader.Port
+		ctraderCfg.Endpoint = config.CtraderEndpoint
+		ctraderCfg.Port = config.CtraderPort
 
 		ctraderCfg.ClientID = ctconnectmsg.ClientId
 		ctraderCfg.ClientSecret = ctconnectmsg.ClientSecret
@@ -341,7 +334,6 @@ func (h *messageHandler) writeClientMessage(response messages.AccountConnectMsgR
 type messageHandler struct {
 	router *Router
 	client *models.AccountConnectClient
-	cfg    *config.Config
 }
 
 func (r *Router) logError(context, clientID string, err error) {
