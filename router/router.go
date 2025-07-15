@@ -15,14 +15,14 @@ import (
 
 type Router struct {
 	db             db.AccountConnectDb
-	ClientPlatform map[string]applications.Platform
+	ClientPlatform map[string]applications.PlatformAdapter
 	handlers       map[string]func(client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error
 }
 
 // NewRouter creates a new Router instance
 func NewRouter(accdb db.AccountConnectDb) *Router {
 	return &Router{
-		ClientPlatform: map[string]applications.Platform{},
+		ClientPlatform: map[string]applications.PlatformAdapter{},
 		db:             accdb,
 		handlers:       make(map[string]func(*models.AccountConnectClient, *db.AccountConnectDb, json.RawMessage) error),
 	}
@@ -164,6 +164,7 @@ func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountCon
 	return nil
 }
 
+// InitializeClientStream initializes a stream of messages to be sent through the specified channel
 func (r *Router) InitializeClientStream(ctx context.Context, client *models.AccountConnectClient, payload json.RawMessage) error {
 	var req messages.AccountConnectStreamPayload
 
@@ -198,56 +199,77 @@ func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClien
 }
 
 func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
+	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+
+	var adapter applications.PlatformAdapter
+	var err error
+
 	switch msg.Platform {
 	case messages.Binance:
-		var binanceconnectmsg messages.BinanceConnectPayload
-		if err := json.Unmarshal(msg.Payload, &binanceconnectmsg); err != nil {
-			return fmt.Errorf("invalid connect message format: %w", err)
-		}
-
-		binanceAdapter := applications.NewBinanceAdapter(accountConnClient)
-		h.router.ClientPlatform[h.client.ID] = binanceAdapter
-
-		ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
-		err := binanceAdapter.EstablishConnection(ctx, applications.PlatformConfigs{})
-		if err != nil {
-			return err
-		}
-		msgR := utils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
-		return h.writeClientMessage(msgR)
+		adapter, err = h.handleBinanceConnect(ctx, accountConnClient, msg.Payload)
 	case messages.Ctrader:
-		var ctconnectmsg messages.CTraderConnectPayload
-		if err := json.Unmarshal(msg.Payload, &ctconnectmsg); err != nil {
-			return fmt.Errorf("invalid connect message format: %w", err)
-		}
-
-		ctraderCfg := config.NewCTraderConfig(ctconnectmsg.AccountId)
-		ctraderCfg.Endpoint = config.CtraderEndpoint
-		ctraderCfg.Port = config.CtraderPort
-
-		ctraderCfg.ClientID = ctconnectmsg.ClientId
-		ctraderCfg.ClientSecret = ctconnectmsg.ClientSecret
-		ctraderCfg.AccessToken = ctconnectmsg.AccessToken
-
-		ctraderAdapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, ctraderCfg)
-
-		ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
-		err := ctraderAdapter.EstablishConnection(ctx, applications.PlatformConfigs{
-			AccountId:    &ctconnectmsg.AccountId,
-			ClientId:     ctconnectmsg.ClientId,
-			ClientSecret: ctconnectmsg.ClientSecret,
-			AccessToken:  ctconnectmsg.AccessToken,
-		})
-		if err != nil {
-			return err
-		}
-		msgR := utils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
-		h.router.ClientPlatform[h.client.ID] = ctraderAdapter
-		return h.writeClientMessage(msgR)
+		adapter, err = h.handleCtraderConnect(ctx, accountConnClient, msg.Payload)
 	default:
-		return fmt.Errorf("attempting connection to unsupported platform: %s", msg.Platform)
-
+		return fmt.Errorf("unsupported platform: %s", msg.Platform)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	h.router.ClientPlatform[h.client.ID] = adapter
+	msgR := utils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
+	return h.writeClientMessage(msgR)
+}
+
+// handleBinanceConnect will establish a connection to binance
+func (h *messageHandler) handleBinanceConnect(
+	ctx context.Context,
+	accountConnClient *models.AccountConnectClient,
+	payload json.RawMessage,
+) (applications.PlatformAdapter, error) {
+	var binanceMsg messages.BinanceConnectPayload
+	if err := json.Unmarshal(payload, &binanceMsg); err != nil {
+		return nil, fmt.Errorf("invalid Binance payload: %w", err)
+	}
+
+	adapter := applications.NewBinanceAdapter(accountConnClient)
+	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{}); err != nil {
+		return nil, err
+	}
+
+	return adapter, nil
+}
+
+// handleCtraderConnect will establish a connection to ctrader open api
+func (h *messageHandler) handleCtraderConnect(
+	ctx context.Context,
+	accountConnClient *models.AccountConnectClient,
+	payload json.RawMessage,
+) (applications.PlatformAdapter, error) {
+	var ctraderMsg messages.CTraderConnectPayload
+	if err := json.Unmarshal(payload, &ctraderMsg); err != nil {
+		return nil, fmt.Errorf("invalid cTrader payload: %w", err)
+	}
+
+	cfg := config.NewCTraderConfig(ctraderMsg.AccountId)
+	cfg.Endpoint = config.CtraderEndpoint
+	cfg.Port = config.CtraderPort
+	cfg.ClientID = ctraderMsg.ClientId
+	cfg.ClientSecret = ctraderMsg.ClientSecret
+	cfg.AccessToken = ctraderMsg.AccessToken
+
+	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, cfg)
+	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{
+		AccountId:    &ctraderMsg.AccountId,
+		ClientId:     ctraderMsg.ClientId,
+		ClientSecret: ctraderMsg.ClientSecret,
+		AccessToken:  ctraderMsg.AccessToken,
+	}); err != nil {
+		return nil, err
+	}
+
+	return adapter, nil
 }
 
 func (h *messageHandler) handleClientDisconnect(ctx context.Context, client models.AccountConnectClient) error {
