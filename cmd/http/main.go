@@ -23,7 +23,7 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	ClientSendBufferSize = 50
+	ClientSendBufferSize = 512
 )
 
 func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, _ db.AccountConnectDb) error {
@@ -40,6 +40,20 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 		}
 
 		clientID := req.URL.Query().Get("tradeshare_client_id")
+		if clientID == "" {
+			errMsg := map[string]string{
+				"error":   "client_id_required",
+				"message": "Connection rejected: tradeshare_client_id parameter is required",
+			}
+			ws.WriteJSON(errMsg)
+			ws.WriteControl(
+				websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "client_id_required"),
+				time.Now().Add(time.Second),
+			)
+			ws.Close()
+			return
+		}
 
 		client := &models.AccountConnectClient{
 			ID:      clientID,
