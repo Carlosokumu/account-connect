@@ -76,8 +76,8 @@ type AccountConnectTrendBarsPayload struct {
 
 // AccountConnectStreamPayload wrapper payload required to initialize a stream of messages.
 type AccountConnectStreamPayload struct {
-	StreamId string `json:"stream_id"`
-	SymbolId string `json:"symbol_id"`
+	StreamType string `json:"stream_type"`
+	SymbolId   string `json:"symbol_id"`
 }
 
 // AccountConnectCtId is wrapper payload containing all of the possible fields required  by  each of the supported platforms  to request a trader's information.
