@@ -132,12 +132,14 @@ func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []message
 	var accsyms []messages.AccountConnectSymbol
 
 	for _, sym := range binancesyms {
-		//The symbol from binance will be used as an id and symbol name
-		accsym := messages.AccountConnectSymbol{
-			SymbolName: &sym.Symbol,
-			SymbolId:   sym.Symbol,
+		if sym.Status == "TRADING" {
+			//The symbol from binance will be used as an id and symbol name
+			accsym := messages.AccountConnectSymbol{
+				SymbolName: &sym.Symbol,
+				SymbolId:   sym.Symbol,
+			}
+			accsyms = append(accsyms, accsym)
 		}
-		accsyms = append(accsyms, accsym)
 	}
 	return accsyms
 }
