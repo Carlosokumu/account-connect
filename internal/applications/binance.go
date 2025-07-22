@@ -200,6 +200,8 @@ func (b *BinanceConnection) GetTraderInfo(ctx context.Context) error {
 }
 
 func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) ([]byte, error) {
+	//TODO:
+	//add check for fields sent in via trendbarsArgs
 	kservice := b.Client.NewKlinesService()
 	ohlc, err := kservice.Symbol(trendbarsArgs.SymbolName).Interval(trendbarsArgs.Period).StartTime(*trendbarsArgs.FromTimestamp).EndTime(*trendbarsArgs.ToTimestamp).Do(ctx)
 	if err != nil {
@@ -209,7 +211,13 @@ func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArg
 	if err != nil {
 		return nil, err
 	}
-	acctrendbarsB, err := json.Marshal(acctrendbars)
+	acctrendbarsRes := messages.AccountConnectTrendBarRes{
+		Trendbars: acctrendbars,
+		Symbol:    trendbarsArgs.SymbolName,
+		Period:    trendbarsArgs.Period,
+	}
+
+	acctrendbarsB, err := json.Marshal(acctrendbarsRes)
 	if err != nil {
 		log.Printf("Failed to marshal acctrendbars data : %v", err)
 		return nil, err
