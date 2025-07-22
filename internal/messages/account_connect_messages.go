@@ -32,7 +32,7 @@ const (
 	TypeStream         MessageType = "stream_subscribe"
 )
 
-// AccountConnectMsg all incoming client messages are expected to have this payload structure.
+// AccountConnectMsg is a base message structure that incoming client messages are expected to have.
 type AccountConnectMsg struct {
 	Type               MessageType     `json:"type" validate:"required"`
 	TradeshareClientId string          `json:"tradeshare_client_id"`
@@ -41,7 +41,7 @@ type AccountConnectMsg struct {
 	Payload            json.RawMessage `json:"payload"`
 }
 
-// AccountConnectMsgRes all outgoing client messages should have this payload structure
+// AccountConnectMsgRes  is a base message structure that all outgoing client messages should have.
 type AccountConnectMsgRes struct {
 	Type               MessageType     `json:"type"`
 	Status             MessageStatus   `json:"status"`
@@ -50,7 +50,7 @@ type AccountConnectMsgRes struct {
 	Payload            json.RawMessage `json:"payload"`
 }
 
-// Payload that should be contained in the  payload field of AccountConnectMsg struct for ctrader connection.
+// CTraderConnectPayload  is payload structure defining fields  required to establish a ctrader connection.
 type CTraderConnectPayload struct {
 	AccountId    int64  `json:"account_id"`
 	ClientId     string `json:"client_id"`
@@ -58,7 +58,7 @@ type CTraderConnectPayload struct {
 	AccessToken  string `json:"access_token"`
 }
 
-// Payload that should be contained in the  payload field of AccountConnectMsg struct for binance connection.
+// BinanceConnectPayload is payload structure defining fields  required to establish a binance connection.
 type BinanceConnectPayload struct {
 	APIKey    string `json:"api_key"`
 	APISecret string `json:"api_secret"`
@@ -85,45 +85,9 @@ type AccountConnectCtId struct {
 	Ctid *int64 `json:"ctid"`
 }
 
-// AccountConnectDeal  is model message containing information about a deal that happened for a particular trade
-type AccountConnectDeal struct {
-	ExecutionPrice *float64 `json:"execution_price"`
-	Commission     *int64   `json:"commission"`
-	Lots           *int64   `json:"lots"`
-	ClosingPrice   *int64   `json:"closing_price"`
-	Profit         *int64   `json:"profit"`
-	Direction      string   `json:"direction"`
-	Balance        *int64   `json:"balance"`
-	Symbol         *int64   `json:"symbol"`
-}
-
 // AccountConnectError contains description of an error that occurred while processing a client's request
 type AccountConnectError struct {
 	Description string `json:"description"`
-}
-
-// AccountConnectTraderInfo is a model message containing trader's information.
-type AccountConnectTraderInfo struct {
-	CtidTraderAccountId *int64  `json:"account_id"`
-	Login               *int64  `json:"login"`
-	BrokerName          *string `json:"broker_name"`
-	DepositAssetId      *int64  `json:"depositAssetId"`
-}
-
-// AccountConnectTrendBar  is model message providing the  OHLC values
-type AccountConnectTrendBar struct {
-	High                  float64 `json:"high"`
-	Open                  float64 `json:"open"`
-	Close                 float64 `json:"close"`
-	Low                   float64 `json:"low"`
-	UtcTimestampInMinutes uint32  `json:"utcTimeStampInMinutes"`
-	Volume                int64   `json:"volume"`
-}
-
-// AccountConnectSymbol  is model message containing trading pairs information
-type AccountConnectSymbol struct {
-	SymbolName *string `json:"name"` //E.g EUR/USD
-	SymbolId   any     `json:"id"`
 }
 
 // AccountConnectHistoricalDealsPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to request past account trades.
@@ -148,6 +112,50 @@ type AccountConnectSymbolInfoPayload struct {
 	SymbolId []int64 `json:"symbol_id"`
 }
 
+// AccountConnectTraderInfo is a model message containing trader's information.
+type AccountConnectTraderInfo struct {
+	CtidTraderAccountId *int64  `json:"account_id"`
+	Login               *int64  `json:"login"`
+	BrokerName          *string `json:"broker_name"`
+	DepositAssetId      *int64  `json:"depositAssetId"`
+}
+
+// AccountConnectTrendBar  is model message providing the  OHLC values
+type AccountConnectTrendBar struct {
+	High                  float64 `json:"high"`
+	Open                  float64 `json:"open"`
+	Close                 float64 `json:"close"`
+	Low                   float64 `json:"low"`
+	UtcTimestampInMinutes uint32  `json:"utcTimeStampInMinutes"`
+	Volume                int64   `json:"volume"`
+}
+
+// AccountConnectTrendBar  is  wrapper model message for the [AccountConnectTrendBar] containing additional metadata.
+type AccountConnectTrendBarRes struct {
+	Trendbars []AccountConnectTrendBar `json:"trendbars"`
+	Symbol    string                   `json:"symbol"`
+	Period    string                   `json:"period"`
+}
+
+// AccountConnectDeal  is model message containing information about a deal that happened for a particular trade
+type AccountConnectDeal struct {
+	ExecutionPrice *float64 `json:"execution_price"`
+	Commission     *int64   `json:"commission"`
+	Lots           *int64   `json:"lots"`
+	ClosingPrice   *int64   `json:"closing_price"`
+	Profit         *int64   `json:"profit"`
+	Direction      string   `json:"direction"`
+	Balance        *int64   `json:"balance"`
+	Symbol         *int64   `json:"symbol"`
+}
+
+// AccountConnectSymbol  is model message containing trading pairs information
+type AccountConnectSymbol struct {
+	SymbolName *string `json:"name"` //E.g EUR/USD
+	SymbolId   any     `json:"id"`
+}
+
+// AccountConnectCryptoPrice is model message containing information about a crypto price.
 type AccountConnectCryptoPrice struct {
 	Symbol string `json:"symbol"`
 	Price  string `json:"price"`
