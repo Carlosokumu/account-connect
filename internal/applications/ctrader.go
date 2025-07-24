@@ -6,7 +6,6 @@ import (
 	gen_messages "account-connect/gen"
 	"account-connect/internal/mappers"
 	"account-connect/internal/models"
-	"account-connect/internal/utils"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -19,6 +18,8 @@ import (
 	"time"
 
 	acount_connect_messages "account-connect/internal/messages"
+
+	messageutils "account-connect/internal/accountconnectmessageutils"
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
@@ -642,7 +643,7 @@ func (t *CTrader) handleTraderInfoResponse(ctx context.Context, payload []byte) 
 		return fmt.Errorf("failed to find pending request for key: %s", common.REQ_TRADER_INFO)
 	}
 
-	msg := utils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -727,7 +728,7 @@ func (t *CTrader) handleSymbolInfoForTrendBars(trendBars []acount_connect_messag
 		return
 	}
 
-	msg := utils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal final message: %v", err)
@@ -758,7 +759,7 @@ func (t *CTrader) handleSymbolListResponse(ctx context.Context, payload []byte) 
 		return err
 	}
 
-	msg := utils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -785,7 +786,7 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, payload []by
 		if err != nil {
 			return fmt.Errorf("failed to marshal deal: %s", err)
 		}
-		msg := utils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, t.AccountConnClient.ID, dealsB)
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, t.AccountConnClient.ID, dealsB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			return err
@@ -839,7 +840,7 @@ func (t *CTrader) handleErrorReponse(ctx context.Context, payload []byte) error 
 	if err != nil {
 		return fmt.Errorf("failed to marshal error response: %s", err)
 	}
-	msg := utils.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
+	msg := messageutils.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err

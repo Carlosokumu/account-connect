@@ -2,10 +2,11 @@ package router
 
 import (
 	"account-connect/config"
+	messageutils "account-connect/internal/accountconnectmessageutils"
+	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/applications"
 	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
-	"account-connect/internal/utils"
 	db "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -199,7 +200,7 @@ func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClien
 }
 
 func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 
 	var adapter applications.PlatformAdapter
 	var err error
@@ -218,7 +219,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 	}
 
 	h.router.ClientPlatform[h.client.ID] = adapter
-	msgR := utils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
+	msgR := messageutils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
 	return h.writeClientMessage(msgR)
 }
 
@@ -283,13 +284,13 @@ func (h *messageHandler) handleClientDisconnect(ctx context.Context, client mode
 
 func (h *messageHandler) handleHistorical(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 	return h.router.RequestHistoricalDeals(ctx, h.client, &h.router.db, payload)
 }
 
 func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 	if err := h.router.RequestTraderInfo(ctx, h.client, &h.router.db, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeTraderInfo, err)
 	}
@@ -298,7 +299,7 @@ func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.Acco
 
 func (h *messageHandler) handleClientSubcribeToStream(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 	if err := h.router.InitializeClientStream(ctx, h.client, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeTraderInfo, err)
 	}
@@ -307,7 +308,7 @@ func (h *messageHandler) handleClientSubcribeToStream(ctx context.Context, msg m
 
 func (h *messageHandler) handleTrendBars(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 	if err := h.router.RequestTrendBars(ctx, h.client, &h.router.db, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeTrendBars, err)
 	}
@@ -316,7 +317,7 @@ func (h *messageHandler) handleTrendBars(ctx context.Context, msg messages.Accou
 
 func (h *messageHandler) handleAccountSymbols(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
-	ctx = context.WithValue(ctx, utils.REQUEST_ID, msg.RequestId)
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 	if err := h.router.RequestAccountSymbols(ctx, h.client, &h.router.db, payload); err != nil {
 		return h.writeErrorResponse(messages.TypeAccountSymbols, err)
 	}

@@ -1,10 +1,10 @@
 package applications
 
 import (
+	messageutils "account-connect/internal/accountconnectmessageutils"
 	"account-connect/internal/mappers"
 	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
-	"account-connect/internal/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -272,7 +272,7 @@ func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages
 	if err != nil {
 		return err
 	}
-	msg := utils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, b.binanceConn.AccountConnClient.ID, binanceSyms)
 
 	msgB, err := json.Marshal(msg)
 	if err != nil {
@@ -296,7 +296,7 @@ func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload message
 		log.Printf("Failed to retrieve binance ohlc data: %v", err)
 		return err
 	}
-	msg := utils.CreateSuccessResponse(ctx, messages.TypeTrendBars, b.binanceConn.AccountConnClient.ID, trendbars)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTrendBars, b.binanceConn.AccountConnClient.ID, trendbars)
 
 	msgB, err := json.Marshal(msg)
 	if err != nil {
@@ -328,7 +328,7 @@ func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload mes
 	if err != nil {
 		return err
 	}
-	msg := utils.CreateSuccessResponse(ctx, messages.TypeStream, b.binanceConn.AccountConnClient.ID, payloadB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeStream, b.binanceConn.AccountConnClient.ID, payloadB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
