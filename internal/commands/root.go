@@ -1,9 +1,6 @@
 package commands
 
 import (
-	"account-connect/config"
-	"account-connect/connection"
-	"account-connect/persistence"
 	"log"
 	"os"
 
@@ -50,18 +47,8 @@ var rootCmd = &cobra.Command{
 	Use:   "account-connect",
 	Short: "Connect trading accounts to social platforms",
 	Run: func(cmd *cobra.Command, args []string) {
-		switch platform {
-		case "ctrader":
-			ctraderCfg := config.NewCTraderConfig(accountID)
-			accountDb := persistence.AccountConnectDb{}
-			_, err := connection.EstablishCTraderConnection(ctraderCfg, accountDb)
-			if err != nil {
-				log.Fatalf("CTrader initialization failed: %v", err)
-			}
-			log.Println("CTrader connection established successfully")
-		default:
-			log.Fatalf("Unsupported platform: %s", platform)
-		}
+		//TODO
+		//Handle Connection logic for the different platforms
 	},
 }
 
