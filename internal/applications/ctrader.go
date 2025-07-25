@@ -97,7 +97,7 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(common.TrendBarsRes), t.handleTrendBarsResponse)
 	t.RegisterHandler(uint32(common.SymbolListRes), t.handleSymbolListResponse)
 	t.RegisterHandler(uint32(common.AccountSymbolInfoRes), t.handleSymbolsByIdResponse)
-
+	t.RegisterHandler(uint32(common.AccountListRes), t.handleAccountListResponse)
 }
 
 func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
@@ -119,12 +119,20 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 		log.Printf("Connection establishment to ctrader fail: %v", err)
 		return err
 	}
-	err = cta.ctrader.AuthorizeApplication()
+	err = cta.ctrader.AuthorizeApplication(ctx)
 	if err != nil {
 		log.Printf("Failed to authorize application: %v", err)
 		return err
 	}
 	return err
+}
+
+func (cta *CtraderAdapter) AuthorizeAccount(ctx context.Context, payload acount_connect_messages.AccountConnectAuthorizeTradingAccountPayload) error {
+	return cta.ctrader.AuthorizeAccount(payload.AccountId)
+}
+
+func (cta *CtraderAdapter) GetUserAccounts(ctx context.Context) error {
+	return nil
 }
 
 func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload acount_connect_messages.AccountConnectSymbolsPayload) error {
@@ -134,7 +142,7 @@ func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload acount
 
 func (cta *CtraderAdapter) GetHistoricalTrades(ctx context.Context, payload acount_connect_messages.AccountConnectHistoricalDealsPayload) error {
 	//Add a check for  validity of the to and from timestamps
-	return cta.ctrader.GetAccountHistoricalDeals(ctx, *payload.FromTimestamp, *payload.ToTimestamp)
+	return cta.ctrader.GetAccountHistoricalDeals(ctx, *payload.AccountId, *payload.FromTimestamp, *payload.ToTimestamp)
 }
 
 func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload acount_connect_messages.AccountConnectTraderInfoPayload) error {
@@ -218,12 +226,7 @@ func (t *CTrader) StartConnectionReader(ctx context.Context) {
 }
 
 // AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
-func (t *CTrader) AuthorizeApplication() error {
-	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
-	if !ok {
-		return fmt.Errorf("failed to retrieve platform_connect_status channel from registry")
-	}
-
+func (t *CTrader) AuthorizeApplication(ctx context.Context) error {
 	if t.ClientId == "" || t.ClientSecret == "" {
 		return errors.New("client credentials not set")
 	}
@@ -247,12 +250,22 @@ func (t *CTrader) AuthorizeApplication() error {
 		return fmt.Errorf("failed to marshal protocol message: %w", err)
 	}
 
-	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
-	if err != nil {
-		return fmt.Errorf("failed to send auth request: %w", err)
+	req := &pendingRequest{
+		ctx:    ctx,
+		respCh: make(chan *pendingResponse, 1),
 	}
 
-	<-platformConnectStatusCh
+	t.mutex.Lock()
+	t.pendingRequests[common.REQ_ACCOUNT_LIST] = req
+	t.mutex.Unlock()
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		t.mutex.Lock()
+		delete(t.pendingRequests, common.REQ_ACCOUNT_LIST)
+		t.mutex.Unlock()
+		return fmt.Errorf("failed to send auth request: %w", err)
+	}
 
 	return nil
 
@@ -267,7 +280,7 @@ func (t *CTrader) DisconnectPlatformConn() error {
 }
 
 // AuthorizeAccount sends a request to authorize specified ctrader account id
-func (t *CTrader) AuthorizeAccount() error {
+func (t *CTrader) AuthorizeAccount(accountId *int64) error {
 	t.mutex.Lock()
 	if !t.readyForAccount {
 		t.mutex.Unlock()
@@ -275,16 +288,16 @@ func (t *CTrader) AuthorizeAccount() error {
 	}
 	t.mutex.Unlock()
 
-	if t.AccountId == nil {
+	if accountId == nil {
 		return errors.New("account id cannot be nil")
 	}
 
-	if len(strconv.FormatInt(*t.AccountId, 10)) < 8 {
+	if len(strconv.FormatInt(*accountId, 10)) < 8 {
 		return errors.New("invalid Account id")
 	}
 
 	msgReq := &gen_messages.ProtoOAAccountAuthReq{
-		CtidTraderAccountId: t.AccountId,
+		CtidTraderAccountId: accountId,
 		AccessToken:         &t.AccessToken,
 	}
 	msgB, err := proto.Marshal(msgReq)
@@ -305,6 +318,40 @@ func (t *CTrader) AuthorizeAccount() error {
 	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
 	if err != nil {
 		return fmt.Errorf("failed to send auth request: %w", err)
+	}
+
+	return nil
+}
+
+// GetUserAcountListByAccessToken gets a list of granted trader's accounts for the access token
+func (t *CTrader) GetUserAcountListByAccessToken(accessToken string) error {
+	t.mutex.Lock()
+	if !t.readyForAccount {
+		t.mutex.Unlock()
+		return errors.New("application not yet authorized")
+	}
+	t.mutex.Unlock()
+
+	msgReq := &gen_messages.ProtoOAGetAccountListByAccessTokenReq{
+		AccessToken: &accessToken,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal account list request: %w", err)
+	}
+	msgP := &gen_messages.ProtoMessage{
+		PayloadType: &common.AccountListMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_ACCOUNT_LIST,
+	}
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		return fmt.Errorf("failed to send account list request: %w", err)
 	}
 
 	return nil
@@ -511,18 +558,18 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 	return nil
 }
 
-// GetAccountHistoricalDeals is a request for getting Trader's deals historical data (execution details).
-func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, fromTimestamp, toTimestamp int64) error {
+// GetAccountHistoricalDeals is a request for getting trader's deals historical data (execution details).
+func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, accountId, fromTimestamp, toTimestamp int64) error {
 	if t.AccountId == nil {
 		return errors.New("account id cannot be nil")
 	}
 
-	if len(strconv.FormatInt(*t.AccountId, 10)) < 8 {
+	if len(strconv.FormatInt(accountId, 10)) < 8 {
 		return errors.New("invalid account id")
 	}
 
 	msgReq := &gen_messages.ProtoOADealListReq{
-		CtidTraderAccountId: t.AccountId,
+		CtidTraderAccountId: &accountId,
 		FromTimestamp:       &fromTimestamp,
 		ToTimestamp:         &toTimestamp,
 	}
@@ -562,16 +609,69 @@ func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, fromTimestamp, 
 }
 
 func (t *CTrader) handleApplicationAuthResponse(ctx context.Context, payload []byte) error {
-	var r gen_messages.ProtoOAApplicationAuthRes
+	var (
+		r gen_messages.ProtoOAApplicationAuthRes
+	)
+
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal auth response: %w", err)
 	}
 
 	t.mutex.Lock()
 	t.readyForAccount = true
+	req, ok := t.pendingRequests[common.REQ_ACCOUNT_LIST]
 	t.mutex.Unlock()
 
-	return t.AuthorizeAccount()
+	if !ok {
+		return fmt.Errorf("failed to find pending request for account list to authorize")
+	}
+	go func() {
+		ch := <-req.respCh
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeConnect, acount_connect_messages.Ctrader, t.AccountConnClient.ID, ch.Payload)
+		msgB, err := json.Marshal(msg)
+		if err != nil {
+			log.Printf("Failed to marshal application auth: %v", err)
+			return
+		}
+		t.AccountConnClient.Send <- msgB
+	}()
+
+	return t.GetUserAcountListByAccessToken(t.AccessToken)
+}
+
+func (t *CTrader) handleAccountListResponse(ctx context.Context, payload []byte) error {
+	var (
+		r               gen_messages.ProtoOAGetAccountListByAccessTokenRes
+		tradingaccounts []acount_connect_messages.AccountConnectCtraderTradingAccount
+	)
+
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal auth response: %w", err)
+	}
+	t.mutex.Lock()
+	t.readyForAccount = true
+	req, ok := t.pendingRequests[common.REQ_ACCOUNT_LIST]
+	t.mutex.Unlock()
+
+	if !ok {
+		return fmt.Errorf("failed to find pending request for account list to authorize")
+	}
+
+	for _, acc := range r.CtidTraderAccount {
+		tradingaccounts = append(tradingaccounts, acount_connect_messages.AccountConnectCtraderTradingAccount{
+			AccountId:  acc.CtidTraderAccountId,
+			BrokerName: *acc.BrokerTitleShort,
+		})
+	}
+
+	tradingaccountsB, err := json.Marshal(tradingaccounts)
+	if err != nil {
+		return err
+	}
+	req.respCh <- &pendingResponse{
+		Payload: tradingaccountsB,
+	}
+	return nil
 }
 
 func (t *CTrader) handleHeartBeatMessage(ctx context.Context, payload []byte) error {
@@ -591,22 +691,28 @@ func (t *CTrader) handleHeartBeatMessage(ctx context.Context, payload []byte) er
 }
 
 func (t *CTrader) handleAccountAuthResponse(ctx context.Context, payload []byte) error {
-	var r gen_messages.ProtoOAAccountAuthRes
+	var (
+		r gen_messages.ProtoOAAccountAuthRes
+	)
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
 	}
-	platformConnectStatusCh, ok := ChannelRegistry["platform_connect_status"]
-	if !ok {
-		return fmt.Errorf("failed to retrieve platform_connect_status channel from registry")
-	}
 
-	connectStatusB, err := json.Marshal(PlatformConnectionStatus{
-		Authorized: false,
+	accauthresB, err := json.Marshal(map[string]any{
+		"messsage":   "account authorized",
+		"account_id": r.CtidTraderAccountId,
 	})
+
 	if err != nil {
 		return err
 	}
-	platformConnectStatusCh <- connectStatusB
+	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accauthresB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	t.AccountConnClient.Send <- msgB
 
 	return nil
 }
@@ -643,7 +749,7 @@ func (t *CTrader) handleTraderInfoResponse(ctx context.Context, payload []byte) 
 		return fmt.Errorf("failed to find pending request for key: %s", common.REQ_TRADER_INFO)
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTraderInfo, t.AccountConnClient.ID, traderInfoB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTraderInfo, acount_connect_messages.Ctrader, t.AccountConnClient.ID, traderInfoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -728,7 +834,7 @@ func (t *CTrader) handleSymbolInfoForTrendBars(trendBars []acount_connect_messag
 		return
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, t.AccountConnClient.ID, trendBarsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal final message: %v", err)
@@ -759,7 +865,7 @@ func (t *CTrader) handleSymbolListResponse(ctx context.Context, payload []byte) 
 		return err
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, t.AccountConnClient.ID, symsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Binance, t.AccountConnClient.ID, symsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -786,7 +892,7 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, payload []by
 		if err != nil {
 			return fmt.Errorf("failed to marshal deal: %s", err)
 		}
-		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, t.AccountConnClient.ID, dealsB)
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, acount_connect_messages.Binance, t.AccountConnClient.ID, dealsB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			return err
