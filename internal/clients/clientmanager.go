@@ -167,7 +167,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 				log.Printf("Failed to unmarshal account connect message: %v", err)
 				return
 			}
-			if accountConnectMsgRes.Type == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
+			if accountConnectMsgRes.AccountConnectMessageType == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
 				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload)
 				if err != nil {
@@ -181,7 +181,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 				}
 			} else if accountConnectMsgRes.Status != messages.StatusFailure {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
+				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 					return
@@ -203,7 +203,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 						continue
 					}
 					ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.Type, msg)
+					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, msg)
 					if err != nil {
 						log.Printf("Client: %s message write fail: %v", client.ID, err)
 						return

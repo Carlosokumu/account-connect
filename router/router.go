@@ -364,9 +364,9 @@ func (h *messageHandler) writeErrorResponse(msgType messages.MessageType, err er
 		return err
 	}
 	response := messages.AccountConnectMsgRes{
-		Type:    msgType,
-		Status:  messages.StatusFailure,
-		Payload: accErrB,
+		AccountConnectMessageType: msgType,
+		Status:                    messages.StatusFailure,
+		Payload:                   accErrB,
 	}
 	return h.writeClientMessage(response)
 }

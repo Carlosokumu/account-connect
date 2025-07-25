@@ -44,12 +44,12 @@ type AccountConnectMsg struct {
 
 // AccountConnectMsgRes  is a base message structure that all outgoing client messages should have.
 type AccountConnectMsgRes struct {
-	Type               MessageType     `json:"type"`
-	Status             MessageStatus   `json:"status"`
-	Platform           Platform        `json:"platform"`
-	TradeShareClientId string          `json:"tradeshare_client_id"`
-	RequestId          string          `json:"request_id"`
-	Payload            json.RawMessage `json:"payload"`
+	AccountConnectMessageType MessageType     `json:"messagetype"`
+	Status                    MessageStatus   `json:"status"`
+	Platform                  Platform        `json:"platform"`
+	TradeShareClientId        string          `json:"tradeshare_client_id"`
+	RequestId                 string          `json:"request_id"`
+	Payload                   json.RawMessage `json:"payload"`
 }
 
 // CTraderConnectPayload  is payload structure defining fields  required to establish a ctrader connection.

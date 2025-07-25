@@ -19,10 +19,10 @@ func CreateErrorResponse(clientID string, errData []byte) messages.AccountConnec
 	}
 
 	return messages.AccountConnectMsgRes{
-		Type:               messages.TypeError,
-		Status:             messages.StatusFailure,
-		TradeShareClientId: clientID,
-		Payload:            errResB,
+		AccountConnectMessageType: messages.TypeError,
+		Status:                    messages.StatusFailure,
+		TradeShareClientId:        clientID,
+		Payload:                   errResB,
 	}
 }
 
@@ -33,11 +33,11 @@ func CreateSuccessResponse(ctx context.Context, msgType messages.MessageType, pl
 		v = ""
 	}
 	return messages.AccountConnectMsgRes{
-		RequestId:          v,
-		Type:               msgType,
-		Platform:           platform,
-		Status:             messages.StatusSuccess,
-		TradeShareClientId: clientID,
-		Payload:            payload,
+		RequestId:                 v,
+		AccountConnectMessageType: msgType,
+		Platform:                  platform,
+		Status:                    messages.StatusSuccess,
+		TradeShareClientId:        clientID,
+		Payload:                   payload,
 	}
 }
