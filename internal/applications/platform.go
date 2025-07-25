@@ -25,6 +25,8 @@ type PlatformConnectionStatus struct {
 // account-connect suported functionality
 type PlatformAdapter interface {
 	EstablishConnection(ctxt context.Context, cfg PlatformConfigs) error
+	AuthorizeAccount(ctx context.Context, payload messages.AccountConnectAuthorizeTradingAccountPayload) error
+	GetUserAccounts(ctx context.Context) error
 	GetHistoricalTrades(ctx context.Context, payload messages.AccountConnectHistoricalDealsPayload) error
 	GetTraderInfo(ctx context.Context, payload messages.AccountConnectTraderInfoPayload) error
 	GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error
