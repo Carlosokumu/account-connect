@@ -177,14 +177,13 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
 				err = m.handleClientError(client, accountConnectMsgRes.Payload)
 				if err != nil {
-					return
+					log.Printf("client platform error return: %v", err)
 				}
 			} else if accountConnectMsgRes.Status != messages.StatusFailure {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
 				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
-					return
 				}
 			}
 		default:
@@ -235,7 +234,7 @@ func (m *AccountConnectClientManager) handleClientError(client *models.AccountCo
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
 		return err
 	}
-	return fmt.Errorf("error condition, closing connection")
+	return fmt.Errorf("error condition: %s", string(msg.Payload))
 }
 
 func (m *AccountConnectClientManager) writeJSONWithTimeout(client *models.AccountConnectClient, v interface{}) error {
