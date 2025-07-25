@@ -22,14 +22,15 @@ const (
 type MessageType string
 
 const (
-	TypeConnect        MessageType = "connect"
-	TypeTraderInfo     MessageType = "trader_info"
-	TypeHistorical     MessageType = "historical_deals"
-	TypeAccountSymbols MessageType = "account_symbols"
-	TypeTrendBars      MessageType = "trend_bars"
-	TypeError          MessageType = "error"
-	TypeDisconnect     MessageType = "disconnect"
-	TypeStream         MessageType = "stream_subscribe"
+	TypeConnect          MessageType = "connect"
+	TypeAuthorizeAccount MessageType = "authorize_account"
+	TypeTraderInfo       MessageType = "trader_info"
+	TypeHistorical       MessageType = "historical_deals"
+	TypeAccountSymbols   MessageType = "account_symbols"
+	TypeTrendBars        MessageType = "trend_bars"
+	TypeError            MessageType = "error"
+	TypeDisconnect       MessageType = "disconnect"
+	TypeStream           MessageType = "stream_subscribe"
 )
 
 // AccountConnectMsg is a base message structure that incoming client messages are expected to have.
@@ -45,6 +46,7 @@ type AccountConnectMsg struct {
 type AccountConnectMsgRes struct {
 	Type               MessageType     `json:"type"`
 	Status             MessageStatus   `json:"status"`
+	Platform           Platform        `json:"platform"`
 	TradeShareClientId string          `json:"tradeshare_client_id"`
 	RequestId          string          `json:"request_id"`
 	Payload            json.RawMessage `json:"payload"`
@@ -94,6 +96,12 @@ type AccountConnectError struct {
 type AccountConnectHistoricalDealsPayload struct {
 	FromTimestamp *int64 `json:"fromTimestamp"`
 	ToTimestamp   *int64 `json:"toTimestamp"`
+	AccountId     *int64 `json:"account_id"`
+}
+
+// AccountConnectAuthorizeTradingAccountPayload is a wrapper payload containing all of the possible fields  required by each of  the supported platforms to authorize a trading account(s)
+type AccountConnectAuthorizeTradingAccountPayload struct {
+	AccountId *int64 `json:"account_id"`
 }
 
 // AccountConnectTraderInfoPayload is wrapper payload containing all of the possible fields  required by each of the supported platforms to request a trader's information.
@@ -118,6 +126,12 @@ type AccountConnectTraderInfo struct {
 	Login               *int64  `json:"login"`
 	BrokerName          *string `json:"broker_name"`
 	DepositAssetId      *int64  `json:"depositAssetId"`
+}
+
+type AccountConnectCtraderTradingAccount struct {
+	AccountId  *uint64 `json:"account_id"`
+	BrokerName string  `json:"broker"`
+	Balance    string  `json:"balance"`
 }
 
 // AccountConnectTrendBar  is model message providing the  OHLC values
