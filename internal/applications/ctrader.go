@@ -36,6 +36,12 @@ type pendingResponse struct {
 	err     error
 }
 
+type appauthcredentials struct {
+	ClientSecret string
+	ClientId     string
+	AccessToken  string
+}
+
 type pendingRequest struct {
 	ctx    context.Context
 	respCh chan *pendingResponse
@@ -60,19 +66,16 @@ type CtraderAdapter struct {
 	ctrader CTrader
 }
 
-func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *config.CTraderConfig) *CtraderAdapter {
+func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *CtraderConfig) *CtraderAdapter {
 	return &CtraderAdapter{
 		ctrader: *NewCTrader(accdb, accountConnClient, ctraderconfig),
 	}
 }
 
 // NewCTrader creates a new ctrader instance with the required fields to establish a ctrader connection
-func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *config.CTraderConfig) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *CtraderConfig) *CTrader {
 	return &CTrader{
 		accDb:             accdb,
-		ClientId:          ctraderconfig.ClientID,
-		AccountId:         &ctraderconfig.AccountID,
-		ClientSecret:      ctraderconfig.ClientSecret,
 		AccountConnClient: accountConnClient,
 		AccessToken:       ctraderconfig.AccessToken,
 		handlers:          make(map[uint32]MessageHandler),
@@ -108,18 +111,22 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 		return fmt.Errorf("missing required ctrader port or endpoint")
 	}
 
-	err := cta.ctrader.EstablishCtraderConnection(ctx, config.CTraderConfig{
-		ClientID:     cfg.ClientId,
-		ClientSecret: cfg.SecretKey,
-		Endpoint:     cendpoint,
-		Port:         cport,
-		AccountID:    *cfg.AccountId,
+	err := cta.ctrader.EstablishCtraderConnection(ctx, CtraderConfig{
+		//ClientID:     cfg.Ctrader.ClientId,
+		ClientId:     cfg.Ctrader.ClientId,
+		ClientSecret: cfg.Ctrader.ClientSecret,
+		//Endpoint:     cendpoint,
+		//Port:         cport,
+		//AccountId: cfg.Ctrader.AccountId,
 	})
 	if err != nil {
 		log.Printf("Connection establishment to ctrader fail: %v", err)
 		return err
 	}
-	err = cta.ctrader.AuthorizeApplication(ctx)
+	err = cta.ctrader.AuthorizeApplication(ctx, appauthcredentials{
+		ClientSecret: cfg.Ctrader.ClientSecret,
+		ClientId:     cfg.Ctrader.ClientId,
+	})
 	if err != nil {
 		log.Printf("Failed to authorize application: %v", err)
 		return err
@@ -162,7 +169,7 @@ func (cta *CtraderAdapter) Disconnect() error {
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
-func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig config.CTraderConfig) error {
+func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig CtraderConfig) error {
 	// Set up a dialer with the desired options
 	dialer := websocket.DefaultDialer
 	dialer.EnableCompression = true
@@ -173,8 +180,8 @@ func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig 
 		return err
 	}
 
-	endpoint := ctraderConfig.Endpoint
-	port := ctraderConfig.Port
+	endpoint := config.CtraderEndpoint
+	port := config.CtraderPort
 
 	log.Printf("establishing connection to %s:%d", endpoint, port)
 
@@ -226,14 +233,14 @@ func (t *CTrader) StartConnectionReader(ctx context.Context) {
 }
 
 // AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
-func (t *CTrader) AuthorizeApplication(ctx context.Context) error {
-	if t.ClientId == "" || t.ClientSecret == "" {
+func (t *CTrader) AuthorizeApplication(ctx context.Context, creds appauthcredentials) error {
+	if creds.ClientId == "" || creds.ClientSecret == "" {
 		return errors.New("client credentials not set")
 	}
 
 	msgReq := &gen_messages.ProtoOAApplicationAuthReq{
-		ClientId:     &t.ClientId,
-		ClientSecret: &t.ClientSecret,
+		ClientId:     &creds.ClientId,
+		ClientSecret: &creds.ClientSecret,
 	}
 	msgB, err := proto.Marshal(msgReq)
 	if err != nil {

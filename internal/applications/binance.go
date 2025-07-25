@@ -253,8 +253,8 @@ func NewBinanceAdapter(accountConnClient *models.AccountConnectClient) *BinanceA
 }
 
 func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
-	apiKey := cfg.ApiKey
-	secretKey := cfg.SecretKey
+	apiKey := cfg.Binance.ApiKey
+	secretKey := cfg.Binance.SecretKey
 
 	conn := NewBinanceConnection(b.binanceConn.AccountConnClient)
 	err := conn.Connect(apiKey, secretKey)

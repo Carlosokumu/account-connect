@@ -1,7 +1,6 @@
 package router
 
 import (
-	"account-connect/config"
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/applications"
 	messages "account-connect/internal/messages"
@@ -282,19 +281,18 @@ func (h *messageHandler) handleCtraderConnect(
 		return nil, fmt.Errorf("invalid cTrader payload: %w", err)
 	}
 
-	cfg := config.NewCTraderConfig(ctraderMsg.AccountId)
-	cfg.Endpoint = config.CtraderEndpoint
-	cfg.Port = config.CtraderPort
-	cfg.ClientID = ctraderMsg.ClientId
-	cfg.ClientSecret = ctraderMsg.ClientSecret
-	cfg.AccessToken = ctraderMsg.AccessToken
-
-	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, cfg)
-	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{
-		AccountId:    &ctraderMsg.AccountId,
+	cfg := applications.CtraderConfig{
 		ClientId:     ctraderMsg.ClientId,
 		ClientSecret: ctraderMsg.ClientSecret,
 		AccessToken:  ctraderMsg.AccessToken,
+	}
+	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
+	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{
+		Ctrader: applications.CtraderConfig{
+			ClientId:     ctraderMsg.ClientId,
+			ClientSecret: ctraderMsg.ClientSecret,
+			AccessToken:  ctraderMsg.AccessToken,
+		},
 	}); err != nil {
 		return nil, err
 	}
