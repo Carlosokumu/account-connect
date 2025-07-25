@@ -5,20 +5,20 @@ import (
 	"context"
 )
 
-type PlatformConfigs struct {
-	//Binance
+type BinanceConfig struct {
 	ApiKey    string
 	SecretKey string
+}
 
-	//Ctrader
-	AccountId    *int64
+type CtraderConfig struct {
 	ClientId     string
 	ClientSecret string
 	AccessToken  string
 }
 
-type PlatformConnectionStatus struct {
-	Authorized bool
+type PlatformConfigs struct {
+	Binance BinanceConfig
+	Ctrader CtraderConfig
 }
 
 // Platform defines a set of method signatures that are common for all trading platforms APIs and that are required by
