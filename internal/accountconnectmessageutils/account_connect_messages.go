@@ -27,7 +27,7 @@ func CreateErrorResponse(clientID string, errData []byte) messages.AccountConnec
 }
 
 // CreateSuccessResponse creates a new [AccountConnectMsgRes] response of message type success
-func CreateSuccessResponse(ctx context.Context, msgType messages.MessageType, clientID string, payload []byte) messages.AccountConnectMsgRes {
+func CreateSuccessResponse(ctx context.Context, msgType messages.MessageType, platform messages.Platform, clientID string, payload []byte) messages.AccountConnectMsgRes {
 	v, ok := ctx.Value(messageutils.REQUEST_ID).(string)
 	if !ok {
 		v = ""
@@ -35,6 +35,7 @@ func CreateSuccessResponse(ctx context.Context, msgType messages.MessageType, cl
 	return messages.AccountConnectMsgRes{
 		RequestId:          v,
 		Type:               msgType,
+		Platform:           platform,
 		Status:             messages.StatusSuccess,
 		TradeShareClientId: clientID,
 		Payload:            payload,
