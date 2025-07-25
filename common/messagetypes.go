@@ -6,6 +6,7 @@ var (
 
 	//Message requests
 	AppAuthMsgType           = uint32(messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_REQ)
+	AccountListMsgType       = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ)
 	AccountAuthMsgType       = uint32(messages.ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_REQ)
 	HeartBeatMsgType         = uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT)
 	AccountHistoricalDeals   = uint32(messages.ProtoOAPayloadType_PROTO_OA_DEAL_LIST_REQ)
@@ -25,5 +26,6 @@ var (
 	ErrorRes             = uint32(messages.ProtoOAPayloadType_PROTO_OA_ERROR_RES)
 	AccountAuthRes       = uint32(messages.ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES)
 	ApplicationAthRes    = uint32(messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_RES)
+	AccountListRes       = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES)
 	HeartBeatRes         = uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT)
 )
