@@ -706,7 +706,7 @@ func (t *CTrader) handleAccountAuthResponse(ctx context.Context, payload []byte)
 	if err != nil {
 		return err
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accauthresB)
+	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAuthorizeAccount, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accauthresB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
