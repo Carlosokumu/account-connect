@@ -40,7 +40,7 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 		client: client,
 	}
 
-	switch msg.Type {
+	switch msg.AccountConnectMessageType {
 	case messages.TypeConnect:
 		return handler.handleConnect(ctx, client, msg)
 	case messages.TypeAuthorizeAccount:
@@ -59,7 +59,7 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 		return handler.handleClientSubcribeToStream(ctx, msg)
 
 	default:
-		return fmt.Errorf("unknown message type: %s", msg.Type)
+		return fmt.Errorf("unknown message type: %s", msg.AccountConnectMessageType)
 	}
 }
 

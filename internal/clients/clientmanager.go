@@ -68,9 +68,9 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.Lock()
 			for _, client := range m.clients {
 				disconnectMsg := messages.AccountConnectMsg{
-					Type:               messages.TypeDisconnect,
-					Payload:            nil,
-					TradeshareClientId: client.ID,
+					AccountConnectMessageType: messages.TypeDisconnect,
+					Payload:                   nil,
+					TradeshareClientId:        client.ID,
 				}
 				if clientCtx, ok := m.clientContexts[client.ID]; ok {
 					m.msgRouter.Route(clientCtx.ctx, client, disconnectMsg)
@@ -96,9 +96,9 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.Lock()
 			if _, ok := m.clients[client.ID]; ok {
 				disconnectMsg := messages.AccountConnectMsg{
-					Type:               messages.TypeDisconnect,
-					Payload:            nil,
-					TradeshareClientId: client.ID,
+					AccountConnectMessageType: messages.TypeDisconnect,
+					Payload:                   nil,
+					TradeshareClientId:        client.ID,
 				}
 				if clientCtx, ok := m.clientContexts[client.ID]; ok {
 					log.Printf("Canceling ctx for client id: %v via unregister", client.ID)
