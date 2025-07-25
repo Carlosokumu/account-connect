@@ -3,7 +3,6 @@ package clients
 import (
 	messageutils "account-connect/internal/accountconnectmessageutils"
 	requestutils "account-connect/internal/accountconnectrequestutils"
-	"account-connect/internal/applications"
 	messages "account-connect/internal/messages"
 	"account-connect/internal/models"
 	"account-connect/router"
@@ -169,14 +168,8 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 				return
 			}
 			if accountConnectMsgRes.Type == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
-				var trader applications.CTrader
-				err = json.Unmarshal(accountConnectMsgRes.Payload, &trader)
-				if err != nil {
-					log.Printf("Failed to unmarshal ctrader %v", err)
-					return
-				}
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				err = m.writeClientConnMessage(ctx, client, messages.TypeConnect, nil)
+				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 					return
@@ -188,7 +181,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 				}
 			} else if accountConnectMsgRes.Status != messages.StatusFailure {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
+				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.Type, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 					return
@@ -210,7 +203,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 						continue
 					}
 					ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Type, msg)
+					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.Type, msg)
 					if err != nil {
 						log.Printf("Client: %s message write fail: %v", client.ID, err)
 						return
@@ -225,10 +218,11 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
-func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *models.AccountConnectClient, msgType messages.MessageType, payload []byte) error {
+func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *models.AccountConnectClient, platform messages.Platform, msgType messages.MessageType, payload []byte) error {
 	msg := messageutils.CreateSuccessResponse(
 		ctx,
 		msgType,
+		platform,
 		client.ID,
 		payload,
 	)
