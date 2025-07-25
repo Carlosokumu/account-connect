@@ -115,6 +115,23 @@ message ProtoOATrader {
     optional ProtoOALimitedRiskMarginCalculationStrategy limitedRiskMarginCalculationStrategy = 19 [default = ACCORDING_TO_LEVERAGE]; // Special strategy used in margin calculations for this account (if account isLimitedRisk).
 }
 
+/** Trader account entity. */
+message ProtoOACtidTraderAccount {
+    required uint64 ctidTraderAccountId = 1; // Unique identifier of the trader's account. Used to match responses to trader's accounts.cTrader platform. Different brokers might have different ids
+    optional bool isLive = 2; // If TRUE then the account is belong to Live environment and live host must be used to authorize it
+    optional int64 traderLogin = 3; // TraderLogin for a specific account. Value is displayed on Client App UI
+    optional int64 lastClosingDealTimestamp = 4; // The Unix time in milliseconds of the last ProtoOAClosePositionDetail happened to this account.
+    optional int64 lastBalanceUpdateTimestamp = 5; // The Unix time in milliseconds of the last ProtoOADepositWithdraw happened to this account.
+    optional string brokerTitleShort = 6; // The name of the broker to which the account belongs to. Shortened to be displayed in the UI.
+}
+
+/** Open API application permission in regards to token ENUM. */
+enum ProtoOAClientPermissionScope {
+    SCOPE_VIEW = 0; // Allows to use only view commends. Trade is prohibited.
+    SCOPE_TRADE = 1; // Allows to use all commands.
+}
+
+
 /** Enum for specifying access right for a trader. */
 enum ProtoOAAccessRights {
     FULL_ACCESS = 0; // Enable all trading.

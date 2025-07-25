@@ -68,6 +68,23 @@ message ProtoOATraderRes {
     required ProtoOATrader trader = 3; // The Trader account information.
 }
 
+/** Request for getting the list of granted trader's account for the access token. */
+message ProtoOAGetAccountListByAccessTokenReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ];
+
+    required string accessToken = 2; // The Access Token issued for providing access to the Trader's Account.
+}
+
+/** Response to the ProtoOAGetAccountListByAccessTokenReq request. */
+message ProtoOAGetAccountListByAccessTokenRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES];
+
+    required string accessToken = 2; // The Access Token issued for providing access to the Trader's Account.
+    optional ProtoOAClientPermissionScope permissionScope = 3; // SCOPE_VIEW, SCOPE_TRADE.
+    repeated ProtoOACtidTraderAccount ctidTraderAccount = 4; // The list of the accounts.
+}
+
+
 
 /** Request for getting historical trend bars for the symbol. */
 message ProtoOAGetTrendbarsReq {
