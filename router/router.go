@@ -2,7 +2,6 @@ package router
 
 import (
 	"account-connect/config"
-	messageutils "account-connect/internal/accountconnectmessageutils"
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/applications"
 	messages "account-connect/internal/messages"
@@ -44,6 +43,8 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 	switch msg.Type {
 	case messages.TypeConnect:
 		return handler.handleConnect(ctx, client, msg)
+	case messages.TypeAuthorizeAccount:
+		return handler.handleAccountAuthorize(ctx, msg)
 	case messages.TypeHistorical:
 		return handler.handleHistorical(ctx, msg)
 	case messages.TypeTraderInfo:
@@ -82,6 +83,27 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.Acco
 		log.Printf("Failed to fetch account historical deals: %v", err)
 		return err
 	}
+	return nil
+}
+
+func (r *Router) AuthorizeAccount(ctx context.Context, accclient *models.AccountConnectClient, payload json.RawMessage) error {
+	var req messages.AccountConnectAuthorizeTradingAccountPayload
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal trader info payload request: %v", err)
+		return err
+	}
+
+	cp, ok := r.ClientPlatform[accclient.ID]
+	if !ok {
+		return fmt.Errorf("failed to find router client with id: %s", accclient.ID)
+	}
+	err = cp.AuthorizeAccount(ctx, req)
+	if err != nil {
+		log.Printf("Failed to retreive trader info: %v", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -217,10 +239,17 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *m
 	if err != nil {
 		return err
 	}
-
 	h.router.ClientPlatform[h.client.ID] = adapter
-	msgR := messageutils.CreateSuccessResponse(ctx, messages.TypeConnect, h.client.ID, nil)
-	return h.writeClientMessage(msgR)
+	return nil
+}
+
+func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+	if err := h.router.AuthorizeAccount(ctx, h.client, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeTraderInfo, err)
+	}
+	return nil
 }
 
 // handleBinanceConnect will establish a connection to binance
