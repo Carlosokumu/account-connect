@@ -931,16 +931,6 @@ func (t *CTrader) handleErrorReponse(ctx context.Context, payload []byte) error 
 	}
 
 	log.Printf("Received an error response: %s  with error code: %s", string(*r.Description), r.GetErrorCode())
-	if r.GetErrorCode() == common.REQ_CLIENT_FAILURE {
-		connectStatusB, err := json.Marshal(PlatformConnectionStatus{
-			Authorized: false,
-		})
-		if err != nil {
-			return err
-		}
-		t.AccountConnClient.Send <- connectStatusB
-	}
-
 	pErr := mappers.ProtoOAErrorResToError(&r)
 	pErrB, err := json.Marshal(pErr)
 	if err != nil {
@@ -951,7 +941,6 @@ func (t *CTrader) handleErrorReponse(ctx context.Context, payload []byte) error 
 	if err != nil {
 		return err
 	}
-
 	t.AccountConnClient.Send <- msgB
 
 	return nil
