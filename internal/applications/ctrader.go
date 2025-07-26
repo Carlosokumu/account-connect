@@ -112,12 +112,8 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 	}
 
 	err := cta.ctrader.EstablishCtraderConnection(ctx, CtraderConfig{
-		//ClientID:     cfg.Ctrader.ClientId,
 		ClientId:     cfg.Ctrader.ClientId,
 		ClientSecret: cfg.Ctrader.ClientSecret,
-		//Endpoint:     cendpoint,
-		//Port:         cport,
-		//AccountId: cfg.Ctrader.AccountId,
 	})
 	if err != nil {
 		log.Printf("Connection establishment to ctrader fail: %v", err)
@@ -567,7 +563,7 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 
 // GetAccountHistoricalDeals is a request for getting trader's deals historical data (execution details).
 func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, accountId, fromTimestamp, toTimestamp int64) error {
-	if t.AccountId == nil {
+	if accountId == 0 {
 		return errors.New("account id cannot be nil")
 	}
 
@@ -872,7 +868,7 @@ func (t *CTrader) handleSymbolListResponse(ctx context.Context, payload []byte) 
 		return err
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Binance, t.AccountConnClient.ID, symsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, symsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -899,7 +895,7 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, payload []by
 		if err != nil {
 			return fmt.Errorf("failed to marshal deal: %s", err)
 		}
-		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, acount_connect_messages.Binance, t.AccountConnClient.ID, dealsB)
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, acount_connect_messages.Ctrader, t.AccountConnClient.ID, dealsB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			return err
