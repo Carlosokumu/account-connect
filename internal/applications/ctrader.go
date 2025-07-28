@@ -664,12 +664,16 @@ func (t *CTrader) handleAccountListResponse(ctx context.Context, payload []byte)
 		})
 	}
 
-	tradingaccountsB, err := json.Marshal(tradingaccounts)
+	tradingaccountsres := acount_connect_messages.AccountConnectTradingAccountRes{
+		CtTradingAccounts: tradingaccounts,
+	}
+
+	tradingaccountsresB, err := json.Marshal(tradingaccountsres)
 	if err != nil {
 		return err
 	}
 	req.respCh <- &pendingResponse{
-		Payload: tradingaccountsB,
+		Payload: tradingaccountsresB,
 	}
 	return nil
 }

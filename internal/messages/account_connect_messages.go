@@ -134,6 +134,10 @@ type AccountConnectCtraderTradingAccount struct {
 	Balance    string  `json:"balance"`
 }
 
+type AccountConnectTradingAccountRes struct {
+	CtTradingAccounts []AccountConnectCtraderTradingAccount `json:"ct_trading_accounts"`
+}
+
 // AccountConnectTrendBar  is model message providing the  OHLC values
 type AccountConnectTrendBar struct {
 	High                  float64 `json:"high"`
