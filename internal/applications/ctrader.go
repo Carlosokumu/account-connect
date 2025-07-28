@@ -49,10 +49,7 @@ type pendingRequest struct {
 
 type CTrader struct {
 	accDb             accdb.AccountConnectDb
-	ClientSecret      string
 	AccountConnClient *models.AccountConnectClient
-	ClientId          string
-	AccountId         *int64
 	AccessToken       string
 	PlatformConn      *websocket.Conn
 	handlers          map[uint32]MessageHandler
@@ -780,7 +777,7 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, payload []byte) e
 	trendBars := mappers.ProotoOAToTrendBars(&res)
 	if err := t.getSymbolListInformation(req.ctx, acount_connect_messages.AccountConnectSymbolInfoPayload{
 		SymbolId: []int64{*res.SymbolId},
-		Ctid:     t.AccountId,
+		Ctid:     res.CtidTraderAccountId,
 	}); err != nil {
 		return err
 	}
