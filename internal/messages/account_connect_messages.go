@@ -173,6 +173,10 @@ type AccountConnectSymbol struct {
 	SymbolId   any     `json:"id"`
 }
 
+type AccountConnectSymbolRes struct {
+	AccountConnectSymbols []AccountConnectSymbol `json:"symbols"`
+}
+
 // AccountConnectCryptoPrice is model message containing information about a crypto price.
 type AccountConnectCryptoPrice struct {
 	Symbol string `json:"symbol"`
