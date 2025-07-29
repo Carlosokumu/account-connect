@@ -832,10 +832,10 @@ func (t *CTrader) handleSymbolInfoForTrendBars(trendBars []acount_connect_messag
 		})
 	}
 
-	trendBarRes := acount_connect_messages.AccountConnectTrendBarRes{
+	trendBarsRes := acount_connect_messages.AccountConnectTrendBarRes{
 		Trendbars: mappedTrendBars,
 	}
-	trendBarsResB, err := json.Marshal(trendBarRes)
+	trendBarsResB, err := json.Marshal(trendBarsRes)
 	if err != nil {
 		log.Printf("Failed to marshal scaled trend bars: %v", err)
 		return
