@@ -703,7 +703,7 @@ func (t *CTrader) handleAccountAuthResponse(ctx context.Context, payload []byte)
 	}
 
 	accauthresB, err := json.Marshal(map[string]any{
-		"messsage":   "account authorized",
+		"message":    "account authorized",
 		"account_id": r.CtidTraderAccountId,
 	})
 
@@ -832,13 +832,16 @@ func (t *CTrader) handleSymbolInfoForTrendBars(trendBars []acount_connect_messag
 		})
 	}
 
-	trendBarsB, err := json.Marshal(mappedTrendBars)
+	trendBarRes := acount_connect_messages.AccountConnectTrendBarRes{
+		Trendbars: mappedTrendBars,
+	}
+	trendBarsResB, err := json.Marshal(trendBarRes)
 	if err != nil {
 		log.Printf("Failed to marshal scaled trend bars: %v", err)
 		return
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeTrendBars, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsResB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("Failed to marshal final message: %v", err)
@@ -849,7 +852,9 @@ func (t *CTrader) handleSymbolInfoForTrendBars(trendBars []acount_connect_messag
 }
 
 func (t *CTrader) handleSymbolListResponse(ctx context.Context, payload []byte) error {
-	var r gen_messages.ProtoOASymbolsListRes
+	var (
+		r gen_messages.ProtoOASymbolsListRes
+	)
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal symbol list: %w", err)
 	}
@@ -863,13 +868,17 @@ func (t *CTrader) handleSymbolListResponse(ctx context.Context, payload []byte) 
 	}
 
 	syms := mappers.ProtoSymbolListResponseToAccountConnectSymbol(&r)
-	symsB, err := json.Marshal(syms)
+	accconnectsyms := acount_connect_messages.AccountConnectSymbolRes{
+		AccountConnectSymbols: syms,
+	}
+
+	accconnectsymsB, err := json.Marshal(accconnectsyms)
 	if err != nil {
 		log.Printf("Failed to marshal symbol list data: %v", err)
 		return err
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, symsB)
+	msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
