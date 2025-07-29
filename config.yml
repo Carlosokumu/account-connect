@@ -1,0 +1,6 @@
+servers:
+  ctrader:
+    endpoint: "demo.ctraderapi.com"
+    port: 5035
+  account-connect-server:
+    port: 8080
