@@ -3,7 +3,7 @@ package applications
 import (
 	messageutils "account-connect/internal/accountconnectmessageutils"
 	"account-connect/internal/mappers"
-	messages "account-connect/internal/messages"
+	"account-connect/internal/messages"
 	"account-connect/internal/models"
 	"context"
 	"encoding/json"
@@ -227,19 +227,14 @@ func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArg
 }
 
 // GetBinanceTradingSymbols will retrieve all the available tradable symbols from binance
-func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]byte, error) {
+func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]messages.AccountConnectSymbol, error) {
 	exchangeInfo, err := b.Client.NewExchangeInfoService().Do(ctx)
 	if err != nil {
 		log.Printf("Failed to retrieve binance trading symbols")
 		return nil, err
 	}
 	syms := mappers.BinanceSymbolToAccountConnectSymbol(exchangeInfo.Symbols)
-	symsB, err := json.Marshal(syms)
-	if err != nil {
-		log.Printf("Failed to marshal trading symbols data info: %v", err)
-		return nil, err
-	}
-	return symsB, nil
+	return syms, nil
 }
 
 type BinanceAdapter struct {
@@ -287,12 +282,22 @@ func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages
 	if err != nil {
 		return err
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Binance, b.binanceConn.AccountConnClient.ID, binanceSyms)
+	accconnectsyms := messages.AccountConnectSymbolRes{
+		AccountConnectSymbols: binanceSyms,
+	}
 
+	accconnectsymsB, err := json.Marshal(accconnectsyms)
+	if err != nil {
+		log.Printf("Failed to marshal symbol list data: %v", err)
+		return err
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Binance, b.binanceConn.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
+
 	b.binanceConn.AccountConnClient.Send <- msgB
 	return nil
 }
