@@ -64,9 +64,9 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 
 // RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
 func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
-	var res messages.AccountConnectHistoricalDealsPayload
+	var req messages.AccountConnectHistoricalDealsPayload
 
-	err := json.Unmarshal(payload, &res)
+	err := json.Unmarshal(payload, &req)
 	if err != nil {
 		log.Printf("Failed to unmarshal trader info payload request: %v", err)
 		return err
@@ -77,7 +77,7 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.Acco
 		return fmt.Errorf("failed to find router client with id: %s", client.ID)
 	}
 
-	err = cp.GetHistoricalTrades(ctx, res)
+	err = cp.GetHistoricalTrades(ctx, req)
 	if err != nil {
 		log.Printf("Failed to fetch account historical deals: %v", err)
 		return err
@@ -85,6 +85,7 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.Acco
 	return nil
 }
 
+// AuthorizeAccount performs  any neccessary account-specific authorization if required by the data provider API
 func (r *Router) AuthorizeAccount(ctx context.Context, accclient *models.AccountConnectClient, payload json.RawMessage) error {
 	var req messages.AccountConnectAuthorizeTradingAccountPayload
 	err := json.Unmarshal(payload, &req)
@@ -108,9 +109,9 @@ func (r *Router) AuthorizeAccount(ctx context.Context, accclient *models.Account
 
 // RequestTraderInfo will request the trader's information if  supported by the trading platform's api
 func (r *Router) RequestTraderInfo(ctx context.Context, accclient *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
-	var res messages.AccountConnectTraderInfoPayload
+	var req messages.AccountConnectTraderInfoPayload
 
-	err := json.Unmarshal(payload, &res)
+	err := json.Unmarshal(payload, &req)
 	if err != nil {
 		log.Printf("Failed to unmarshal trader info payload request: %v", err)
 		return err
@@ -121,7 +122,7 @@ func (r *Router) RequestTraderInfo(ctx context.Context, accclient *models.Accoun
 		return fmt.Errorf("failed to find router client with id: %s", accclient.ID)
 	}
 
-	err = cp.GetTraderInfo(ctx, res)
+	err = cp.GetTraderInfo(ctx, req)
 	if err != nil {
 		log.Printf("Failed to retreive trader info: %v", err)
 		return err
@@ -132,9 +133,9 @@ func (r *Router) RequestTraderInfo(ctx context.Context, accclient *models.Accoun
 
 // RequestAccountSymbols will fetch all of the available trading symbols(tradable assets) for a given trading platform
 func (r *Router) RequestAccountSymbols(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
-	var res messages.AccountConnectSymbolsPayload
+	var req messages.AccountConnectSymbolsPayload
 
-	err := json.Unmarshal(payload, &res)
+	err := json.Unmarshal(payload, &req)
 	if err != nil {
 		return err
 	}
@@ -144,7 +145,7 @@ func (r *Router) RequestAccountSymbols(ctx context.Context, client *models.Accou
 		return fmt.Errorf("failed to find router client with id: %s", client.ID)
 	}
 
-	err = cp.GetTradingSymbols(ctx, res)
+	err = cp.GetTradingSymbols(ctx, req)
 	if err != nil {
 		log.Printf("Failed to retrieve account symbols: %v", err)
 		return err
@@ -155,7 +156,7 @@ func (r *Router) RequestAccountSymbols(ctx context.Context, client *models.Accou
 
 // RequestTrendBars will request trendbars for a particular symbol(trading pair)
 func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
-	var res messages.AccountConnectTrendBarsPayload
+	var req messages.AccountConnectTrendBarsPayload
 
 	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
@@ -163,18 +164,18 @@ func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountCon
 		return fmt.Errorf("failed to find router client with id: %s", client.ID)
 	}
 
-	err := json.Unmarshal(payload, &res)
+	err := json.Unmarshal(payload, &req)
 	if err != nil {
 		log.Printf("Failed to unmarshal account connect trend bars requests: %v", err)
 		return fmt.Errorf("failed to unmarshal account connect trend bars requests: %w", err)
 	}
 	trendBarArgs := messages.AccountConnectTrendBarsPayload{
-		SymbolId:      res.SymbolId,
-		SymbolName:    res.SymbolName,
-		Ctid:          res.Ctid,
-		Period:        res.Period,
-		FromTimestamp: res.FromTimestamp,
-		ToTimestamp:   res.ToTimestamp,
+		SymbolId:      req.SymbolId,
+		SymbolName:    req.SymbolName,
+		Ctid:          req.Ctid,
+		Period:        req.Period,
+		FromTimestamp: req.FromTimestamp,
+		ToTimestamp:   req.ToTimestamp,
 	}
 
 	err = cp.GetSymbolTrendBars(ctx, trendBarArgs)
