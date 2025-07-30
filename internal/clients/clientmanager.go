@@ -116,14 +116,14 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			var msg messages.AccountConnectMsg
 			if err := json.Unmarshal(incomingMsg, &msg); err != nil {
 				log.Printf("Invalid account-connect message %v:", err)
-				return
+				continue
 			}
 			m.RLock()
 			client, exists := m.clients[msg.TradeshareClientId]
 			if !exists {
 				m.RUnlock()
 				log.Printf("Client id: %s not found", msg.TradeshareClientId)
-				return
+				continue
 			}
 			m.RUnlock()
 			err := m.msgRouter.Route(m.clientContexts[client.ID].ctx, client, msg)
@@ -165,14 +165,14 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 			err = json.Unmarshal(msg, &accountConnectMsgRes)
 			if err != nil {
 				log.Printf("Failed to unmarshal account connect message: %v", err)
-				return
+				continue
 			}
 			if accountConnectMsgRes.AccountConnectMessageType == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
 				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
-					return
+					continue
 				}
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
 				err = m.handleClientError(client, accountConnectMsgRes.Payload)
