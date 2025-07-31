@@ -9,6 +9,9 @@ import (
 	"github.com/adshao/go-binance/v2"
 )
 
+// ProtoOADealToAccountConnectDeal converts a list of ProtoOADeal messages from a ProtoOADealListRes
+// into a slice of AccountConnectDeal domain objects used by the application.
+// It maps relevant fields such as execution price, commission, direction, and symbol.
 func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []messages.AccountConnectDeal {
 	var deals []messages.AccountConnectDeal
 
@@ -24,6 +27,8 @@ func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []messages.Accoun
 	return deals
 }
 
+// ProtoOATraderToaccountConnectTrader converts a ProtoOATraderRes message into an AccountConnectTraderInfo
+// domain object. It extracts trader account ID, login, deposit asset ID, and broker name.
 func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) messages.AccountConnectTraderInfo {
 	return messages.AccountConnectTraderInfo{
 		CtidTraderAccountId: r.CtidTraderAccountId,
@@ -33,6 +38,8 @@ func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) messages.Accoun
 	}
 }
 
+// ProotoOAToTrendBars converts a ProtoOAGetTrendbarsRes message into a slice of AccountConnectTrendBar objects.
+// It computes Open, High, Close prices by applying respective deltas to the Low price, and also extracts volume and timestamp.
 func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnectTrendBar {
 	var trendBars []messages.AccountConnectTrendBar
 	for _, trendBar := range r.Trendbar {
@@ -75,12 +82,16 @@ func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnect
 	return trendBars
 }
 
+// ProtoOAErrorResToError converts a ProtoOAErrorRes message into an AccountConnectError object.
+// It extracts the error description from the response.
 func ProtoOAErrorResToError(r *pb.ProtoOAErrorRes) *messages.AccountConnectError {
 	return &messages.AccountConnectError{
 		Description: *r.Description,
 	}
 }
 
+// ProtoSymbolListResponseToAccountConnectSymbol converts a ProtoOASymbolsListRes message
+// into a slice of AccountConnectSymbol objects by mapping each symbol's name and ID.
 func ProtoSymbolListResponseToAccountConnectSymbol(r *pb.ProtoOASymbolsListRes) []messages.AccountConnectSymbol {
 	var symList []messages.AccountConnectSymbol
 
@@ -94,6 +105,10 @@ func ProtoSymbolListResponseToAccountConnectSymbol(r *pb.ProtoOASymbolsListRes) 
 	return symList
 }
 
+//	PeriodStrToBarPeriod maps a string-based time period (e.g., "M1", "H1", "D1")
+//
+// to its corresponding ProtoOATrendbarPeriod enum value used in gRPC requests.
+// Returns an error if the input string is not a recognized period.
 func PeriodStrToBarPeriod(periodStr string) (pb.ProtoOATrendbarPeriod, error) {
 	switch periodStr {
 	case "M1":
@@ -128,12 +143,15 @@ func PeriodStrToBarPeriod(periodStr string) (pb.ProtoOATrendbarPeriod, error) {
 		return 0, fmt.Errorf("invalid period: %s", periodStr)
 	}
 }
+
+// BinanceSymbolToAccountConnectSymbol filters Binance symbols with status "TRADING"
+// and converts them into AccountConnectSymbol objects. The Binance symbol string is
+// used as both the ID and the name.
 func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []messages.AccountConnectSymbol {
 	var accsyms []messages.AccountConnectSymbol
 
 	for _, sym := range binancesyms {
 		if sym.Status == "TRADING" {
-			//The symbol from binance will be used as an id and symbol name
 			accsym := messages.AccountConnectSymbol{
 				SymbolName: &sym.Symbol,
 				SymbolId:   sym.Symbol,
@@ -144,6 +162,10 @@ func BinanceSymbolToAccountConnectSymbol(binancesyms []binance.Symbol) []message
 	return accsyms
 }
 
+// BinanceKlineDataToAccountConnectTrendBar converts Binance OHLC (Kline) data into a slice of
+// AccountConnectTrendBar objects. It parses string-based price and volume fields into floats,
+// calculates the open time in minutes, and returns a structured result.
+// Returns an error if any numeric field fails to parse.
 func BinanceKlineDataToAccountConnectTrendBar(ohlc []*binance.Kline) ([]messages.AccountConnectTrendBar, error) {
 	var acctrendbars []messages.AccountConnectTrendBar
 
