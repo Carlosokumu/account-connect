@@ -3,9 +3,12 @@ package main
 import (
 	"account-connect/config"
 	"account-connect/internal/clients"
+	"account-connect/internal/messages"
+	"account-connect/internal/messagevalidator"
 	"account-connect/internal/models"
 	db "account-connect/persistence"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,6 +34,9 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 		Addr:    fmt.Sprintf(":%d", config.AccountConnectPort),
 		Handler: nil,
 	}
+
+	msgValidator := messagevalidator.New()
+	msgValidator.RegisterValidations()
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
 		ws, err := upgrader.Upgrade(w, req, nil)
@@ -77,6 +83,31 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 			if err != nil {
 				log.Printf("Error received while reading: %v", err)
 				break
+			}
+
+			var msg messages.AccountConnectMsg
+			if err := json.Unmarshal(rawMsg, &msg); err != nil {
+				ws.WriteJSON(map[string]string{
+					"error":   "unmarshal_failed",
+					"message": "Message does not match expected structure",
+				})
+				continue
+			}
+
+			if err := msgValidator.Validate(msg); err != nil {
+				ws.WriteJSON(map[string]string{
+					"error":   "validation_failed",
+					"message": err.Error(),
+				})
+				continue
+			}
+
+			if err := clientManager.ValidateClient(msg.TradeshareClientId); err != nil {
+				ws.WriteJSON(map[string]string{
+					"error":   "client_check_error",
+					"message": err.Error(),
+				})
+				continue
 			}
 			clientManager.IncomingClientMessages <- rawMsg
 		}
