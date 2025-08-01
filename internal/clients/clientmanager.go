@@ -8,6 +8,7 @@ import (
 	"account-connect/router"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -142,6 +143,19 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			}
 		}
 	}
+}
+
+// ValidateClient will validate if the provided client id is registered by the ClientManager or  perform any other future checks on the client.
+func (m *AccountConnectClientManager) ValidateClient(clientId string) error {
+	m.RLock()
+	_, exists := m.clients[clientId]
+	m.RUnlock()
+
+	if !exists {
+		return errors.New("client is not yet registered by the client manager")
+	}
+
+	return nil
 }
 
 // handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the [Send] channel of the client
