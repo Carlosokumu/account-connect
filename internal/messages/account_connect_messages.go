@@ -35,11 +35,11 @@ const (
 
 // AccountConnectMsg is a base message structure that incoming client messages are expected to have.
 type AccountConnectMsg struct {
-	AccountConnectMessageType MessageType     `json:"messagetype" validate:"required"`
-	TradeshareClientId        string          `json:"tradeshare_client_id"`
-	Platform                  Platform        `json:"platform"`
-	RequestId                 string          `json:"request_id"`
-	Payload                   json.RawMessage `json:"payload"`
+	AccountConnectMessageType MessageType     `json:"messagetype" validate:"required,messagetype_enum"`
+	TradeshareClientId        string          `json:"tradeshare_client_id" validate:"required"`
+	Platform                  Platform        `json:"platform" validate:"required"`
+	RequestId                 string          `json:"request_id" validate:"required"`
+	Payload                   json.RawMessage `json:"payload" validate:"required"`
 }
 
 // AccountConnectMsgRes  is a base message structure that all outgoing client messages should have.
