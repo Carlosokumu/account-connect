@@ -362,6 +362,6 @@ func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload mes
 	return nil
 }
 
-func (b *BinanceAdapter) Disconnect() error {
+func (b *BinanceAdapter) Disconnect(ctx context.Context) error {
 	return nil
 }

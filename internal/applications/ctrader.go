@@ -157,7 +157,7 @@ func (cta *CtraderAdapter) InitializeClientStream(ctx context.Context, payload a
 	return nil
 }
 
-func (cta *CtraderAdapter) Disconnect() error {
+func (cta *CtraderAdapter) Disconnect(ctx context.Context) error {
 	return cta.ctrader.DisconnectPlatformConn()
 }
 
