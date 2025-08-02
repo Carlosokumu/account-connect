@@ -2,10 +2,11 @@ package main
 
 import (
 	"account-connect/config"
+	"account-connect/internal/adapters"
 	"account-connect/internal/clients"
+	"account-connect/internal/managers"
 	"account-connect/internal/messages"
 	"account-connect/internal/messagevalidator"
-	"account-connect/internal/models"
 	db "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -29,7 +30,7 @@ const (
 	ClientSendBufferSize = 512
 )
 
-func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager) error {
+func startWsService(ctx context.Context, clientManager *managers.AccountConnectClientManager) error {
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", config.AccountConnectPort),
 		Handler: nil,
@@ -61,11 +62,12 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 			return
 		}
 
-		client := &models.AccountConnectClient{
-			ID:      clientID,
-			Conn:    ws,
-			Send:    make(chan []byte, ClientSendBufferSize),
-			Streams: make(map[string]chan []byte, ClientSendBufferSize),
+		client := &clients.AccountConnectClient{
+			ID:            clientID,
+			Conn:          ws,
+			Send:          make(chan []byte, ClientSendBufferSize),
+			Streams:       make(map[string]chan []byte, ClientSendBufferSize),
+			PlatformConns: make(map[messages.Platform]adapters.PlatformAdapter),
 		}
 
 		clientManager.Register <- client
@@ -221,7 +223,7 @@ func main() {
 		cancel()
 	}()
 
-	clientManager := clients.NewClientManager(accdb)
+	clientManager := managers.NewClientManager(accdb)
 
 	wg.Add(1)
 	go func() {
