@@ -17,5 +17,5 @@ type PlatformAdapter interface {
 	GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error
 	GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error
 	InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error
-	Disconnect() error
+	Disconnect(ctx context.Context) error
 }
