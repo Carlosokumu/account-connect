@@ -189,7 +189,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 					continue
 				}
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
-				err = m.handleClientError(client, accountConnectMsgRes.Payload)
+				err = m.HandleClientError(client, accountConnectMsgRes.Payload)
 				if err != nil {
 					log.Printf("client platform error return: %v", err)
 				}
@@ -242,7 +242,7 @@ func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context
 	return m.writeJSONWithTimeout(client, msg)
 }
 
-func (m *AccountConnectClientManager) handleClientError(client *models.AccountConnectClient, errData []byte) error {
+func (m *AccountConnectClientManager) HandleClientError(client *models.AccountConnectClient, errData []byte) error {
 	msg := messageutils.CreateErrorResponse(client.ID, errData)
 
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
