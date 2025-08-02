@@ -1,10 +1,12 @@
 package router
 
 import (
+	"account-connect/config"
 	requestutils "account-connect/internal/accountconnectrequestutils"
+	"account-connect/internal/adapters"
 	"account-connect/internal/applications"
+	"account-connect/internal/clients"
 	messages "account-connect/internal/messages"
-	"account-connect/internal/models"
 	db "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -14,26 +16,26 @@ import (
 
 type Router struct {
 	db             db.AccountConnectDb
-	ClientPlatform map[string]applications.PlatformAdapter
-	handlers       map[string]func(client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error
+	ClientPlatform map[string]adapters.PlatformAdapter
+	handlers       map[string]func(client *clients.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error
 }
 
 // NewRouter creates a new Router instance
 func NewRouter(accdb db.AccountConnectDb) *Router {
 	return &Router{
-		ClientPlatform: map[string]applications.PlatformAdapter{},
+		ClientPlatform: map[string]adapters.PlatformAdapter{},
 		db:             accdb,
-		handlers:       make(map[string]func(*models.AccountConnectClient, *db.AccountConnectDb, json.RawMessage) error),
+		handlers:       make(map[string]func(*clients.AccountConnectClient, *db.AccountConnectDb, json.RawMessage) error),
 	}
 }
 
 // Register a handler for a message type
-func (r *Router) Handle(messageType string, handler func(*models.AccountConnectClient, *db.AccountConnectDb, json.RawMessage) error) {
+func (r *Router) Handle(messageType string, handler func(*clients.AccountConnectClient, *db.AccountConnectDb, json.RawMessage) error) {
 	r.handlers[messageType] = handler
 }
 
 // Route  routes the different message types from clients to the right handler function
-func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
+func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	handler := messageHandler{
 		router: r,
 		client: client,
@@ -53,7 +55,7 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 	case messages.TypeAccountSymbols:
 		return handler.handleAccountSymbols(ctx, msg)
 	case messages.TypeDisconnect:
-		return handler.handleClientDisconnect(ctx, *client)
+		return handler.handleClientDisconnect(ctx)
 	case messages.TypeStream:
 		return handler.handleClientSubcribeToStream(ctx, msg)
 
@@ -63,7 +65,7 @@ func (r *Router) Route(ctx context.Context, client *models.AccountConnectClient,
 }
 
 // RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
-func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
+func (r *Router) RequestHistoricalDeals(ctx context.Context, client *clients.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
 	var req messages.AccountConnectHistoricalDealsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -86,7 +88,7 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, client *models.Acco
 }
 
 // AuthorizeAccount performs  any neccessary account-specific authorization if required by the data provider API
-func (r *Router) AuthorizeAccount(ctx context.Context, accclient *models.AccountConnectClient, payload json.RawMessage) error {
+func (r *Router) AuthorizeAccount(ctx context.Context, accclient *clients.AccountConnectClient, payload json.RawMessage) error {
 	var req messages.AccountConnectAuthorizeTradingAccountPayload
 	err := json.Unmarshal(payload, &req)
 	if err != nil {
@@ -108,7 +110,7 @@ func (r *Router) AuthorizeAccount(ctx context.Context, accclient *models.Account
 }
 
 // RequestTraderInfo will request the trader's information if  supported by the trading platform's api
-func (r *Router) RequestTraderInfo(ctx context.Context, accclient *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
+func (r *Router) RequestTraderInfo(ctx context.Context, accclient *clients.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
 	var req messages.AccountConnectTraderInfoPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -132,7 +134,7 @@ func (r *Router) RequestTraderInfo(ctx context.Context, accclient *models.Accoun
 }
 
 // RequestAccountSymbols will fetch all of the available trading symbols(tradable assets) for a given trading platform
-func (r *Router) RequestAccountSymbols(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
+func (r *Router) RequestAccountSymbols(ctx context.Context, client *clients.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
 	var req messages.AccountConnectSymbolsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -155,7 +157,7 @@ func (r *Router) RequestAccountSymbols(ctx context.Context, client *models.Accou
 }
 
 // RequestTrendBars will request trendbars for a particular symbol(trading pair)
-func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
+func (r *Router) RequestTrendBars(ctx context.Context, client *clients.AccountConnectClient, accDb *db.AccountConnectDb, payload json.RawMessage) error {
 	var req messages.AccountConnectTrendBarsPayload
 
 	cp, ok := r.ClientPlatform[client.ID]
@@ -188,7 +190,7 @@ func (r *Router) RequestTrendBars(ctx context.Context, client *models.AccountCon
 }
 
 // InitializeClientStream initializes a stream of messages to be sent through the specified channel
-func (r *Router) InitializeClientStream(ctx context.Context, client *models.AccountConnectClient, payload json.RawMessage) error {
+func (r *Router) InitializeClientStream(ctx context.Context, client *clients.AccountConnectClient, payload json.RawMessage) error {
 	var req messages.AccountConnectStreamPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -211,20 +213,20 @@ func (r *Router) InitializeClientStream(ctx context.Context, client *models.Acco
 	return nil
 }
 
-// DisconnectPlatformConnection  handles graceful disconnection  of the to underlying platform connection for the client
-func (r *Router) DisconnectPlatformConnection(client *models.AccountConnectClient) error {
+// DisconnectPlatformConnection  handles graceful disconnection  of the underlying platform connection for the client
+func (r *Router) DisconnectPlatformConnection(ctx context.Context, client *clients.AccountConnectClient) error {
 	cp, ok := r.ClientPlatform[client.ID]
 	if !ok {
 		log.Printf("Client with id: %s not found", client.ID)
 		return fmt.Errorf("failed to find router client with id: %s", client.ID)
 	}
-	return cp.Disconnect()
+	return cp.Disconnect(ctx)
 }
 
-func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *models.AccountConnectClient, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *clients.AccountConnectClient, msg messages.AccountConnectMsg) error {
 	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 
-	var adapter applications.PlatformAdapter
+	var adapter adapters.PlatformAdapter
 	var err error
 
 	switch msg.Platform {
@@ -255,41 +257,41 @@ func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg message
 // handleBinanceConnect will establish a connection to binance
 func (h *messageHandler) handleBinanceConnect(
 	ctx context.Context,
-	accountConnClient *models.AccountConnectClient,
+	accountConnClient *clients.AccountConnectClient,
 	payload json.RawMessage,
-) (applications.PlatformAdapter, error) {
+) (adapters.PlatformAdapter, error) {
 	var binanceMsg messages.BinanceConnectPayload
 	if err := json.Unmarshal(payload, &binanceMsg); err != nil {
 		return nil, fmt.Errorf("invalid Binance payload: %w", err)
 	}
 
 	adapter := applications.NewBinanceAdapter(accountConnClient)
-	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{}); err != nil {
+	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{}); err != nil {
 		return nil, err
 	}
-
+	accountConnClient.PlatformConns[messages.Binance] = adapter
 	return adapter, nil
 }
 
 // handleCtraderConnect will establish a connection to ctrader open api
 func (h *messageHandler) handleCtraderConnect(
 	ctx context.Context,
-	accountConnClient *models.AccountConnectClient,
+	accountConnClient *clients.AccountConnectClient,
 	payload json.RawMessage,
-) (applications.PlatformAdapter, error) {
+) (adapters.PlatformAdapter, error) {
 	var ctraderMsg messages.CTraderConnectPayload
 	if err := json.Unmarshal(payload, &ctraderMsg); err != nil {
 		return nil, fmt.Errorf("invalid cTrader payload: %w", err)
 	}
 
-	cfg := applications.CtraderConfig{
+	cfg := config.CtraderConfig{
 		ClientId:     ctraderMsg.ClientId,
 		ClientSecret: ctraderMsg.ClientSecret,
 		AccessToken:  ctraderMsg.AccessToken,
 	}
 	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
-	if err := adapter.EstablishConnection(ctx, applications.PlatformConfigs{
-		Ctrader: applications.CtraderConfig{
+	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
+		Ctrader: config.CtraderConfig{
 			ClientId:     ctraderMsg.ClientId,
 			ClientSecret: ctraderMsg.ClientSecret,
 			AccessToken:  ctraderMsg.AccessToken,
@@ -297,17 +299,22 @@ func (h *messageHandler) handleCtraderConnect(
 	}); err != nil {
 		return nil, err
 	}
+	accountConnClient.PlatformConns[messages.Ctrader] = adapter
 
 	return adapter, nil
 }
 
-func (h *messageHandler) handleClientDisconnect(ctx context.Context, client models.AccountConnectClient) error {
-	_, ok := h.router.ClientPlatform[client.ID]
-	if !ok {
-		log.Printf("Client with id: %s not found when disconnecting", client.ID)
-		return fmt.Errorf("could not handle disconnect for client with id: %s as client has no active connections", client.ID)
+func (h *messageHandler) handleClientDisconnect(ctx context.Context) error {
+	var disconnecterr error
+	client := h.client
+
+	for range client.PlatformConns {
+		if err := h.router.DisconnectPlatformConnection(ctx, client); err != nil {
+			disconnecterr = err
+		}
 	}
-	return h.router.DisconnectPlatformConnection(&client)
+
+	return disconnecterr
 }
 
 func (h *messageHandler) handleHistorical(ctx context.Context, msg messages.AccountConnectMsg) error {
@@ -384,7 +391,7 @@ func (h *messageHandler) writeClientMessage(response messages.AccountConnectMsgR
 
 type messageHandler struct {
 	router *Router
-	client *models.AccountConnectClient
+	client *clients.AccountConnectClient
 }
 
 func (r *Router) logError(context, clientID string, err error) {
