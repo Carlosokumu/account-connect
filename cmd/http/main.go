@@ -29,7 +29,7 @@ const (
 	ClientSendBufferSize = 512
 )
 
-func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager, _ db.AccountConnectDb) error {
+func startWsService(ctx context.Context, clientManager *clients.AccountConnectClientManager) error {
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", config.AccountConnectPort),
 		Handler: nil,
@@ -173,7 +173,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := startWsService(ctx, clientManager, accdb); err != nil {
+		if err := startWsService(ctx, clientManager); err != nil {
 			log.Printf("WebSocket service error: %v", err)
 			cancel()
 		}
