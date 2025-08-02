@@ -1,10 +1,10 @@
-package clients
+package managers
 
 import (
 	messageutils "account-connect/internal/accountconnectmessageutils"
 	requestutils "account-connect/internal/accountconnectrequestutils"
+	"account-connect/internal/clients"
 	messages "account-connect/internal/messages"
-	"account-connect/internal/models"
 	"account-connect/router"
 	"context"
 	"encoding/json"
@@ -25,11 +25,11 @@ type clientContext struct {
 }
 
 type AccountConnectClientManager struct {
-	clients                map[string]*models.AccountConnectClient
+	clients                map[string]*clients.AccountConnectClient
 	clientContexts         map[string]clientContext
 	IncomingClientMessages chan []byte
-	Register               chan *models.AccountConnectClient
-	Unregister             chan *models.AccountConnectClient
+	Register               chan *clients.AccountConnectClient
+	Unregister             chan *clients.AccountConnectClient
 	msgRouter              *router.Router
 	sync.RWMutex
 }
@@ -39,11 +39,11 @@ func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
 	r := router.NewRouter(accdb)
 
 	return &AccountConnectClientManager{
-		clients:                make(map[string]*models.AccountConnectClient),
+		clients:                make(map[string]*clients.AccountConnectClient),
 		clientContexts:         make(map[string]clientContext),
 		IncomingClientMessages: make(chan []byte),
-		Register:               make(chan *models.AccountConnectClient),
-		Unregister:             make(chan *models.AccountConnectClient),
+		Register:               make(chan *clients.AccountConnectClient),
+		Unregister:             make(chan *clients.AccountConnectClient),
 		msgRouter:              r,
 	}
 }
@@ -80,7 +80,7 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 				}
 				close(client.Send)
 			}
-			m.clients = make(map[string]*models.AccountConnectClient)
+			m.clients = make(map[string]*clients.AccountConnectClient)
 			m.Unlock()
 			return
 		case client := <-m.Register:
@@ -159,7 +159,7 @@ func (m *AccountConnectClientManager) ValidateClient(clientId string) error {
 }
 
 // handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the [Send] channel of the client
-func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, client *models.AccountConnectClient) {
+func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, client *clients.AccountConnectClient) {
 	var (
 		err                  error
 		accountConnectMsgRes messages.AccountConnectMsgRes
@@ -231,7 +231,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
-func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *models.AccountConnectClient, platform messages.Platform, msgType messages.MessageType, payload []byte) error {
+func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *clients.AccountConnectClient, platform messages.Platform, msgType messages.MessageType, payload []byte) error {
 	msg := messageutils.CreateSuccessResponse(
 		ctx,
 		msgType,
@@ -242,7 +242,7 @@ func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context
 	return m.writeJSONWithTimeout(client, msg)
 }
 
-func (m *AccountConnectClientManager) HandleClientError(client *models.AccountConnectClient, errData []byte) error {
+func (m *AccountConnectClientManager) HandleClientError(client *clients.AccountConnectClient, errData []byte) error {
 	msg := messageutils.CreateErrorResponse(client.ID, errData)
 
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
@@ -251,7 +251,7 @@ func (m *AccountConnectClientManager) HandleClientError(client *models.AccountCo
 	return fmt.Errorf("error condition: %s", string(msg.Payload))
 }
 
-func (m *AccountConnectClientManager) writeJSONWithTimeout(client *models.AccountConnectClient, v interface{}) error {
+func (m *AccountConnectClientManager) writeJSONWithTimeout(client *clients.AccountConnectClient, v interface{}) error {
 	//allow larger messages to complete writing to the connection.
 	client.Conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 

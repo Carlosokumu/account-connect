@@ -1,10 +1,11 @@
 package applications
 
 import (
+	"account-connect/config"
 	messageutils "account-connect/internal/accountconnectmessageutils"
+	"account-connect/internal/clients"
 	"account-connect/internal/mappers"
 	"account-connect/internal/messages"
-	"account-connect/internal/models"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -93,12 +94,12 @@ func WsMiniTickerServe(
 
 type BinanceConnection struct {
 	Client            *binance.Client
-	AccountConnClient *models.AccountConnectClient
+	AccountConnClient *clients.AccountConnectClient
 	wsServeMux        sync.Mutex
 	doneChans         map[string]chan struct{}
 }
 
-func NewBinanceConnection(accountConnClient *models.AccountConnectClient) *BinanceConnection {
+func NewBinanceConnection(accountConnClient *clients.AccountConnectClient) *BinanceConnection {
 	return &BinanceConnection{
 		AccountConnClient: accountConnClient,
 		doneChans:         make(map[string]chan struct{}),
@@ -241,13 +242,13 @@ type BinanceAdapter struct {
 	binanceConn *BinanceConnection
 }
 
-func NewBinanceAdapter(accountConnClient *models.AccountConnectClient) *BinanceAdapter {
+func NewBinanceAdapter(accountConnClient *clients.AccountConnectClient) *BinanceAdapter {
 	return &BinanceAdapter{
 		binanceConn: NewBinanceConnection(accountConnClient),
 	}
 }
 
-func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
+func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
 	apiKey := cfg.Binance.ApiKey
 	secretKey := cfg.Binance.SecretKey
 
@@ -361,6 +362,6 @@ func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload mes
 	return nil
 }
 
-func (b *BinanceAdapter) Disconnect() error {
+func (b *BinanceAdapter) Disconnect(ctx context.Context) error {
 	return nil
 }

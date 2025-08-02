@@ -1,6 +1,8 @@
-package models
+package clients
 
 import (
+	"account-connect/internal/adapters"
+	"account-connect/internal/messages"
 	"errors"
 	"sync"
 
@@ -10,12 +12,13 @@ import (
 const StreamBufferSize = 500
 
 type AccountConnectClient struct {
-	ID           string
-	Conn         *websocket.Conn
-	PlatformConn *websocket.Conn
-	Send         chan []byte
-	Streams      map[string]chan []byte
-	StreamsMutex sync.Mutex
+	ID   string
+	Conn *websocket.Conn
+	// PlatformConn *websocket.Conn
+	PlatformConns map[messages.Platform]adapters.PlatformAdapter
+	Send          chan []byte
+	Streams       map[string]chan []byte
+	StreamsMutex  sync.Mutex
 }
 
 // AddStream adds a new stream to the [Streams] map

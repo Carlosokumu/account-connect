@@ -4,8 +4,8 @@ import (
 	"account-connect/common"
 	"account-connect/config"
 	gen_messages "account-connect/gen"
+	"account-connect/internal/clients"
 	"account-connect/internal/mappers"
-	"account-connect/internal/models"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -49,7 +49,7 @@ type pendingRequest struct {
 
 type CTrader struct {
 	accDb             accdb.AccountConnectDb
-	AccountConnClient *models.AccountConnectClient
+	AccountConnClient *clients.AccountConnectClient
 	AccessToken       string
 	PlatformConn      *websocket.Conn
 	handlers          map[uint32]MessageHandler
@@ -63,14 +63,14 @@ type CtraderAdapter struct {
 	ctrader CTrader
 }
 
-func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *CtraderConfig) *CtraderAdapter {
+func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CtraderAdapter {
 	return &CtraderAdapter{
 		ctrader: *NewCTrader(accdb, accountConnClient, ctraderconfig),
 	}
 }
 
 // NewCTrader creates a new ctrader instance with the required fields to establish a ctrader connection
-func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *models.AccountConnectClient, ctraderconfig *CtraderConfig) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CTrader {
 	return &CTrader{
 		accDb:             accdb,
 		AccountConnClient: accountConnClient,
@@ -100,7 +100,7 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(common.AccountListRes), t.handleAccountListResponse)
 }
 
-func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg PlatformConfigs) error {
+func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
 	cendpoint := config.CtraderEndpoint
 	cport := config.CtraderPort
 
@@ -108,7 +108,7 @@ func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg Platform
 		return fmt.Errorf("missing required ctrader port or endpoint")
 	}
 
-	err := cta.ctrader.EstablishCtraderConnection(ctx, CtraderConfig{
+	err := cta.ctrader.EstablishCtraderConnection(ctx, config.CtraderConfig{
 		ClientId:     cfg.Ctrader.ClientId,
 		ClientSecret: cfg.Ctrader.ClientSecret,
 	})
@@ -157,12 +157,12 @@ func (cta *CtraderAdapter) InitializeClientStream(ctx context.Context, payload a
 	return nil
 }
 
-func (cta *CtraderAdapter) Disconnect() error {
+func (cta *CtraderAdapter) Disconnect(ctx context.Context) error {
 	return cta.ctrader.DisconnectPlatformConn()
 }
 
 // EstablishCtraderConnection  establishes a  new ctrader websocket connection
-func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig CtraderConfig) error {
+func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig config.CtraderConfig) error {
 	// Set up a dialer with the desired options
 	dialer := websocket.DefaultDialer
 	dialer.EnableCompression = true
