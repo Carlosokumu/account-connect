@@ -70,6 +70,35 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 
 		clientManager.Register <- client
 
+		ws.SetPongHandler(func(pongMsg string) error {
+			log.Printf("pong message received from client:%s", client.ID)
+			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
+			return nil
+		})
+
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					err := ws.WriteControl(
+						websocket.PingMessage,
+						[]byte{},
+						time.Now().Add(5*time.Second),
+					)
+					if err != nil {
+						log.Printf("Ping failed (client %s): %v", clientID, err)
+						ws.Close()
+						return
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
 		defer func() {
 			clientManager.Unregister <- client
 			ws.Close()
@@ -77,7 +106,7 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 		}()
 
 		for {
-			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
 			ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			_, rawMsg, err := ws.ReadMessage()
 			if err != nil {
@@ -87,26 +116,56 @@ func startWsService(ctx context.Context, clientManager *clients.AccountConnectCl
 
 			var msg messages.AccountConnectMsg
 			if err := json.Unmarshal(rawMsg, &msg); err != nil {
-				ws.WriteJSON(map[string]string{
+				errPayload := map[string]string{
 					"error":   "unmarshal_failed",
-					"message": "Message does not match expected structure",
-				})
+					"message": err.Error(),
+				}
+
+				errPayloadB, err := json.Marshal(errPayload)
+				if err != nil {
+					log.Printf("Failed to marshal client error: %v", err)
+					continue
+				}
+				err = clientManager.HandleClientError(client, errPayloadB)
+				if err != nil {
+					log.Printf("Handle Client error fail: %v", err)
+				}
 				continue
 			}
 
 			if err := msgValidator.Validate(msg); err != nil {
-				ws.WriteJSON(map[string]string{
-					"error":   "validation_failed",
+				errPayload := map[string]string{
+					"error":   "message_validation_failed",
 					"message": err.Error(),
-				})
+				}
+
+				errPayloadB, err := json.Marshal(errPayload)
+				if err != nil {
+					log.Printf("Failed to marshal client error: %v", err)
+					continue
+				}
+				err = clientManager.HandleClientError(client, errPayloadB)
+				if err != nil {
+					log.Printf("Handle Client error fail: %v", err)
+				}
 				continue
 			}
 
 			if err := clientManager.ValidateClient(msg.TradeshareClientId); err != nil {
-				ws.WriteJSON(map[string]string{
-					"error":   "client_check_error",
+				errPayload := map[string]string{
+					"error":   "client_validation_failed",
 					"message": err.Error(),
-				})
+				}
+
+				errPayloadB, err := json.Marshal(errPayload)
+				if err != nil {
+					log.Printf("Failed to marshal client error: %v", err)
+					continue
+				}
+				err = clientManager.HandleClientError(client, errPayloadB)
+				if err != nil {
+					log.Printf("Handle Client error fail: %v", err)
+				}
 				continue
 			}
 			clientManager.IncomingClientMessages <- rawMsg
