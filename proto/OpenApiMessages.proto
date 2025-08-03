@@ -84,6 +84,25 @@ message ProtoOAGetAccountListByAccessTokenRes {
     repeated ProtoOACtidTraderAccount ctidTraderAccount = 4; // The list of the accounts.
 }
 
+/** Request for getting historical tick data for the symbol. */
+message ProtoOAGetTickDataReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TICKDATA_REQ];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    required int64 symbolId = 3; // Unique identifier of the Symbol in cTrader platform.
+    required ProtoOAQuoteType type = 4; // Bid/Ask (1/2).
+    optional int64 fromTimestamp = 5; // The Unix time in milliseconds of starting the search. Must be bigger or equal to zero (1st Jan 1970).
+    optional int64 toTimestamp = 6; // The Unix time in milliseconds of finishing the search. <= 2147483646000 (19th Jan 2038).
+}
+
+/** Response to the ProtoOAGetTickDataReq request. */
+message ProtoOAGetTickDataRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TICKDATA_RES];
+
+    required int64 ctidTraderAccountId = 2; // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+    repeated ProtoOATickData tickData = 3; // The list of ticks is in chronological order (newest first). The first tick contains Unix time in milliseconds while all subsequent ticks have the time difference in milliseconds between the previous and the current one.
+    required bool hasMore = 4; // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+}
 
 
 /** Request for getting historical trend bars for the symbol. */
