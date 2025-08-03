@@ -12,9 +12,8 @@ import (
 const StreamBufferSize = 500
 
 type AccountConnectClient struct {
-	ID   string
-	Conn *websocket.Conn
-	// PlatformConn *websocket.Conn
+	ID            string
+	Conn          *websocket.Conn
 	PlatformConns map[messages.Platform]adapters.PlatformAdapter
 	Send          chan []byte
 	Streams       map[string]chan []byte
