@@ -216,6 +216,18 @@ enum ProtoOATradeSide {
     SELL = 2;
 }
 
+/** Price quote type. */
+enum ProtoOAQuoteType {
+    BID = 1;
+    ASK = 2;
+}
+
+/** Historical tick data type. */
+message ProtoOATickData {
+    required int64 timestamp = 1; // The Unix time in milliseconds of the tick. See ProtoOAGetTickDataRes.tickData for details.
+    required int64 tick = 2; // Tick price.
+}
+
 
 /** Stop Order and Stop Lost triggering method ENUM. */
 enum ProtoOAOrderTriggerMethod {

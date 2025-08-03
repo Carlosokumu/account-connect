@@ -730,6 +730,63 @@ func (ProtoOATradeSide) EnumDescriptor() ([]byte, []int) {
 	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{7}
 }
 
+// * Price quote type.
+type ProtoOAQuoteType int32
+
+const (
+	ProtoOAQuoteType_BID ProtoOAQuoteType = 1
+	ProtoOAQuoteType_ASK ProtoOAQuoteType = 2
+)
+
+// Enum value maps for ProtoOAQuoteType.
+var (
+	ProtoOAQuoteType_name = map[int32]string{
+		1: "BID",
+		2: "ASK",
+	}
+	ProtoOAQuoteType_value = map[string]int32{
+		"BID": 1,
+		"ASK": 2,
+	}
+)
+
+func (x ProtoOAQuoteType) Enum() *ProtoOAQuoteType {
+	p := new(ProtoOAQuoteType)
+	*p = x
+	return p
+}
+
+func (x ProtoOAQuoteType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ProtoOAQuoteType) Descriptor() protoreflect.EnumDescriptor {
+	return file_OpenApiModelMessages_proto_enumTypes[8].Descriptor()
+}
+
+func (ProtoOAQuoteType) Type() protoreflect.EnumType {
+	return &file_OpenApiModelMessages_proto_enumTypes[8]
+}
+
+func (x ProtoOAQuoteType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Do not use.
+func (x *ProtoOAQuoteType) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = ProtoOAQuoteType(num)
+	return nil
+}
+
+// Deprecated: Use ProtoOAQuoteType.Descriptor instead.
+func (ProtoOAQuoteType) EnumDescriptor() ([]byte, []int) {
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{8}
+}
+
 // * Stop Order and Stop Lost triggering method ENUM.
 type ProtoOAOrderTriggerMethod int32
 
@@ -767,11 +824,11 @@ func (x ProtoOAOrderTriggerMethod) String() string {
 }
 
 func (ProtoOAOrderTriggerMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[8].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[9].Descriptor()
 }
 
 func (ProtoOAOrderTriggerMethod) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[8]
+	return &file_OpenApiModelMessages_proto_enumTypes[9]
 }
 
 func (x ProtoOAOrderTriggerMethod) Number() protoreflect.EnumNumber {
@@ -790,7 +847,7 @@ func (x *ProtoOAOrderTriggerMethod) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOAOrderTriggerMethod.Descriptor instead.
 func (ProtoOAOrderTriggerMethod) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{8}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{9}
 }
 
 // * Order type ENUM.
@@ -836,11 +893,11 @@ func (x ProtoOAOrderType) String() string {
 }
 
 func (ProtoOAOrderType) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[9].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[10].Descriptor()
 }
 
 func (ProtoOAOrderType) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[9]
+	return &file_OpenApiModelMessages_proto_enumTypes[10]
 }
 
 func (x ProtoOAOrderType) Number() protoreflect.EnumNumber {
@@ -859,7 +916,7 @@ func (x *ProtoOAOrderType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOAOrderType.Descriptor instead.
 func (ProtoOAOrderType) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{9}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{10}
 }
 
 // * Order status ENUM.
@@ -902,11 +959,11 @@ func (x ProtoOAOrderStatus) String() string {
 }
 
 func (ProtoOAOrderStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[10].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[11].Descriptor()
 }
 
 func (ProtoOAOrderStatus) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[10]
+	return &file_OpenApiModelMessages_proto_enumTypes[11]
 }
 
 func (x ProtoOAOrderStatus) Number() protoreflect.EnumNumber {
@@ -925,7 +982,7 @@ func (x *ProtoOAOrderStatus) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOAOrderStatus.Descriptor instead.
 func (ProtoOAOrderStatus) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{10}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{11}
 }
 
 // * Order's time in force ENUM.
@@ -968,11 +1025,11 @@ func (x ProtoOATimeInForce) String() string {
 }
 
 func (ProtoOATimeInForce) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[11].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[12].Descriptor()
 }
 
 func (ProtoOATimeInForce) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[11]
+	return &file_OpenApiModelMessages_proto_enumTypes[12]
 }
 
 func (x ProtoOATimeInForce) Number() protoreflect.EnumNumber {
@@ -991,7 +1048,7 @@ func (x *ProtoOATimeInForce) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOATimeInForce.Descriptor instead.
 func (ProtoOATimeInForce) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{11}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{12}
 }
 
 type ProtoOADayOfWeek int32
@@ -1042,11 +1099,11 @@ func (x ProtoOADayOfWeek) String() string {
 }
 
 func (ProtoOADayOfWeek) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[12].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[13].Descriptor()
 }
 
 func (ProtoOADayOfWeek) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[12]
+	return &file_OpenApiModelMessages_proto_enumTypes[13]
 }
 
 func (x ProtoOADayOfWeek) Number() protoreflect.EnumNumber {
@@ -1065,7 +1122,7 @@ func (x *ProtoOADayOfWeek) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOADayOfWeek.Descriptor instead.
 func (ProtoOADayOfWeek) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{12}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{13}
 }
 
 // * Enum for specifying type of minimum trading commission.
@@ -1099,11 +1156,11 @@ func (x ProtoOAMinCommissionType) String() string {
 }
 
 func (ProtoOAMinCommissionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[13].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[14].Descriptor()
 }
 
 func (ProtoOAMinCommissionType) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[13]
+	return &file_OpenApiModelMessages_proto_enumTypes[14]
 }
 
 func (x ProtoOAMinCommissionType) Number() protoreflect.EnumNumber {
@@ -1122,7 +1179,7 @@ func (x *ProtoOAMinCommissionType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOAMinCommissionType.Descriptor instead.
 func (ProtoOAMinCommissionType) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{13}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{14}
 }
 
 // * Enum for specifying symbol trading mode.
@@ -1162,11 +1219,11 @@ func (x ProtoOATradingMode) String() string {
 }
 
 func (ProtoOATradingMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[14].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[15].Descriptor()
 }
 
 func (ProtoOATradingMode) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[14]
+	return &file_OpenApiModelMessages_proto_enumTypes[15]
 }
 
 func (x ProtoOATradingMode) Number() protoreflect.EnumNumber {
@@ -1185,7 +1242,7 @@ func (x *ProtoOATradingMode) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOATradingMode.Descriptor instead.
 func (ProtoOATradingMode) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{14}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{15}
 }
 
 // * Enum for specifying type of trading commission.
@@ -1225,11 +1282,11 @@ func (x ProtoOACommissionType) String() string {
 }
 
 func (ProtoOACommissionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[15].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[16].Descriptor()
 }
 
 func (ProtoOACommissionType) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[15]
+	return &file_OpenApiModelMessages_proto_enumTypes[16]
 }
 
 func (x ProtoOACommissionType) Number() protoreflect.EnumNumber {
@@ -1248,7 +1305,7 @@ func (x *ProtoOACommissionType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOACommissionType.Descriptor instead.
 func (ProtoOACommissionType) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{15}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{16}
 }
 
 // * Enum for specifying stop loss and take profit distances.
@@ -1282,11 +1339,11 @@ func (x ProtoOASymbolDistanceType) String() string {
 }
 
 func (ProtoOASymbolDistanceType) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[16].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[17].Descriptor()
 }
 
 func (ProtoOASymbolDistanceType) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[16]
+	return &file_OpenApiModelMessages_proto_enumTypes[17]
 }
 
 func (x ProtoOASymbolDistanceType) Number() protoreflect.EnumNumber {
@@ -1305,7 +1362,7 @@ func (x *ProtoOASymbolDistanceType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOASymbolDistanceType.Descriptor instead.
 func (ProtoOASymbolDistanceType) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{16}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{17}
 }
 
 // * Deal status ENUM.
@@ -1351,11 +1408,11 @@ func (x ProtoOADealStatus) String() string {
 }
 
 func (ProtoOADealStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[17].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[18].Descriptor()
 }
 
 func (ProtoOADealStatus) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[17]
+	return &file_OpenApiModelMessages_proto_enumTypes[18]
 }
 
 func (x ProtoOADealStatus) Number() protoreflect.EnumNumber {
@@ -1374,7 +1431,7 @@ func (x *ProtoOADealStatus) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOADealStatus.Descriptor instead.
 func (ProtoOADealStatus) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{17}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{18}
 }
 
 // * Enum for specifying SWAP calculation type for symbol.
@@ -1408,11 +1465,11 @@ func (x ProtoOASwapCalculationType) String() string {
 }
 
 func (ProtoOASwapCalculationType) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[18].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[19].Descriptor()
 }
 
 func (ProtoOASwapCalculationType) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[18]
+	return &file_OpenApiModelMessages_proto_enumTypes[19]
 }
 
 func (x ProtoOASwapCalculationType) Number() protoreflect.EnumNumber {
@@ -1431,7 +1488,7 @@ func (x *ProtoOASwapCalculationType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOASwapCalculationType.Descriptor instead.
 func (ProtoOASwapCalculationType) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{18}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{19}
 }
 
 // * Trendbar period ENUM.
@@ -1501,11 +1558,11 @@ func (x ProtoOATrendbarPeriod) String() string {
 }
 
 func (ProtoOATrendbarPeriod) Descriptor() protoreflect.EnumDescriptor {
-	return file_OpenApiModelMessages_proto_enumTypes[19].Descriptor()
+	return file_OpenApiModelMessages_proto_enumTypes[20].Descriptor()
 }
 
 func (ProtoOATrendbarPeriod) Type() protoreflect.EnumType {
-	return &file_OpenApiModelMessages_proto_enumTypes[19]
+	return &file_OpenApiModelMessages_proto_enumTypes[20]
 }
 
 func (x ProtoOATrendbarPeriod) Number() protoreflect.EnumNumber {
@@ -1524,7 +1581,7 @@ func (x *ProtoOATrendbarPeriod) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ProtoOATrendbarPeriod.Descriptor instead.
 func (ProtoOATrendbarPeriod) EnumDescriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{19}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{20}
 }
 
 // * Trading account entity.
@@ -2150,6 +2207,59 @@ func (x *ProtoOATradeData) GetGuaranteedStopLoss() bool {
 	return false
 }
 
+// * Historical tick data type.
+type ProtoOATickData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     *int64                 `protobuf:"varint,1,req,name=timestamp" json:"timestamp,omitempty"` // The Unix time in milliseconds of the tick. See ProtoOAGetTickDataRes.tickData for details.
+	Tick          *int64                 `protobuf:"varint,2,req,name=tick" json:"tick,omitempty"`           // Tick price.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProtoOATickData) Reset() {
+	*x = ProtoOATickData{}
+	mi := &file_OpenApiModelMessages_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOATickData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOATickData) ProtoMessage() {}
+
+func (x *ProtoOATickData) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiModelMessages_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOATickData.ProtoReflect.Descriptor instead.
+func (*ProtoOATickData) Descriptor() ([]byte, []int) {
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ProtoOATickData) GetTimestamp() int64 {
+	if x != nil && x.Timestamp != nil {
+		return *x.Timestamp
+	}
+	return 0
+}
+
+func (x *ProtoOATickData) GetTick() int64 {
+	if x != nil && x.Tick != nil {
+		return *x.Tick
+	}
+	return 0
+}
+
 // * Trade order entity.
 type ProtoOAOrder struct {
 	state                  protoimpl.MessageState     `protogen:"open.v1"`
@@ -2188,7 +2298,7 @@ const (
 
 func (x *ProtoOAOrder) Reset() {
 	*x = ProtoOAOrder{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[5]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2200,7 +2310,7 @@ func (x *ProtoOAOrder) String() string {
 func (*ProtoOAOrder) ProtoMessage() {}
 
 func (x *ProtoOAOrder) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[5]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2213,7 +2323,7 @@ func (x *ProtoOAOrder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAOrder.ProtoReflect.Descriptor instead.
 func (*ProtoOAOrder) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{5}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ProtoOAOrder) GetOrderId() int64 {
@@ -2428,7 +2538,7 @@ const (
 
 func (x *ProtoOASymbol) Reset() {
 	*x = ProtoOASymbol{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[6]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2440,7 +2550,7 @@ func (x *ProtoOASymbol) String() string {
 func (*ProtoOASymbol) ProtoMessage() {}
 
 func (x *ProtoOASymbol) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[6]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2453,7 +2563,7 @@ func (x *ProtoOASymbol) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbol.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbol) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{6}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ProtoOASymbol) GetSymbolId() int64 {
@@ -2677,7 +2787,7 @@ type ProtoOAInterval struct {
 
 func (x *ProtoOAInterval) Reset() {
 	*x = ProtoOAInterval{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[7]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2689,7 +2799,7 @@ func (x *ProtoOAInterval) String() string {
 func (*ProtoOAInterval) ProtoMessage() {}
 
 func (x *ProtoOAInterval) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[7]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2702,7 +2812,7 @@ func (x *ProtoOAInterval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAInterval.ProtoReflect.Descriptor instead.
 func (*ProtoOAInterval) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{7}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ProtoOAInterval) GetStartSecond() uint32 {
@@ -2745,7 +2855,7 @@ type ProtoOADeal struct {
 
 func (x *ProtoOADeal) Reset() {
 	*x = ProtoOADeal{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[8]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2757,7 +2867,7 @@ func (x *ProtoOADeal) String() string {
 func (*ProtoOADeal) ProtoMessage() {}
 
 func (x *ProtoOADeal) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[8]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2770,7 +2880,7 @@ func (x *ProtoOADeal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOADeal.ProtoReflect.Descriptor instead.
 func (*ProtoOADeal) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{8}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ProtoOADeal) GetDealId() int64 {
@@ -2905,7 +3015,7 @@ type ProtoOADealOffset struct {
 
 func (x *ProtoOADealOffset) Reset() {
 	*x = ProtoOADealOffset{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[9]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2917,7 +3027,7 @@ func (x *ProtoOADealOffset) String() string {
 func (*ProtoOADealOffset) ProtoMessage() {}
 
 func (x *ProtoOADealOffset) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[9]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2930,7 +3040,7 @@ func (x *ProtoOADealOffset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOADealOffset.ProtoReflect.Descriptor instead.
 func (*ProtoOADealOffset) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{9}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ProtoOADealOffset) GetDealId() int64 {
@@ -2980,7 +3090,7 @@ type ProtoOAClosePositionDetail struct {
 
 func (x *ProtoOAClosePositionDetail) Reset() {
 	*x = ProtoOAClosePositionDetail{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[10]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2992,7 +3102,7 @@ func (x *ProtoOAClosePositionDetail) String() string {
 func (*ProtoOAClosePositionDetail) ProtoMessage() {}
 
 func (x *ProtoOAClosePositionDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[10]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3005,7 +3115,7 @@ func (x *ProtoOAClosePositionDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAClosePositionDetail.ProtoReflect.Descriptor instead.
 func (*ProtoOAClosePositionDetail) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{10}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ProtoOAClosePositionDetail) GetEntryPrice() float64 {
@@ -3099,7 +3209,7 @@ const (
 
 func (x *ProtoOATrendbar) Reset() {
 	*x = ProtoOATrendbar{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[11]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3111,7 +3221,7 @@ func (x *ProtoOATrendbar) String() string {
 func (*ProtoOATrendbar) ProtoMessage() {}
 
 func (x *ProtoOATrendbar) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[11]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3124,7 +3234,7 @@ func (x *ProtoOATrendbar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOATrendbar.ProtoReflect.Descriptor instead.
 func (*ProtoOATrendbar) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{11}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProtoOATrendbar) GetVolume() int64 {
@@ -3188,7 +3298,7 @@ type ProtoOAAsset struct {
 
 func (x *ProtoOAAsset) Reset() {
 	*x = ProtoOAAsset{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[12]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3200,7 +3310,7 @@ func (x *ProtoOAAsset) String() string {
 func (*ProtoOAAsset) ProtoMessage() {}
 
 func (x *ProtoOAAsset) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[12]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3213,7 +3323,7 @@ func (x *ProtoOAAsset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAAsset.ProtoReflect.Descriptor instead.
 func (*ProtoOAAsset) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{12}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ProtoOAAsset) GetAssetId() int64 {
@@ -3249,7 +3359,7 @@ type ProtoOAArchivedSymbol struct {
 
 func (x *ProtoOAArchivedSymbol) Reset() {
 	*x = ProtoOAArchivedSymbol{}
-	mi := &file_OpenApiModelMessages_proto_msgTypes[13]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3261,7 +3371,7 @@ func (x *ProtoOAArchivedSymbol) String() string {
 func (*ProtoOAArchivedSymbol) ProtoMessage() {}
 
 func (x *ProtoOAArchivedSymbol) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiModelMessages_proto_msgTypes[13]
+	mi := &file_OpenApiModelMessages_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3274,7 +3384,7 @@ func (x *ProtoOAArchivedSymbol) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOAArchivedSymbol.ProtoReflect.Descriptor instead.
 func (*ProtoOAArchivedSymbol) Descriptor() ([]byte, []int) {
-	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{13}
+	return file_OpenApiModelMessages_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ProtoOAArchivedSymbol) GetSymbolId() int64 {
@@ -3385,7 +3495,10 @@ const file_OpenApiModelMessages_proto_rawDesc = "" +
 	"\ttradeSide\x18\x03 \x02(\x0e2\x1a.messages.ProtoOATradeSideR\ttradeSide\x12$\n" +
 	"\ropenTimestamp\x18\x04 \x01(\x03R\ropenTimestamp\x12\x14\n" +
 	"\x05label\x18\x05 \x01(\tR\x05label\x12.\n" +
-	"\x12guaranteedStopLoss\x18\x06 \x01(\bR\x12guaranteedStopLoss\"\xa9\b\n" +
+	"\x12guaranteedStopLoss\x18\x06 \x01(\bR\x12guaranteedStopLoss\"C\n" +
+	"\x0fProtoOATickData\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x02(\x03R\ttimestamp\x12\x12\n" +
+	"\x04tick\x18\x02 \x02(\x03R\x04tick\"\xa9\b\n" +
 	"\fProtoOAOrder\x12\x18\n" +
 	"\aorderId\x18\x01 \x02(\x03R\aorderId\x128\n" +
 	"\ttradeData\x18\x02 \x02(\v2\x1a.messages.ProtoOATradeDataR\ttradeData\x128\n" +
@@ -3640,7 +3753,10 @@ const file_OpenApiModelMessages_proto_rawDesc = "" +
 	"\x15POSITION_STATUS_ERROR\x10\x04*%\n" +
 	"\x10ProtoOATradeSide\x12\a\n" +
 	"\x03BUY\x10\x01\x12\b\n" +
-	"\x04SELL\x10\x02*[\n" +
+	"\x04SELL\x10\x02*$\n" +
+	"\x10ProtoOAQuoteType\x12\a\n" +
+	"\x03BID\x10\x01\x12\a\n" +
+	"\x03ASK\x10\x02*[\n" +
 	"\x19ProtoOAOrderTriggerMethod\x12\t\n" +
 	"\x05TRADE\x10\x01\x12\f\n" +
 	"\bOPPOSITE\x10\x02\x12\x10\n" +
@@ -3738,8 +3854,8 @@ func file_OpenApiModelMessages_proto_rawDescGZIP() []byte {
 	return file_OpenApiModelMessages_proto_rawDescData
 }
 
-var file_OpenApiModelMessages_proto_enumTypes = make([]protoimpl.EnumInfo, 20)
-var file_OpenApiModelMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_OpenApiModelMessages_proto_enumTypes = make([]protoimpl.EnumInfo, 21)
+var file_OpenApiModelMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_OpenApiModelMessages_proto_goTypes = []any{
 	(ProtoOAPayloadType)(0),                          // 0: messages.ProtoOAPayloadType
 	(ProtoOAClientPermissionScope)(0),                // 1: messages.ProtoOAClientPermissionScope
@@ -3749,59 +3865,61 @@ var file_OpenApiModelMessages_proto_goTypes = []any{
 	(ProtoOALimitedRiskMarginCalculationStrategy)(0), // 5: messages.ProtoOALimitedRiskMarginCalculationStrategy
 	(ProtoOAPositionStatus)(0),                       // 6: messages.ProtoOAPositionStatus
 	(ProtoOATradeSide)(0),                            // 7: messages.ProtoOATradeSide
-	(ProtoOAOrderTriggerMethod)(0),                   // 8: messages.ProtoOAOrderTriggerMethod
-	(ProtoOAOrderType)(0),                            // 9: messages.ProtoOAOrderType
-	(ProtoOAOrderStatus)(0),                          // 10: messages.ProtoOAOrderStatus
-	(ProtoOATimeInForce)(0),                          // 11: messages.ProtoOATimeInForce
-	(ProtoOADayOfWeek)(0),                            // 12: messages.ProtoOADayOfWeek
-	(ProtoOAMinCommissionType)(0),                    // 13: messages.ProtoOAMinCommissionType
-	(ProtoOATradingMode)(0),                          // 14: messages.ProtoOATradingMode
-	(ProtoOACommissionType)(0),                       // 15: messages.ProtoOACommissionType
-	(ProtoOASymbolDistanceType)(0),                   // 16: messages.ProtoOASymbolDistanceType
-	(ProtoOADealStatus)(0),                           // 17: messages.ProtoOADealStatus
-	(ProtoOASwapCalculationType)(0),                  // 18: messages.ProtoOASwapCalculationType
-	(ProtoOATrendbarPeriod)(0),                       // 19: messages.ProtoOATrendbarPeriod
-	(*ProtoOATrader)(nil),                            // 20: messages.ProtoOATrader
-	(*ProtoOACtidTraderAccount)(nil),                 // 21: messages.ProtoOACtidTraderAccount
-	(*ProtoOALightSymbol)(nil),                       // 22: messages.ProtoOALightSymbol
-	(*ProtoOAPosition)(nil),                          // 23: messages.ProtoOAPosition
-	(*ProtoOATradeData)(nil),                         // 24: messages.ProtoOATradeData
-	(*ProtoOAOrder)(nil),                             // 25: messages.ProtoOAOrder
-	(*ProtoOASymbol)(nil),                            // 26: messages.ProtoOASymbol
-	(*ProtoOAInterval)(nil),                          // 27: messages.ProtoOAInterval
-	(*ProtoOADeal)(nil),                              // 28: messages.ProtoOADeal
-	(*ProtoOADealOffset)(nil),                        // 29: messages.ProtoOADealOffset
-	(*ProtoOAClosePositionDetail)(nil),               // 30: messages.ProtoOAClosePositionDetail
-	(*ProtoOATrendbar)(nil),                          // 31: messages.ProtoOATrendbar
-	(*ProtoOAAsset)(nil),                             // 32: messages.ProtoOAAsset
-	(*ProtoOAArchivedSymbol)(nil),                    // 33: messages.ProtoOAArchivedSymbol
+	(ProtoOAQuoteType)(0),                            // 8: messages.ProtoOAQuoteType
+	(ProtoOAOrderTriggerMethod)(0),                   // 9: messages.ProtoOAOrderTriggerMethod
+	(ProtoOAOrderType)(0),                            // 10: messages.ProtoOAOrderType
+	(ProtoOAOrderStatus)(0),                          // 11: messages.ProtoOAOrderStatus
+	(ProtoOATimeInForce)(0),                          // 12: messages.ProtoOATimeInForce
+	(ProtoOADayOfWeek)(0),                            // 13: messages.ProtoOADayOfWeek
+	(ProtoOAMinCommissionType)(0),                    // 14: messages.ProtoOAMinCommissionType
+	(ProtoOATradingMode)(0),                          // 15: messages.ProtoOATradingMode
+	(ProtoOACommissionType)(0),                       // 16: messages.ProtoOACommissionType
+	(ProtoOASymbolDistanceType)(0),                   // 17: messages.ProtoOASymbolDistanceType
+	(ProtoOADealStatus)(0),                           // 18: messages.ProtoOADealStatus
+	(ProtoOASwapCalculationType)(0),                  // 19: messages.ProtoOASwapCalculationType
+	(ProtoOATrendbarPeriod)(0),                       // 20: messages.ProtoOATrendbarPeriod
+	(*ProtoOATrader)(nil),                            // 21: messages.ProtoOATrader
+	(*ProtoOACtidTraderAccount)(nil),                 // 22: messages.ProtoOACtidTraderAccount
+	(*ProtoOALightSymbol)(nil),                       // 23: messages.ProtoOALightSymbol
+	(*ProtoOAPosition)(nil),                          // 24: messages.ProtoOAPosition
+	(*ProtoOATradeData)(nil),                         // 25: messages.ProtoOATradeData
+	(*ProtoOATickData)(nil),                          // 26: messages.ProtoOATickData
+	(*ProtoOAOrder)(nil),                             // 27: messages.ProtoOAOrder
+	(*ProtoOASymbol)(nil),                            // 28: messages.ProtoOASymbol
+	(*ProtoOAInterval)(nil),                          // 29: messages.ProtoOAInterval
+	(*ProtoOADeal)(nil),                              // 30: messages.ProtoOADeal
+	(*ProtoOADealOffset)(nil),                        // 31: messages.ProtoOADealOffset
+	(*ProtoOAClosePositionDetail)(nil),               // 32: messages.ProtoOAClosePositionDetail
+	(*ProtoOATrendbar)(nil),                          // 33: messages.ProtoOATrendbar
+	(*ProtoOAAsset)(nil),                             // 34: messages.ProtoOAAsset
+	(*ProtoOAArchivedSymbol)(nil),                    // 35: messages.ProtoOAArchivedSymbol
 }
 var file_OpenApiModelMessages_proto_depIdxs = []int32{
 	2,  // 0: messages.ProtoOATrader.accessRights:type_name -> messages.ProtoOAAccessRights
 	3,  // 1: messages.ProtoOATrader.totalMarginCalculationType:type_name -> messages.ProtoOATotalMarginCalculationType
 	4,  // 2: messages.ProtoOATrader.accountType:type_name -> messages.ProtoOAAccountType
 	5,  // 3: messages.ProtoOATrader.limitedRiskMarginCalculationStrategy:type_name -> messages.ProtoOALimitedRiskMarginCalculationStrategy
-	24, // 4: messages.ProtoOAPosition.tradeData:type_name -> messages.ProtoOATradeData
+	25, // 4: messages.ProtoOAPosition.tradeData:type_name -> messages.ProtoOATradeData
 	6,  // 5: messages.ProtoOAPosition.positionStatus:type_name -> messages.ProtoOAPositionStatus
-	8,  // 6: messages.ProtoOAPosition.stopLossTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
+	9,  // 6: messages.ProtoOAPosition.stopLossTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
 	7,  // 7: messages.ProtoOATradeData.tradeSide:type_name -> messages.ProtoOATradeSide
-	24, // 8: messages.ProtoOAOrder.tradeData:type_name -> messages.ProtoOATradeData
-	9,  // 9: messages.ProtoOAOrder.orderType:type_name -> messages.ProtoOAOrderType
-	10, // 10: messages.ProtoOAOrder.orderStatus:type_name -> messages.ProtoOAOrderStatus
-	11, // 11: messages.ProtoOAOrder.timeInForce:type_name -> messages.ProtoOATimeInForce
-	8,  // 12: messages.ProtoOAOrder.stopTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
-	12, // 13: messages.ProtoOASymbol.swapRollover3Days:type_name -> messages.ProtoOADayOfWeek
-	27, // 14: messages.ProtoOASymbol.schedule:type_name -> messages.ProtoOAInterval
-	15, // 15: messages.ProtoOASymbol.commissionType:type_name -> messages.ProtoOACommissionType
-	16, // 16: messages.ProtoOASymbol.distanceSetIn:type_name -> messages.ProtoOASymbolDistanceType
-	13, // 17: messages.ProtoOASymbol.minCommissionType:type_name -> messages.ProtoOAMinCommissionType
-	14, // 18: messages.ProtoOASymbol.tradingMode:type_name -> messages.ProtoOATradingMode
-	12, // 19: messages.ProtoOASymbol.rolloverCommission3Days:type_name -> messages.ProtoOADayOfWeek
-	18, // 20: messages.ProtoOASymbol.swapCalculationType:type_name -> messages.ProtoOASwapCalculationType
+	25, // 8: messages.ProtoOAOrder.tradeData:type_name -> messages.ProtoOATradeData
+	10, // 9: messages.ProtoOAOrder.orderType:type_name -> messages.ProtoOAOrderType
+	11, // 10: messages.ProtoOAOrder.orderStatus:type_name -> messages.ProtoOAOrderStatus
+	12, // 11: messages.ProtoOAOrder.timeInForce:type_name -> messages.ProtoOATimeInForce
+	9,  // 12: messages.ProtoOAOrder.stopTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
+	13, // 13: messages.ProtoOASymbol.swapRollover3Days:type_name -> messages.ProtoOADayOfWeek
+	29, // 14: messages.ProtoOASymbol.schedule:type_name -> messages.ProtoOAInterval
+	16, // 15: messages.ProtoOASymbol.commissionType:type_name -> messages.ProtoOACommissionType
+	17, // 16: messages.ProtoOASymbol.distanceSetIn:type_name -> messages.ProtoOASymbolDistanceType
+	14, // 17: messages.ProtoOASymbol.minCommissionType:type_name -> messages.ProtoOAMinCommissionType
+	15, // 18: messages.ProtoOASymbol.tradingMode:type_name -> messages.ProtoOATradingMode
+	13, // 19: messages.ProtoOASymbol.rolloverCommission3Days:type_name -> messages.ProtoOADayOfWeek
+	19, // 20: messages.ProtoOASymbol.swapCalculationType:type_name -> messages.ProtoOASwapCalculationType
 	7,  // 21: messages.ProtoOADeal.tradeSide:type_name -> messages.ProtoOATradeSide
-	17, // 22: messages.ProtoOADeal.dealStatus:type_name -> messages.ProtoOADealStatus
-	30, // 23: messages.ProtoOADeal.closePositionDetail:type_name -> messages.ProtoOAClosePositionDetail
-	19, // 24: messages.ProtoOATrendbar.period:type_name -> messages.ProtoOATrendbarPeriod
+	18, // 22: messages.ProtoOADeal.dealStatus:type_name -> messages.ProtoOADealStatus
+	32, // 23: messages.ProtoOADeal.closePositionDetail:type_name -> messages.ProtoOAClosePositionDetail
+	20, // 24: messages.ProtoOATrendbar.period:type_name -> messages.ProtoOATrendbarPeriod
 	25, // [25:25] is the sub-list for method output_type
 	25, // [25:25] is the sub-list for method input_type
 	25, // [25:25] is the sub-list for extension type_name
@@ -3819,8 +3937,8 @@ func file_OpenApiModelMessages_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_OpenApiModelMessages_proto_rawDesc), len(file_OpenApiModelMessages_proto_rawDesc)),
-			NumEnums:      20,
-			NumMessages:   14,
+			NumEnums:      21,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
