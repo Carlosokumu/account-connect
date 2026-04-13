@@ -1,4 +1,4 @@
-package applications
+package providers
 
 import (
 	"account-connect/config"

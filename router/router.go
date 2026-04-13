@@ -4,7 +4,8 @@ import (
 	"account-connect/config"
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/adapters"
-	"account-connect/internal/applications"
+	providers "account-connect/internal/providers"
+
 	"account-connect/internal/clients"
 	messages "account-connect/internal/messages"
 	db "account-connect/persistence"
@@ -233,7 +234,7 @@ func (h *messageHandler) handleBinanceConnect(
 		return nil, fmt.Errorf("invalid Binance payload: %w", err)
 	}
 
-	adapter := applications.NewBinanceAdapter(accountConnClient)
+	adapter := providers.NewBinanceAdapter(accountConnClient)
 	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{}); err != nil {
 		return nil, err
 	}
@@ -257,7 +258,7 @@ func (h *messageHandler) handleCtraderConnect(
 		ClientSecret: ctraderMsg.ClientSecret,
 		AccessToken:  ctraderMsg.AccessToken,
 	}
-	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
+	adapter := providers.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
 	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
 		Ctrader: config.CtraderConfig{
 			ClientId:     ctraderMsg.ClientId,
