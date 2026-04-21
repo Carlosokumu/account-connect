@@ -22,15 +22,16 @@ const (
 type MessageType string
 
 const (
-	TypeConnect          MessageType = "connect"
-	TypeAuthorizeAccount MessageType = "authorize_account"
-	TypeTraderInfo       MessageType = "trader_info"
-	TypeHistorical       MessageType = "historical_deals"
-	TypeAccountSymbols   MessageType = "account_symbols"
-	TypeTrendBars        MessageType = "trend_bars"
-	TypeError            MessageType = "error"
-	TypeDisconnect       MessageType = "disconnect"
-	TypeStream           MessageType = "stream_subscribe"
+	TypeConnect           MessageType = "connect"
+	TypeAuthorizeAccount  MessageType = "authorize_account"
+	TypeTraderInfo        MessageType = "trader_info"
+	TypeHistorical        MessageType = "historical_deals"
+	TypeAccountSymbols    MessageType = "account_symbols"
+	TypeTrendBars         MessageType = "trend_bars"
+	TypeError             MessageType = "error"
+	TypeDisconnect        MessageType = "disconnect"
+	TypeStream            MessageType = "stream_subscribe"
+	TypeCandlestickStream MessageType = "candlestick_stream"
 )
 
 // AccountConnectMsg is a base message structure that incoming client messages are expected to have.
@@ -181,4 +182,30 @@ type AccountConnectSymbolRes struct {
 type AccountConnectCryptoPrice struct {
 	Symbol string `json:"symbol"`
 	Price  string `json:"price"`
+}
+
+// AccountConnectCandlestickStreamPayload is a wrapper payload containing all of the possible fields
+// required by each of the supported platforms to subscribe to a symbol's candlestick/kline stream.
+type AccountConnectCandlestickStreamPayload struct {
+	Symbol   string `json:"symbol"`
+	Interval string `json:"interval"`
+}
+
+// AccountConnectCandlestickBar is a model message containing OHLCV values for a single candlestick/kline bar.
+type AccountConnectCandlestickBar struct {
+	OpenTime  int64   `json:"open_time"`
+	Open      float64 `json:"open"`
+	High      float64 `json:"high"`
+	Low       float64 `json:"low"`
+	Close     float64 `json:"close"`
+	Volume    float64 `json:"volume"`
+	CloseTime int64   `json:"close_time"`
+	IsFinal   bool    `json:"is_final"`
+}
+
+// AccountConnectCandlestickBarRes is a wrapper model message for [AccountConnectCandlestickBar] containing additional metadata.
+type AccountConnectCandlestickBarRes struct {
+	Bars     []AccountConnectCandlestickBar `json:"bars"`
+	Symbol   string                         `json:"symbol"`
+	Interval string                         `json:"interval"`
 }
