@@ -6,9 +6,9 @@ import (
 	"context"
 )
 
-// Platform defines a set of method signatures that are common for all trading platforms APIs and that are required by
+// ProvidersAdapter defines a set of method signatures that are common for all the data providers APIs and that are required by
 // account-connect suported functionality
-type PlatformAdapter interface {
+type ProvidersAdapter interface {
 	EstablishConnection(ctxt context.Context, cfg config.PlatformConfigs) error
 	AuthorizeAccount(ctx context.Context, payload messages.AccountConnectAuthorizeTradingAccountPayload) error
 	GetUserAccounts(ctx context.Context) error
@@ -18,4 +18,5 @@ type PlatformAdapter interface {
 	GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error
 	InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error
 	Disconnect(ctx context.Context) error
+	GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error
 }
