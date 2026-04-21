@@ -2,7 +2,6 @@ package main
 
 import (
 	"account-connect/config"
-	"account-connect/internal/adapters"
 	"account-connect/internal/clients"
 	"account-connect/internal/managers"
 	"account-connect/internal/messages"
@@ -62,13 +61,7 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 			return
 		}
 
-		client := &clients.AccountConnectClient{
-			ID:            clientID,
-			Conn:          ws,
-			Send:          make(chan []byte, ClientSendBufferSize),
-			Streams:       make(map[string]chan []byte, ClientSendBufferSize),
-			PlatformConns: make(map[messages.Platform]adapters.PlatformAdapter),
-		}
+		client := clients.NewAccountConnectClient(clientID, ws)
 
 		clientManager.Register <- client
 
