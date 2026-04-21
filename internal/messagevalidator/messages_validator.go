@@ -36,7 +36,8 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 			messages.TypeTrendBars,
 			messages.TypeError,
 			messages.TypeDisconnect,
-			messages.TypeStream:
+			messages.TypeStream,
+			messages.TypeCandlestickStream:
 			return true
 		default:
 			return false
