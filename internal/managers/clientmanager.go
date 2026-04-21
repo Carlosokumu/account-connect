@@ -5,6 +5,7 @@ import (
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/clients"
 	messages "account-connect/internal/messages"
+	"account-connect/internal/streams"
 	"account-connect/router"
 	"context"
 	"encoding/json"
@@ -84,12 +85,12 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.Unlock()
 			return
 		case client := <-m.Register:
+
 			m.Lock()
 			m.clients[client.ID] = client
-			//create client specific ctx
 			cctx, cancel := context.WithCancel(mgrCtx)
 			m.clientContexts[client.ID] = clientContext{ctx: cctx, cancel: cancel}
-
+			client.StreamMerger = streams.NewStreamMerger(cctx)
 			m.Unlock()
 			go m.handleClientMessages(cctx, client)
 
@@ -158,75 +159,51 @@ func (m *AccountConnectClientManager) ValidateClient(clientId string) error {
 	return nil
 }
 
-// handleClientMessages  will handle [AccountConnectMsgRes] messages sent through the [Send] channel of the client
 func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, client *clients.AccountConnectClient) {
-	var (
-		err                  error
-		accountConnectMsgRes messages.AccountConnectMsgRes
-	)
+	var accountConnectMsgRes messages.AccountConnectMsgRes
+	client.StreamMerger = streams.NewStreamMerger(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("Ctx canceled for client: %s", client.ID)
 			return
+
 		case msg, ok := <-client.Send:
 			if !ok {
-				log.Print("client msg read via send  error")
+				log.Print("client msg read via send error")
 				return
 			}
-			log.Printf("Message to the client %s: %s\n", client.ID, string(msg))
-			err = json.Unmarshal(msg, &accountConnectMsgRes)
-			if err != nil {
+			if err := json.Unmarshal(msg, &accountConnectMsgRes); err != nil {
 				log.Printf("Failed to unmarshal account connect message: %v", err)
 				continue
 			}
 			if accountConnectMsgRes.AccountConnectMessageType == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload)
-				if err != nil {
+				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload); err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
-					continue
 				}
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
-				err = m.HandleClientError(client, accountConnectMsgRes.Payload)
-				if err != nil {
+				if err := m.HandleClientError(client, accountConnectMsgRes.Payload); err != nil {
 					log.Printf("client platform error return: %v", err)
 				}
-			} else if accountConnectMsgRes.Status != messages.StatusFailure {
+			} else {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload)
-				if err != nil {
+				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload); err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 				}
 			}
-		default:
-			client.StreamsMutex.Lock()
-			streams := make([]chan []byte, 0, len(client.Streams))
-			for _, stream := range client.Streams {
-				streams = append(streams, stream)
-			}
-			client.StreamsMutex.Unlock()
 
-			// Check each stream for messages
-			for _, stream := range streams {
-				select {
-				case msg, ok := <-stream:
-					if !ok {
-						continue
-					}
-					ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-					err = m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, msg)
-					if err != nil {
-						log.Printf("Client: %s message write fail: %v", client.ID, err)
-						return
-					}
-				default:
-				}
+		case msg, ok := <-client.StreamMerger.Messages():
+			if !ok {
+				return
 			}
-
+			// TODO: unmarshal into typed envelope once stream payloads are wrapped in AccountConnectMsgRes
+			ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
+			if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, msg); err != nil {
+				log.Printf("Client: %s stream write fail: %v", client.ID, err)
+			}
 		}
-
 	}
 }
 
@@ -252,7 +229,6 @@ func (m *AccountConnectClientManager) HandleClientError(client *clients.AccountC
 }
 
 func (m *AccountConnectClientManager) writeJSONWithTimeout(client *clients.AccountConnectClient, v interface{}) error {
-	//allow larger messages to complete writing to the connection.
 	client.Conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 
 	err := client.Conn.WriteJSON(v)
