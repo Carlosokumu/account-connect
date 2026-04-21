@@ -3,33 +3,49 @@ package clients
 import (
 	"account-connect/internal/adapters"
 	"account-connect/internal/messages"
-	"errors"
+	"account-connect/internal/streams"
+	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
-const StreamBufferSize = 500
+const (
+	ClientSendBufferSize = 512
+	StreamBufferSize     = 500
+)
 
 type AccountConnectClient struct {
 	ID            string
 	Conn          *websocket.Conn
-	PlatformConns map[messages.Platform]adapters.PlatformAdapter
+	PlatformConns map[messages.Platform]adapters.ProvidersAdapter
 	Send          chan []byte
 	Streams       map[string]chan []byte
 	StreamsMutex  sync.Mutex
+	StreamMerger  *streams.StreamMerger
 }
 
-// AddStream adds a new stream to the [Streams] map
-func (c *AccountConnectClient) AddStream(streamID string) error {
+func NewAccountConnectClient(id string, conn *websocket.Conn) *AccountConnectClient {
+	return &AccountConnectClient{
+		ID:            id,
+		Conn:          conn,
+		Send:          make(chan []byte, ClientSendBufferSize),
+		Streams:       make(map[string]chan []byte),
+		PlatformConns: make(map[messages.Platform]adapters.ProvidersAdapter),
+	}
+}
+
+func (c *AccountConnectClient) AddStream(ctx context.Context, streamId string) error {
 	c.StreamsMutex.Lock()
 	defer c.StreamsMutex.Unlock()
 
-	if _, exists := c.Streams[streamID]; exists {
-		return errors.New("stream already exists")
+	if _, exists := c.Streams[streamId]; exists {
+		return fmt.Errorf("stream %s already exists", streamId)
 	}
-
-	c.Streams[streamID] = make(chan []byte, StreamBufferSize)
+	stream := make(chan []byte, 100)
+	c.Streams[streamId] = stream
+	c.StreamMerger.Add(stream)
 	return nil
 }
 
