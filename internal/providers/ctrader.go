@@ -6,6 +6,7 @@ import (
 	gen_messages "account-connect/gen"
 	"account-connect/internal/clients"
 	"account-connect/internal/mappers"
+	"account-connect/internal/messages"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -151,6 +152,11 @@ func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload acount_con
 
 func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acount_connect_messages.AccountConnectTrendBarsPayload) error {
 	return cta.ctrader.GetChartTrendBars(ctx, payload)
+}
+
+// GetCandlestickStream initializes and starts a real-time candlestick/kline stream for a given symbol and interval
+func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+	return fmt.Errorf("Unimplemented")
 }
 
 func (cta *CtraderAdapter) InitializeClientStream(ctx context.Context, payload acount_connect_messages.AccountConnectStreamPayload) error {

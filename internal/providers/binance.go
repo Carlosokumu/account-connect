@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -29,6 +30,34 @@ type MiniTickerEvent struct {
 	LowPrice    string `json:"l"`
 	Volume      string `json:"v"`
 	QuoteVolume string `json:"q"`
+}
+
+// BinanceKlineEvent represents a kline/candlestick WebSocket message from Binance
+type BinanceKlineEvent struct {
+	EventType string       `json:"e"`
+	EventTime int64        `json:"E"`
+	Symbol    string       `json:"s"`
+	Kline     BinanceKline `json:"k"`
+}
+
+type BinanceKline struct {
+	StartTime           int64  `json:"t"`
+	EndTime             int64  `json:"T"`
+	Symbol              string `json:"s"`
+	Interval            string `json:"i"`
+	FirstTradeId        int64  `json:"f"`
+	LastTradeId         int64  `json:"L"`
+	Open                string `json:"o"`
+	Close               string `json:"c"`
+	High                string `json:"h"`
+	Low                 string `json:"l"`
+	Volume              string `json:"v"`
+	NumberOfTrades      int64  `json:"n"`
+	IsFinal             bool   `json:"x"`
+	QuoteVolume         string `json:"q"`
+	TakerBuyBaseVolume  string `json:"V"`
+	TakerBuyQuoteVolume string `json:"Q"`
+	Ignore              string `json:"B"`
 }
 
 // WsMiniTickerServe connects to Binance miniTicker stream and streams updates
@@ -327,6 +356,36 @@ func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload message
 	return nil
 }
 
+// GetCandlestickStream initializes and starts a real-time candlestick/kline stream for a given symbol and interval
+func (b *BinanceAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+	if payload.Symbol == "" || payload.Interval == "" {
+		return fmt.Errorf("required symbol or interval is missing")
+	}
+
+	streamId := "candlestick_" + strings.ToLower(payload.Symbol) + "_" + payload.Interval
+
+	err := b.binanceConn.AccountConnClient.AddStream(ctx, streamId)
+	if err != nil {
+		return err
+	}
+
+	stream := b.binanceConn.AccountConnClient.Streams[streamId]
+
+	go func() {
+		for barB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeCandlestickStream, messages.Binance, b.binanceConn.AccountConnClient.ID, barB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal candlestick stream message: %v", err)
+				continue
+			}
+			b.binanceConn.AccountConnClient.Send <- msgB
+		}
+	}()
+
+	return b.binanceConn.StartCandlestickStream(ctx, payload, stream)
+}
+
 // InitializeClientStream will initialize a stream of real time market prices for the specified stream id for a particular symbol
 func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error {
 	streamType := payload.StreamType
@@ -336,7 +395,7 @@ func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload mes
 	}
 	streamId := streamType + "_" + symbolId
 
-	err := b.binanceConn.AccountConnClient.AddStream(streamId)
+	err := b.binanceConn.AccountConnClient.AddStream(ctx, streamId)
 	if err != nil {
 		return err
 	}
@@ -362,6 +421,107 @@ func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload mes
 	return nil
 }
 
+// StartCandlestickStream starts a real-time candlestick/kline stream for a given symbol and interval
+func (b *BinanceConnection) StartCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload, strm chan []byte) error {
+	b.wsServeMux.Lock()
+	defer b.wsServeMux.Unlock()
+
+	symbol := strings.ToLower(payload.Symbol)
+	streamKey := symbol + "_" + payload.Interval
+
+	doneChan := make(chan struct{})
+	b.doneChans[streamKey] = doneChan
+
+	wsURL := url.URL{
+		Scheme: "wss",
+		Host:   "stream.binance.com:443",
+		Path:   fmt.Sprintf("/ws/%s@kline_%s", symbol, payload.Interval),
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
+	if err != nil {
+		delete(b.doneChans, streamKey)
+		close(doneChan)
+		return fmt.Errorf("failed to connect candlestick WebSocket: %w", err)
+	}
+
+	go func() {
+		defer conn.Close()
+		for {
+			msgChan := make(chan []byte)
+			errChan := make(chan error)
+
+			go func() {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					fmt.Printf("Error here: %s", err)
+					errChan <- err
+					return
+				}
+				fmt.Printf("Message here: %s", msg)
+				msgChan <- msg
+			}()
+
+			select {
+			case <-ctx.Done():
+				log.Printf("Context cancelled for candlestick stream %s", streamKey)
+				delete(b.doneChans, streamKey)
+				close(doneChan)
+				return
+			case err := <-errChan:
+				log.Printf("Error in candlestick stream %s: %v", streamKey, err)
+				delete(b.doneChans, streamKey)
+				close(doneChan)
+				return
+			case msg := <-msgChan:
+				var event BinanceKlineEvent
+				if err := json.Unmarshal(msg, &event); err != nil {
+					log.Printf("Failed to unmarshal kline event for %s: %v", streamKey, err)
+					return
+				}
+				bar := messages.AccountConnectCandlestickBar{
+					OpenTime:  event.Kline.StartTime,
+					Open:      parseFloat(event.Kline.Open),
+					High:      parseFloat(event.Kline.High),
+					Low:       parseFloat(event.Kline.Low),
+					Close:     parseFloat(event.Kline.Close),
+					Volume:    parseFloat(event.Kline.Volume),
+					CloseTime: event.Kline.EndTime,
+					IsFinal:   event.Kline.IsFinal,
+				}
+				barRes := messages.AccountConnectCandlestickBarRes{
+					Bars:     []messages.AccountConnectCandlestickBar{bar},
+					Symbol:   payload.Symbol,
+					Interval: payload.Interval,
+				}
+				barB, err := json.Marshal(barRes)
+				if err != nil {
+					log.Printf("Failed to marshal candlestick bar: %v", err)
+					return
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case strm <- barB:
+				default:
+					log.Printf("Stream channel full for %s, dropping update", streamKey)
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
 func (b *BinanceAdapter) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func parseFloat(s string) float64 {
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Printf("Failed to parse float from string %q: %v", s, err)
+		return 0
+	}
+	return val
 }
