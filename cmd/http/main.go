@@ -45,17 +45,19 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 			return
 		}
 
+		ws.SetReadLimit(512 * 1024)
+
 		clientID := req.URL.Query().Get("tradeshare_client_id")
 		if clientID == "" {
 			errMsg := map[string]string{
 				"error":   "client_id_required",
 				"message": "Connection rejected: tradeshare_client_id parameter is required",
 			}
-			ws.WriteJSON(errMsg)
+			writeJSON(ws, errMsg)
 			ws.WriteControl(
 				websocket.CloseMessage,
 				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "client_id_required"),
-				time.Now().Add(time.Second),
+				time.Now().Add(10*time.Second),
 			)
 			ws.Close()
 			return
@@ -67,7 +69,7 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 
 		ws.SetPongHandler(func(pongMsg string) error {
 			log.Printf("pong message received from client:%s", client.ID)
-			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
+			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 
@@ -81,7 +83,7 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 					err := ws.WriteControl(
 						websocket.PingMessage,
 						[]byte{},
-						time.Now().Add(5*time.Second),
+						time.Now().Add(15*time.Second),
 					)
 					if err != nil {
 						log.Printf("Ping failed (client %s): %v", clientID, err)
@@ -101,8 +103,7 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 		}()
 
 		for {
-			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
-			ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 			_, rawMsg, err := ws.ReadMessage()
 			if err != nil {
 				log.Printf("Error received while reading: %v", err)
@@ -186,6 +187,11 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 
 	log.Println("WebSocket server stopped gracefully")
 	return nil
+}
+
+func writeJSON(ws *websocket.Conn, v any) error {
+	ws.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	return ws.WriteJSON(v)
 }
 
 func main() {
