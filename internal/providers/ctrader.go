@@ -6,7 +6,6 @@ import (
 	gen_messages "account-connect/gen"
 	"account-connect/internal/clients"
 	"account-connect/internal/mappers"
-	"account-connect/internal/messages"
 	accdb "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -49,7 +48,7 @@ type pendingRequest struct {
 }
 
 type CTrader struct {
-	accDb             accdb.AccountConnectDb
+	accDb             accdb.AccountConnectCache
 	AccountConnClient *clients.AccountConnectClient
 	AccessToken       string
 	PlatformConn      *websocket.Conn
@@ -58,20 +57,23 @@ type CTrader struct {
 	readyForAccount   bool
 	pendingRequests   map[string]*pendingRequest
 	mutex             sync.Mutex
+
+	candleBuilders map[int64][]*candleBuilder // keyed by SymbolId
+	symbolDigits   map[int64]float64          // cached scale, keyed by SymbolId
+	builderMutex   sync.Mutex
 }
 
 type CtraderAdapter struct {
 	ctrader CTrader
 }
 
-func NewCtraderAdapter(accdb accdb.AccountConnectDb, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CtraderAdapter {
+func NewCtraderAdapter(accdb accdb.AccountConnectCache, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CtraderAdapter {
 	return &CtraderAdapter{
 		ctrader: *NewCTrader(accdb, accountConnClient, ctraderconfig),
 	}
 }
 
-// NewCTrader creates a new ctrader instance with the required fields to establish a ctrader connection
-func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CTrader {
+func NewCTrader(accdb accdb.AccountConnectCache, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CTrader {
 	return &CTrader{
 		accDb:             accdb,
 		AccountConnClient: accountConnClient,
@@ -79,6 +81,8 @@ func NewCTrader(accdb accdb.AccountConnectDb, accountConnClient *clients.Account
 		handlers:          make(map[uint32]MessageHandler),
 		authCompleted:     make(chan bool, 1),
 		pendingRequests:   make(map[string]*pendingRequest),
+		candleBuilders:    make(map[int64][]*candleBuilder),
+		symbolDigits:      make(map[int64]float64),
 	}
 }
 
@@ -99,6 +103,8 @@ func (t *CTrader) registerHandlers() {
 	t.RegisterHandler(uint32(common.SymbolListRes), t.handleSymbolListResponse)
 	t.RegisterHandler(uint32(common.AccountSymbolInfoRes), t.handleSymbolsByIdResponse)
 	t.RegisterHandler(uint32(common.AccountListRes), t.handleAccountListResponse)
+	t.RegisterHandler(uint32(common.SpotEventMsgType), t.handleSpotEvent)
+	t.RegisterHandler(uint32(common.AccountReconcileRes), t.handleAccountReconcileRes)
 }
 
 func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
@@ -142,12 +148,34 @@ func (cta *CtraderAdapter) GetTradingSymbols(ctx context.Context, payload acount
 }
 
 func (cta *CtraderAdapter) GetHistoricalTrades(ctx context.Context, payload acount_connect_messages.AccountConnectHistoricalDealsPayload) error {
-	//Add a check for  validity of the to and from timestamps
-	return cta.ctrader.GetAccountHistoricalDeals(ctx, *payload.AccountId, *payload.FromTimestamp, *payload.ToTimestamp)
+	if payload.Ctid == nil {
+		return fmt.Errorf("ctid is required for historical deals")
+	}
+	return cta.ctrader.GetAccountHistoricalDeals(ctx, payload)
 }
 
 func (cta *CtraderAdapter) GetTraderInfo(ctx context.Context, payload acount_connect_messages.AccountConnectTraderInfoPayload) error {
 	return cta.ctrader.GetAccountTraderInfo(ctx, payload.Ctid)
+}
+
+func (cta *CtraderAdapter) GetAccountOrders(ctx context.Context, accountConnectPayload acount_connect_messages.AccountConnectOrderPayload) error {
+
+	if accountConnectPayload.Ctrader == nil {
+		return fmt.Errorf("ctrader payload is required")
+	}
+
+	if err := cta.requireCtid(accountConnectPayload.Ctrader.CtID); err != nil {
+		return err
+	}
+	return cta.ctrader.GetAccountOrders(ctx, *accountConnectPayload.Ctrader)
+
+}
+
+func (cta *CtraderAdapter) requireCtid(ctid *int64) error {
+	if ctid == nil {
+		return fmt.Errorf("ctid is required")
+	}
+	return nil
 }
 
 func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acount_connect_messages.AccountConnectTrendBarsPayload) error {
@@ -155,8 +183,47 @@ func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acoun
 }
 
 // GetCandlestickStream initializes and starts a real-time candlestick/kline stream for a given symbol and interval
-func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
-	return fmt.Errorf("Unimplemented")
+func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload acount_connect_messages.AccountConnectCandlestickStreamPayload) error {
+	if payload.Ctrader == nil {
+		return fmt.Errorf("missing ctrader payload for candlestick stream")
+	}
+	cp := payload.Ctrader
+	if cp.Ctid == nil {
+		return fmt.Errorf("ctid is required for ctrader candlestick stream")
+	}
+	if cp.SymbolId == 0 {
+		return fmt.Errorf("symbol_id is required for ctrader candlestick stream")
+	}
+	if cp.Period == "" {
+		return fmt.Errorf("period is required for ctrader candlestick stream")
+	}
+
+	fmt.Println("Getting candlestick stream..")
+
+	// validate the period maps to a known duration before we do anything else
+	if _, err := mappers.PeriodStrToDuration(cp.Period); err != nil {
+		return fmt.Errorf("invalid period: %w", err)
+	}
+
+	streamId := fmt.Sprintf("candlestick_ctrader_%d_%s", cp.SymbolId, cp.Period)
+	if err := cta.ctrader.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	stream := cta.ctrader.AccountConnClient.Streams[streamId]
+
+	go func() {
+		for barB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeCandlestickStream, acount_connect_messages.Ctrader, cta.ctrader.AccountConnClient.ID, barB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal candlestick stream message: %v", err)
+				continue
+			}
+			cta.ctrader.AccountConnClient.Send <- msgB
+		}
+	}()
+
+	return cta.ctrader.StartCandlestickStream(ctx, *cp, stream)
 }
 
 func (cta *CtraderAdapter) InitializeClientStream(ctx context.Context, payload acount_connect_messages.AccountConnectStreamPayload) error {
@@ -173,11 +240,6 @@ func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig 
 	dialer := websocket.DefaultDialer
 	dialer.EnableCompression = true
 	dialer.HandshakeTimeout = 10 * time.Second
-
-	err := t.accDb.RegisterBucket("ctrader")
-	if err != nil {
-		return err
-	}
 
 	endpoint := config.CtraderEndpoint
 	port := config.CtraderPort
@@ -365,33 +427,33 @@ func (t *CTrader) GetUserAcountListByAccessToken(accessToken string) error {
 
 // GetRefreshToken is a request to refresh the access token using refresh token of granted trader's account.
 func (t *CTrader) GetRefreshToken() error {
-	refreshToken, err := t.accDb.Get("ctrader", "refresh_token")
-	if err != nil {
-		return err
-	}
-	refreshTokenStr := string(refreshToken)
-	msgReq := &gen_messages.ProtoOARefreshTokenReq{
-		RefreshToken: &refreshTokenStr,
-	}
-	msgB, err := proto.Marshal(msgReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal auth refresh request: %w", err)
-	}
-	msgP := &gen_messages.ProtoMessage{
-		PayloadType: &common.RefreshTokenMsgType,
-		Payload:     msgB,
-		ClientMsgId: &common.REQ_REFRESH_TOKEN,
-	}
+	// refreshToken, err := t.accDb.Get("ctrader", "refresh_token")
+	// if err != nil {
+	// 	return err
+	// }
+	// refreshTokenStr := string(refreshToken)
+	// msgReq := &gen_messages.ProtoOARefreshTokenReq{
+	// 	RefreshToken: &refreshTokenStr,
+	// }
+	// msgB, err := proto.Marshal(msgReq)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to marshal auth refresh request: %w", err)
+	// }
+	// msgP := &gen_messages.ProtoMessage{
+	// 	PayloadType: &common.RefreshTokenMsgType,
+	// 	Payload:     msgB,
+	// 	ClientMsgId: &common.REQ_REFRESH_TOKEN,
+	// }
 
-	protoMessage, err := proto.Marshal(msgP)
-	if err != nil {
-		return fmt.Errorf("failed to marshal protocol message: %w", err)
-	}
+	// protoMessage, err := proto.Marshal(msgP)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to marshal protocol message: %w", err)
+	// }
 
-	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
-	if err != nil {
-		return fmt.Errorf("failed to send refresh token request: %w", err)
-	}
+	// err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to send refresh token request: %w", err)
+	// }
 	return nil
 }
 
@@ -434,6 +496,142 @@ func (t *CTrader) GetAccountTraderInfo(ctx context.Context, ctidTraderAccountId 
 	}
 	return nil
 
+}
+
+// GetAccountTraderInfo will retrieve the trader's information for the specified ctidTraderAccountId
+func (t *CTrader) GetAccountOrders(ctx context.Context, requestOPts acount_connect_messages.CtraderOrdersRequestPayload) error {
+	msgReq := &gen_messages.ProtoOAReconcileReq{
+		CtidTraderAccountId: requestOPts.CtID,
+	}
+
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal prototrader  request: %w", err)
+	}
+	msgP := &gen_messages.ProtoMessage{
+		PayloadType: &common.AccountReconcileReq,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_ACCOUNT_ORDERS,
+	}
+
+	req := &pendingRequest{
+		ctx:    ctx,
+		respCh: make(chan *pendingResponse, 1),
+	}
+
+	t.mutex.Lock()
+	t.pendingRequests[common.REQ_ACCOUNT_ORDERS] = req
+	t.mutex.Unlock()
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	err = t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage)
+	if err != nil {
+		t.mutex.Lock()
+		delete(t.pendingRequests, common.REQ_ACCOUNT_ORDERS)
+		t.mutex.Unlock()
+		return fmt.Errorf("failed to get account orders: %w", err)
+	}
+	return nil
+
+}
+
+func (t *CTrader) StartCandlestickStream(ctx context.Context, payload acount_connect_messages.CtraderCandlestickStreamPayload, strm chan []byte) error {
+	scale, err := t.getSymbolDigits(ctx, payload.Ctid, payload.SymbolId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch symbol digits: %w", err)
+	}
+
+	builder, err := newCandleBuilder(payload.SymbolId, "", payload.Period, scale, strm)
+	if err != nil {
+		return fmt.Errorf("invalid period: %w", err)
+	}
+
+	t.builderMutex.Lock()
+	existing := t.candleBuilders[payload.SymbolId]
+	spotAlreadySubscribed := len(existing) > 0
+	t.candleBuilders[payload.SymbolId] = append(existing, builder)
+	t.builderMutex.Unlock()
+
+	if !spotAlreadySubscribed {
+		if err := t.subscribeSpots(ctx, payload.Ctid, []int64{payload.SymbolId}); err != nil {
+			return fmt.Errorf("failed to subscribe to spots: %w", err)
+		}
+	}
+
+	if err := t.subscribeLiveTrendbar(ctx, payload.Ctid, payload.SymbolId, payload.Period); err != nil {
+		return fmt.Errorf("failed to subscribe to live trendbar: %w", err)
+	}
+
+	return nil
+}
+
+// subscribeSpots sends a request to subscribe to live spot price events for the given symbol IDs.
+// This is fire-and-forget: cTrader does not send a meaningful synchronous response to correlate,
+// since live ProtoOASpotEvent pushes are the de facto continuation of this request.
+func (t *CTrader) subscribeSpots(ctx context.Context, ctid *int64, symbolIds []int64) error {
+	msgReq := &gen_messages.ProtoOASubscribeSpotsReq{
+		CtidTraderAccountId: ctid,
+		SymbolId:            symbolIds,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal subscribe spots request: %w", err)
+	}
+	msgP := &gen_messages.ProtoMessage{
+		PayloadType: &common.SubscribeSpotsMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_SUBSCRIBE_SPOTS,
+	}
+
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	if err := t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage); err != nil {
+		return fmt.Errorf("failed to send subscribe spots request: %w", err)
+	}
+	return nil
+}
+
+// subscribeLiveTrendbar sends a request to subscribe to live trend bar pushes for the given
+// symbol and period. Per cTrader's OpenAPI, this requires an existing spot subscription for
+// the same symbol — callers must subscribeSpots first.
+func (t *CTrader) subscribeLiveTrendbar(ctx context.Context, ctid *int64, symbolId int64, period string) error {
+	trendPeriod, err := mappers.PeriodStrToBarPeriod(period)
+	if err != nil {
+		return fmt.Errorf("invalid period: %w", err)
+	}
+
+	fmt.Printf("Subscribing to trendbars period: %v and and symbol: %v", trendPeriod, symbolId)
+
+	msgReq := &gen_messages.ProtoOASubscribeLiveTrendbarReq{
+		CtidTraderAccountId: ctid,
+		SymbolId:            &symbolId,
+		Period:              &trendPeriod,
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal subscribe live trendbar request: %w", err)
+	}
+	msgP := &gen_messages.ProtoMessage{
+		PayloadType: &common.SubscribeLiveTrendbarMsgType,
+		Payload:     msgB,
+		ClientMsgId: &common.REQ_SUBSCRIBE_LIVE_TRENDBAR,
+	}
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	if err := t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage); err != nil {
+		return fmt.Errorf("failed to send subscribe live trendbar request: %w", err)
+	}
+	return nil
 }
 
 // GetAccountTradingSymbols will retrieve a list of trading symbols(trading pairs e.g EUR/USD) for a certain trading account
@@ -565,23 +763,23 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 }
 
 // GetAccountHistoricalDeals is a request for getting trader's deals historical data (execution details).
-func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, accountId, fromTimestamp, toTimestamp int64) error {
-	if accountId == 0 {
-		return errors.New("account id cannot be nil")
+func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, payload acount_connect_messages.AccountConnectHistoricalDealsPayload) error {
+	if payload.Ctid == nil {
+		return errors.New("ctid cannot be nil")
 	}
-
-	if len(strconv.FormatInt(accountId, 10)) < 8 {
-		return errors.New("invalid account id")
+	if len(strconv.FormatInt(*payload.Ctid, 10)) < 8 {
+		return errors.New("invalid ctid")
 	}
 
 	msgReq := &gen_messages.ProtoOADealListReq{
-		CtidTraderAccountId: &accountId,
-		FromTimestamp:       &fromTimestamp,
-		ToTimestamp:         &toTimestamp,
+		CtidTraderAccountId: payload.Ctid,
+		FromTimestamp:       payload.FromTimestamp,
+		ToTimestamp:         payload.ToTimestamp,
+		MaxRows:             payload.MaxRows,
 	}
 	msgB, err := proto.Marshal(msgReq)
 	if err != nil {
-		return fmt.Errorf("failed to marshal auth request: %w", err)
+		return fmt.Errorf("failed to marshal deal list request: %w", err)
 	}
 	msgP := &gen_messages.ProtoMessage{
 		PayloadType: &common.AccountHistoricalDeals,
@@ -612,6 +810,75 @@ func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, accountId, from
 	}
 
 	return nil
+}
+
+// getSymbolDigits fetches and caches the price scale (10^digits) for symbolId, used to convert
+// raw integer spot prices into actual decimal prices. If already cached, returns immediately
+// without a round-trip to cTrader.
+func (t *CTrader) getSymbolDigits(ctx context.Context, ctid *int64, symbolId int64) (float64, error) {
+	t.builderMutex.Lock()
+	if scale, ok := t.symbolDigits[symbolId]; ok {
+		t.builderMutex.Unlock()
+		return scale, nil
+	}
+	t.builderMutex.Unlock()
+
+	reqKey := fmt.Sprintf("REQ_SYMBOL_INFO_STREAM_%d", symbolId)
+
+	msgReq := &gen_messages.ProtoOASymbolByIdReq{
+		CtidTraderAccountId: ctid,
+		SymbolId:            []int64{symbolId},
+	}
+	msgB, err := proto.Marshal(msgReq)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal symbol info request: %w", err)
+	}
+	msgP := &gen_messages.ProtoMessage{
+		PayloadType: &common.AccountSymbolInfo,
+		Payload:     msgB,
+		ClientMsgId: &reqKey,
+	}
+	protoMessage, err := proto.Marshal(msgP)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal protocol message: %w", err)
+	}
+
+	req := &pendingRequest{
+		ctx:    ctx,
+		respCh: make(chan *pendingResponse, 1),
+	}
+
+	t.mutex.Lock()
+	t.pendingRequests[reqKey] = req
+	t.mutex.Unlock()
+
+	if err := t.PlatformConn.WriteMessage(MESSAGE_TYPE, protoMessage); err != nil {
+		t.mutex.Lock()
+		delete(t.pendingRequests, reqKey)
+		t.mutex.Unlock()
+		return 0, fmt.Errorf("failed to send symbol info request: %w", err)
+	}
+
+	resp := <-req.respCh
+	if resp.err != nil {
+		return 0, resp.err
+	}
+
+	var symbolRes gen_messages.ProtoOASymbolByIdRes
+	if err := proto.Unmarshal(resp.Payload, &symbolRes); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal symbol info: %w", err)
+	}
+	if len(symbolRes.Symbol) == 0 || symbolRes.Symbol[0].Digits == nil {
+		return 0, fmt.Errorf("symbol info missing digits for symbol_id %d", symbolId)
+	}
+
+	scale := math.Pow(10, float64(*symbolRes.Symbol[0].Digits))
+
+	t.builderMutex.Lock()
+	t.symbolDigits[symbolId] = scale
+	t.builderMutex.Unlock()
+
+	return scale, nil
 }
 
 func (t *CTrader) handleApplicationAuthResponse(ctx context.Context, payload []byte) error {
@@ -732,10 +999,10 @@ func (t *CTrader) handleRefreshTokenResponse(ctx context.Context, payload []byte
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal refresh token response: %w", err)
 	}
-	err := t.accDb.Put("ctrader", "refresh_token", *r.AccessToken)
-	if err != nil {
-		return err
-	}
+	// err := t.accDb.Put("ctrader", "refresh_token", *r.AccessToken)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
@@ -911,7 +1178,7 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, payload []by
 		if err != nil {
 			return fmt.Errorf("failed to marshal deal: %s", err)
 		}
-		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistorical, acount_connect_messages.Ctrader, t.AccountConnClient.ID, dealsB)
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeHistoricalTrades, acount_connect_messages.Ctrader, t.AccountConnClient.ID, dealsB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			return err
@@ -922,6 +1189,57 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, payload []by
 	return fmt.Errorf("failed to find pending request for msg id: %v", common.REQ_ACCOUNT_HISTORICAL_DEALS)
 }
 
+func (t *CTrader) handleAccountReconcileRes(ctx context.Context, payload []byte) error {
+
+	var r gen_messages.ProtoOAReconcileRes
+
+	if err := proto.Unmarshal(payload, &r); err != nil {
+		return fmt.Errorf("failed to unmarshal historical deals: %w", err)
+	}
+
+	t.mutex.Lock()
+	req, ok := t.pendingRequests[common.REQ_ACCOUNT_ORDERS]
+	t.mutex.Unlock()
+
+	if ok {
+		orders := mappers.ProtoOAReconcileToAccountConnectOrder(&r)
+		ordersB, err := json.Marshal(orders)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deal: %s", err)
+		}
+		msg := messageutils.CreateSuccessResponse(req.ctx, acount_connect_messages.TypeAccountOrders, acount_connect_messages.Ctrader, t.AccountConnClient.ID, ordersB)
+		msgB, err := json.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		t.AccountConnClient.Send <- msgB
+		return nil
+	}
+	return fmt.Errorf("failed to find pending request for msg id: %v", common.REQ_ACCOUNT_ORDERS)
+
+}
+
+// func (t *CTrader) handleSymbolsByIdResponse(ctx context.Context, payload []byte) error {
+// 	var r gen_messages.ProtoOASymbolByIdRes
+// 	t.mutex.Lock()
+// 	defer t.mutex.Unlock()
+
+// 	if err := proto.Unmarshal(payload, &r); err != nil {
+// 		return fmt.Errorf("failed to unmarshal symbols info: %w", err)
+// 	}
+
+// 	if rqts, exists := t.pendingRequests[common.REQ_SYMBOL_INFO]; exists {
+// 		resp := &pendingResponse{
+// 			Payload: payload,
+// 			err:     nil,
+// 		}
+// 		rqts.respCh <- resp
+// 		delete(t.pendingRequests, common.REQ_SYMBOL_INFO)
+// 	}
+
+// 	return nil
+// }
+
 func (t *CTrader) handleSymbolsByIdResponse(ctx context.Context, payload []byte) error {
 	var r gen_messages.ProtoOASymbolByIdRes
 	t.mutex.Lock()
@@ -931,13 +1249,50 @@ func (t *CTrader) handleSymbolsByIdResponse(ctx context.Context, payload []byte)
 		return fmt.Errorf("failed to unmarshal symbols info: %w", err)
 	}
 
+	// existing trend-bars flow: single fixed key
 	if rqts, exists := t.pendingRequests[common.REQ_SYMBOL_INFO]; exists {
-		resp := &pendingResponse{
-			Payload: payload,
-			err:     nil,
-		}
-		rqts.respCh <- resp
+		rqts.respCh <- &pendingResponse{Payload: payload, err: nil}
 		delete(t.pendingRequests, common.REQ_SYMBOL_INFO)
+	}
+
+	// streaming flow: per-symbol key(s) — a single response can carry multiple symbols
+	for _, sym := range r.Symbol {
+		if sym.SymbolId == nil {
+			continue
+		}
+		reqKey := fmt.Sprintf("REQ_SYMBOL_INFO_STREAM_%d", *sym.SymbolId)
+		if rqts, exists := t.pendingRequests[reqKey]; exists {
+			rqts.respCh <- &pendingResponse{Payload: payload, err: nil}
+			delete(t.pendingRequests, reqKey)
+		}
+	}
+
+	return nil
+}
+
+func (t *CTrader) handleSpotEvent(ctx context.Context, payload []byte) error {
+	var ev gen_messages.ProtoOASpotEvent
+	if err := proto.Unmarshal(payload, &ev); err != nil {
+		return fmt.Errorf("failed to unmarshal spot event: %w", err)
+	}
+
+	if ev.SymbolId == nil || len(ev.Trendbar) == 0 {
+		return nil
+	}
+
+	t.builderMutex.Lock()
+	builders := t.candleBuilders[*ev.SymbolId]
+	t.builderMutex.Unlock()
+
+	for _, tb := range ev.Trendbar {
+		if tb.Period == nil {
+			continue
+		}
+		for _, b := range builders {
+			if *tb.Period == b.periodEnum {
+				b.onTrendbar(tb)
+			}
+		}
 	}
 
 	return nil
@@ -963,4 +1318,112 @@ func (t *CTrader) handleErrorReponse(ctx context.Context, payload []byte) error 
 	t.AccountConnClient.Send <- msgB
 
 	return nil
+}
+
+// candleBuilder holds the per-(symbol, period) state needed to convert cTrader's live
+// ProtoOATrendbar pushes into AccountConnectCandlestickBar messages and relay them onto
+// the client's output stream. cTrader does the OHLC aggregation server-side; this type
+// tracks scale and the last fully-seen bar so that, on rollover to a new timestamp, it can
+// emit a clean IsFinal snapshot of the bar that just closed before relaying the new one.
+type candleBuilder struct {
+	symbolId      int64
+	symbolName    string
+	period        string                             // string form, used for output Interval field
+	periodEnum    gen_messages.ProtoOATrendbarPeriod // enum form, used for matching incoming pushes
+	periodSeconds int64
+	scale         float64
+
+	lastBar    acount_connect_messages.AccountConnectCandlestickBar
+	hasSeenBar bool
+
+	out chan []byte
+}
+
+func newCandleBuilder(symbolId int64, symbolName, period string, scale float64, out chan []byte) (*candleBuilder, error) {
+	d, err := mappers.PeriodStrToDuration(period)
+	if err != nil {
+		return nil, err
+	}
+	periodEnum, err := mappers.PeriodStrToBarPeriod(period)
+	if err != nil {
+		return nil, err
+	}
+	return &candleBuilder{
+		symbolId:      symbolId,
+		symbolName:    symbolName,
+		period:        period,
+		periodEnum:    periodEnum,
+		periodSeconds: int64(d.Seconds()),
+		scale:         scale,
+		out:           out,
+	}, nil
+}
+
+// onTrendbar converts a live ProtoOATrendbar push into an AccountConnectCandlestickBar.
+// If the push's timestamp differs from the last one seen, the previous bar is first emitted
+// as final (using its own last-known OHLC, untouched by this new push), then the new bar is
+// emitted as the start of an in-progress candle. Same-timestamp pushes just relay the
+// updated in-progress bar.
+func (cb *candleBuilder) onTrendbar(tb *gen_messages.ProtoOATrendbar) {
+	if tb.Low == nil || tb.UtcTimestampInMinutes == nil {
+		return
+	}
+
+	low := float64(*tb.Low) / cb.scale
+	open, high, close := low, low, low
+	if tb.DeltaOpen != nil {
+		open = low + float64(*tb.DeltaOpen)/cb.scale
+	}
+	if tb.DeltaHigh != nil {
+		high = low + float64(*tb.DeltaHigh)/cb.scale
+	}
+	if tb.DeltaClose != nil {
+		close = low + float64(*tb.DeltaClose)/cb.scale
+	}
+
+	var volume int64
+	if tb.Volume != nil {
+		volume = *tb.Volume
+	}
+
+	ts := int64(*tb.UtcTimestampInMinutes) * 60
+
+	newBar := acount_connect_messages.AccountConnectCandlestickBar{
+		OpenTime:  ts,
+		Open:      open,
+		High:      high,
+		Low:       low,
+		Close:     close,
+		Volume:    float64(volume),
+		CloseTime: ts + cb.periodSeconds,
+		IsFinal:   false,
+	}
+
+	if cb.hasSeenBar && cb.lastBar.OpenTime != ts {
+		finalBar := cb.lastBar
+		finalBar.IsFinal = true
+		cb.emitBar(finalBar)
+	}
+
+	cb.lastBar = newBar
+	cb.hasSeenBar = true
+	cb.emitBar(newBar)
+}
+
+func (cb *candleBuilder) emitBar(bar acount_connect_messages.AccountConnectCandlestickBar) {
+	barRes := acount_connect_messages.AccountConnectCandlestickBarRes{
+		Bars:     []acount_connect_messages.AccountConnectCandlestickBar{bar},
+		Symbol:   cb.symbolName,
+		Interval: cb.period,
+	}
+	barB, err := json.Marshal(barRes)
+	if err != nil {
+		log.Printf("Failed to marshal candlestick bar for symbol %d: %v", cb.symbolId, err)
+		return
+	}
+	select {
+	case cb.out <- barB:
+	default:
+		log.Printf("Stream channel full for symbol %d period %s, dropping update", cb.symbolId, cb.period)
+	}
 }
