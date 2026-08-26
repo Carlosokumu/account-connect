@@ -31,13 +31,14 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 			messages.TypeConnect,
 			messages.TypeAuthorizeAccount,
 			messages.TypeTraderInfo,
-			messages.TypeHistorical,
+			messages.TypeHistoricalTrades,
 			messages.TypeAccountSymbols,
 			messages.TypeTrendBars,
 			messages.TypeError,
 			messages.TypeDisconnect,
 			messages.TypeStream,
-			messages.TypeCandlestickStream:
+			messages.TypeCandlestickStream,
+			messages.TypeAccountOrders:
 			return true
 		default:
 			return false

@@ -4,9 +4,13 @@ import (
 	pb "account-connect/gen"
 	"account-connect/internal/messages"
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/delivery"
+	"github.com/adshao/go-binance/v2/futures"
 )
 
 // ProtoOADealToAccountConnectDeal converts a list of ProtoOADeal messages from a ProtoOADealListRes
@@ -16,13 +20,28 @@ func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []messages.Accoun
 	var deals []messages.AccountConnectDeal
 
 	for _, deal := range r.Deal {
-		deal := messages.AccountConnectDeal{
-			ExecutionPrice: deal.ExecutionPrice,
-			Commission:     deal.Commission,
-			Direction:      deal.TradeSide.String(),
-			Symbol:         deal.SymbolId,
+		if deal.ClosePositionDetail != nil {
+			vdeal := messages.AccountConnectDeal{
+				ExecutionPrice: deal.ExecutionPrice,
+				Commission:     deal.Commission,
+				EntryTime:      deal.ExecutionTimestamp,
+				Lots:           deal.Volume,
+				Symbol:         deal.SymbolId,
+				DealId:         deal.DealId,
+				Profit:         deal.ClosePositionDetail.GrossProfit,
+				Balance:        deal.ClosePositionDetail.Balance,
+				ClosingPrice:   deal.ExecutionPrice,
+				EntryPrice:     deal.ClosePositionDetail.EntryPrice,
+			}
+
+			if deal.GetTradeSide() == pb.ProtoOATradeSide_BUY {
+				vdeal.Direction = "SELL"
+			} else if deal.GetTradeSide() == pb.ProtoOATradeSide_SELL {
+				vdeal.Direction = "BUY"
+			}
+
+			deals = append(deals, vdeal)
 		}
-		deals = append(deals, deal)
 	}
 	return deals
 }
@@ -207,4 +226,184 @@ func BinanceKlineDataToAccountConnectTrendBar(ohlc []*binance.Kline) ([]messages
 	}
 
 	return acctrendbars, nil
+}
+
+// PeriodStrToDuration maps a string-based time period (e.g., "M1", "H1", "D1")
+// to its corresponding time.Duration, used for client-side candle bucket boundaries
+// and close-time calculations when handling cTrader live trend bar pushes.
+// Returns an error if the input string is not a recognized period.
+func PeriodStrToDuration(periodStr string) (time.Duration, error) {
+	switch periodStr {
+	case "M1":
+		return time.Minute, nil
+	case "M2":
+		return 2 * time.Minute, nil
+	case "M3":
+		return 3 * time.Minute, nil
+	case "M4":
+		return 4 * time.Minute, nil
+	case "M5":
+		return 5 * time.Minute, nil
+	case "M10":
+		return 10 * time.Minute, nil
+	case "M15":
+		return 15 * time.Minute, nil
+	case "M30":
+		return 30 * time.Minute, nil
+	case "H1":
+		return time.Hour, nil
+	case "H4":
+		return 4 * time.Hour, nil
+	case "H12":
+		return 12 * time.Hour, nil
+	case "D1":
+		return 24 * time.Hour, nil
+	case "W1":
+		return 7 * 24 * time.Hour, nil
+	case "MN1":
+		return 0, fmt.Errorf("period %s has no fixed duration (calendar month), not supported for client-side bucketing", periodStr)
+	default:
+		return 0, fmt.Errorf("invalid period: %s", periodStr)
+	}
+}
+
+// FuturesKlinesToBinanceKlines converts futures.Kline slice to binance.Kline slice
+// so downstream mappers (BinanceKlineDataToAccountConnectTrendBar) can handle
+// all account types without branching.
+func FuturesKlinesToBinanceKlines(fk []*futures.Kline) []*binance.Kline {
+	result := make([]*binance.Kline, len(fk))
+	for i, k := range fk {
+		result[i] = &binance.Kline{
+			OpenTime:                 k.OpenTime,
+			Open:                     k.Open,
+			High:                     k.High,
+			Low:                      k.Low,
+			Close:                    k.Close,
+			Volume:                   k.Volume,
+			CloseTime:                k.CloseTime,
+			QuoteAssetVolume:         k.QuoteAssetVolume,
+			TradeNum:                 k.TradeNum,
+			TakerBuyBaseAssetVolume:  k.TakerBuyBaseAssetVolume,
+			TakerBuyQuoteAssetVolume: k.TakerBuyQuoteAssetVolume,
+		}
+	}
+	return result
+}
+
+// DeliveryKlinesToBinanceKlines converts delivery.Kline slice to binance.Kline slice
+// for the same reason as FuturesKlinesToBinanceKlines.
+func DeliveryKlinesToBinanceKlines(dk []*delivery.Kline) []*binance.Kline {
+	result := make([]*binance.Kline, len(dk))
+	for i, k := range dk {
+		result[i] = &binance.Kline{
+			OpenTime:                 k.OpenTime,
+			Open:                     k.Open,
+			High:                     k.High,
+			Low:                      k.Low,
+			Close:                    k.Close,
+			Volume:                   k.Volume,
+			CloseTime:                k.CloseTime,
+			QuoteAssetVolume:         k.QuoteAssetVolume,
+			TradeNum:                 k.TradeNum,
+			TakerBuyBaseAssetVolume:  k.TakerBuyBaseAssetVolume,
+			TakerBuyQuoteAssetVolume: k.TakerBuyQuoteAssetVolume,
+		}
+	}
+	return result
+}
+
+// FuturesSymbolToAccountConnectSymbol filters futures symbols with ContractStatus "TRADING"
+// and converts them into AccountConnectSymbol objects.
+func FuturesSymbolToAccountConnectSymbol(syms []futures.Symbol) []messages.AccountConnectSymbol {
+	var accsyms []messages.AccountConnectSymbol
+	for _, sym := range syms {
+		if sym.Status == "TRADING" {
+			s := sym.Symbol
+			accsyms = append(accsyms, messages.AccountConnectSymbol{
+				SymbolName: &s,
+				SymbolId:   sym.Symbol,
+			})
+		}
+	}
+	return accsyms
+}
+
+// DeliverySymbolToAccountConnectSymbol filters delivery symbols with ContractStatus "TRADING"
+// and converts them into AccountConnectSymbol objects.
+func DeliverySymbolToAccountConnectSymbol(syms []delivery.Symbol) []messages.AccountConnectSymbol {
+	var accsyms []messages.AccountConnectSymbol
+	for _, sym := range syms {
+		if sym.ContractStatus == "TRADING" {
+			s := sym.Symbol
+			accsyms = append(accsyms, messages.AccountConnectSymbol{
+				SymbolName: &s,
+				SymbolId:   sym.Symbol,
+			})
+		}
+	}
+	return accsyms
+}
+
+// BinanceTradeToAccountConnectDeal converts a single binance.Trade into a
+// BinanceAccountConnectDeal, parsing string prices/quantities into float64.
+func BinanceTradeToAccountConnectDeal(t *binance.TradeV3, symbol string) messages.BinanceAccountConnectDeal {
+	price, err := strconv.ParseFloat(t.Price, 64)
+	if err != nil {
+		log.Printf("Failed to parse price for trade %d: %v", t.ID, err)
+	}
+	qty, err := strconv.ParseFloat(t.Quantity, 64)
+	if err != nil {
+		log.Printf("Failed to parse quantity for trade %d: %v", t.ID, err)
+	}
+	commission, err := strconv.ParseFloat(t.Commission, 64)
+	if err != nil {
+		log.Printf("Failed to parse commission for trade %d: %v", t.ID, err)
+	}
+	return messages.BinanceAccountConnectDeal{
+		Symbol:          symbol,
+		TradeId:         t.ID,
+		Price:           price,
+		Quantity:        qty,
+		Commission:      commission,
+		CommissionAsset: t.CommissionAsset,
+		Time:            t.Time,
+		IsBuyer:         t.IsBuyer,
+		IsMaker:         t.IsMaker,
+	}
+}
+
+func BinanceFuturesTradeToAccountConnectDeal(t *futures.AccountTrade) messages.BinanceAccountConnectDeal {
+	price, _ := strconv.ParseFloat(t.Price, 64)
+	qty, _ := strconv.ParseFloat(t.Quantity, 64)
+	commission, _ := strconv.ParseFloat(t.Commission, 64)
+	pnl, _ := strconv.ParseFloat(t.RealizedPnl, 64)
+	return messages.BinanceAccountConnectDeal{
+		Symbol:          t.Symbol,
+		TradeId:         t.ID,
+		OrderId:         t.OrderID,
+		Price:           price,
+		Quantity:        qty,
+		Commission:      commission,
+		CommissionAsset: t.CommissionAsset,
+		Time:            t.Time,
+		IsBuyer:         t.Buyer,
+		IsMaker:         t.Maker,
+		RealizedPnl:     pnl,
+		Side:            string(t.Side),
+	}
+}
+
+func ProtoOAReconcileToAccountConnectOrder(r *pb.ProtoOAReconcileRes) []messages.AccountConnectOrder {
+	var accOrders []messages.AccountConnectOrder
+
+	for _, order := range r.Order {
+		accOrder := messages.AccountConnectOrder{
+			ExecutionPrice: order.ExecutionPrice,
+			OrderId:        order.OrderId,
+			OrderType:      order.OrderType.String(),
+		}
+		accOrders = append(accOrders, accOrder)
+	}
+
+	return accOrders
 }
