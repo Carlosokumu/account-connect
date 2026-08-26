@@ -15,6 +15,7 @@ var (
 	TrendBarsMsyType         = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_REQ)
 	AccountSymbolListMsgType = uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_REQ)
 	AccountSymbolInfo        = uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOL_BY_ID_REQ)
+	AccountReconcileReq      = uint32(messages.ProtoOAPayloadType_PROTO_OA_RECONCILE_REQ)
 
 	//Proto Message responses
 	SymbolListRes        = uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES)
@@ -28,4 +29,9 @@ var (
 	ApplicationAthRes    = uint32(messages.ProtoOAPayloadType_PROTO_OA_APPLICATION_AUTH_RES)
 	AccountListRes       = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES)
 	HeartBeatRes         = uint32(messages.ProtoPayloadType_HEARTBEAT_EVENT)
+	AccountReconcileRes  = uint32(messages.ProtoOAPayloadType_PROTO_OA_RECONCILE_RES)
+
+	SubscribeSpotsMsgType        = uint32(messages.ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_REQ)
+	SpotEventMsgType             = uint32(messages.ProtoOAPayloadType_PROTO_OA_SPOT_EVENT)
+	SubscribeLiveTrendbarMsgType = uint32(messages.ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ)
 )
