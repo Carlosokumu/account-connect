@@ -19,4 +19,5 @@ type ProvidersAdapter interface {
 	InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error
 	Disconnect(ctx context.Context) error
 	GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error
+	GetAccountOrders(ctx context.Context, payload messages.AccountConnectOrderPayload) error
 }

@@ -36,7 +36,7 @@ type AccountConnectClientManager struct {
 }
 
 // NewClientManager creates a new client manager instance
-func NewClientManager(accdb db.AccountConnectDb) *AccountConnectClientManager {
+func NewClientManager(accdb db.AccountConnectCache) *AccountConnectClientManager {
 	r := router.NewRouter(accdb)
 
 	return &AccountConnectClientManager{

@@ -16,12 +16,12 @@ import (
 )
 
 type Router struct {
-	db      db.AccountConnectDb
+	db      db.AccountConnectCache
 	Clients map[string]*clients.AccountConnectClient
 }
 
 // NewRouter creates a new Router instance
-func NewRouter(accdb db.AccountConnectDb) *Router {
+func NewRouter(accdb db.AccountConnectCache) *Router {
 	return &Router{
 		Clients: make(map[string]*clients.AccountConnectClient),
 		db:      accdb,
@@ -37,11 +37,11 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 
 	switch msg.AccountConnectMessageType {
 	case messages.TypeConnect:
-		return handler.handleConnect(ctx, client, msg)
+		return handler.handleConnect(ctx, client, r.db, msg)
 	case messages.TypeAuthorizeAccount:
 		return handler.handleAccountAuthorize(ctx, msg)
-	case messages.TypeHistorical:
-		return handler.handleHistoricalDeals(ctx, msg)
+	case messages.TypeHistoricalTrades:
+		return handler.handleHistoricalTrades(ctx, msg)
 	case messages.TypeTraderInfo:
 		return handler.handleTraderInfo(ctx, msg)
 	case messages.TypeTrendBars:
@@ -54,6 +54,8 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 		return handler.handleClientSubcribeToStream(ctx, msg)
 	case messages.TypeCandlestickStream:
 		return handler.handleCandlestickStream(ctx, msg)
+	case messages.TypeAccountOrders:
+		return handler.handleAccountOrders(ctx, msg)
 
 	default:
 		return fmt.Errorf("unknown message type: %s", msg.AccountConnectMessageType)
@@ -61,7 +63,7 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 }
 
 // RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
-func (r *Router) RequestHistoricalDeals(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+func (r *Router) RequestHistoricalTrades(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
 	var req messages.AccountConnectHistoricalDealsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -71,6 +73,24 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, platformadapter ada
 	}
 
 	err = platformadapter.GetHistoricalTrades(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical deals: %v", err)
+		return err
+	}
+	return nil
+}
+
+// RequestAccountOrders requests  a trader's current  account pending orders
+func (r *Router) RequestAccountOrders(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectOrderPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal trader info payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetAccountOrders(ctx, req)
 	if err != nil {
 		log.Printf("Failed to fetch account historical deals: %v", err)
 		return err
@@ -201,7 +221,7 @@ func (r *Router) DisconnectPlatformConnection(ctx context.Context, platformadapt
 	return platformadapter.Disconnect(ctx)
 }
 
-func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *clients.AccountConnectClient, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *clients.AccountConnectClient, cache db.AccountConnectCache, msg messages.AccountConnectMsg) error {
 	var (
 		err error
 	)
@@ -209,7 +229,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *c
 
 	switch msg.Platform {
 	case messages.Binance:
-		_, err = h.handleBinanceConnect(ctx, accountConnClient, msg.Payload)
+		_, err = h.handleBinanceConnect(ctx, accountConnClient, cache, msg.Payload)
 	case messages.Ctrader:
 		_, err = h.handleCtraderConnect(ctx, accountConnClient, msg.Payload)
 	default:
@@ -243,10 +263,10 @@ func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg message
 	return nil
 }
 
-// handleBinanceConnect will establish a connection to binance
 func (h *messageHandler) handleBinanceConnect(
 	ctx context.Context,
 	accountConnClient *clients.AccountConnectClient,
+	cache db.AccountConnectCache,
 	payload json.RawMessage,
 ) (adapters.ProvidersAdapter, error) {
 	var binanceMsg messages.BinanceConnectPayload
@@ -254,8 +274,18 @@ func (h *messageHandler) handleBinanceConnect(
 		return nil, fmt.Errorf("invalid Binance payload: %w", err)
 	}
 
-	adapter := providers.NewBinanceAdapter(accountConnClient)
-	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{}); err != nil {
+	if binanceMsg.AccountType == "" {
+		return nil, fmt.Errorf("account_type is required for binance connection")
+	}
+
+	adapter := providers.NewBinanceAdapter(accountConnClient, cache)
+	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
+		Binance: config.BinanceConfig{
+			ApiKey:      binanceMsg.APIKey,
+			SecretKey:   binanceMsg.APISecret,
+			AccountType: binanceMsg.AccountType,
+		},
+	}); err != nil {
 		return nil, err
 	}
 	accountConnClient.PlatformConns[messages.Binance] = adapter
@@ -307,7 +337,7 @@ func (h *messageHandler) handleClientDisconnect(ctx context.Context) error {
 	return disconnecterr
 }
 
-func (h *messageHandler) handleHistoricalDeals(ctx context.Context, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleHistoricalTrades(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
 	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 
@@ -321,7 +351,24 @@ func (h *messageHandler) handleHistoricalDeals(ctx context.Context, msg messages
 		return err
 	}
 
-	return h.router.RequestHistoricalDeals(ctx, platformadapter, payload)
+	return h.router.RequestHistoricalTrades(ctx, platformadapter, payload)
+}
+
+func (h *messageHandler) handleAccountOrders(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	return h.router.RequestAccountOrders(ctx, platformadapter, payload)
 }
 
 func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.AccountConnectMsg) error {
