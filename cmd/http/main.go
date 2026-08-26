@@ -6,6 +6,7 @@ import (
 	"account-connect/internal/managers"
 	"account-connect/internal/messages"
 	"account-connect/internal/messagevalidator"
+	"account-connect/persistence"
 	db "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -229,7 +230,13 @@ func main() {
 		cancel()
 	}()
 
-	clientManager := managers.NewClientManager(accdb)
+	accCache := persistence.NewBboltTradeCache(accdb.Db)
+	if err := accCache.RegisterBuckets(); err != nil {
+		log.Printf("Failed to register cache buckets: %v", err)
+		os.Exit(1)
+	}
+
+	clientManager := managers.NewClientManager(accCache)
 
 	wg.Add(1)
 	go func() {
