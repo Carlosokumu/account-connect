@@ -45,11 +45,10 @@ func (c *AccountConnectClient) AddStream(ctx context.Context, streamId string) e
 	}
 	stream := make(chan []byte, 100)
 	c.Streams[streamId] = stream
-	c.StreamMerger.Add(stream)
+
 	return nil
 }
 
-// RemoveStream removes a stream from the [Streams] map
 func (c *AccountConnectClient) RemoveStream(streamID string) {
 	c.StreamsMutex.Lock()
 	defer c.StreamsMutex.Unlock()
