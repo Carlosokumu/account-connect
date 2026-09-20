@@ -1,6 +1,7 @@
 package main
 
 import (
+	"account-connect/assetmeta"
 	"account-connect/config"
 	"account-connect/internal/clients"
 	"account-connect/internal/managers"
@@ -211,6 +212,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Printf("loaded ctrader config: endpoint=%q port=%d live_endpoint=%q live_port=%d",
+		config.CtraderEndpoint, config.CtraderPort, config.CtraderLiveEndpoint, config.CtraderLivePort)
+
 	accdb := db.AccountConnectDb{}
 	err = accdb.Create()
 	if err != nil {
@@ -236,7 +240,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	clientManager := managers.NewClientManager(accCache)
+	assetProvider, err := assetmeta.NewMemoryProvider(context.Background(), accCache)
+	if err != nil {
+		log.Fatalf("failed to initialize asset metadata: %v", err)
+	}
+
+	clientManager := managers.NewClientManager(accCache, assetProvider)
 
 	wg.Add(1)
 	go func() {
