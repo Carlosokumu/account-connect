@@ -34,4 +34,13 @@ var (
 	SubscribeSpotsMsgType        = uint32(messages.ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_REQ)
 	SpotEventMsgType             = uint32(messages.ProtoOAPayloadType_PROTO_OA_SPOT_EVENT)
 	SubscribeLiveTrendbarMsgType = uint32(messages.ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ)
+
+	TickDataMsgType           = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TICKDATA_REQ)
+	TickDataRes               = uint32(messages.ProtoOAPayloadType_PROTO_OA_GET_TICKDATA_RES)
+	SymbolCategoryListMsgType = uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOL_CATEGORY_REQ)
+	SymbolCategoryListRes     = uint32(messages.ProtoOAPayloadType_PROTO_OA_SYMBOL_CATEGORY_RES)
+	AssetClassListMsgType     = uint32(messages.ProtoOAPayloadType_PROTO_OA_ASSET_CLASS_LIST_REQ)
+	AssetClassListRes         = uint32(messages.ProtoOAPayloadType_PROTO_OA_ASSET_CLASS_LIST_RES)
+	AssetListRes              = uint32(messages.ProtoOAPayloadType_PROTO_OA_ASSET_LIST_REQ)
+	AssetListMsgType          = uint32(messages.ProtoOAPayloadType_PROTO_OA_ASSET_LIST_RES)
 )
