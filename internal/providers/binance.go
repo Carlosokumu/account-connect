@@ -1,15 +1,19 @@
 package providers
 
 import (
+	"account-connect/assetmeta"
 	"account-connect/config"
 	messageutils "account-connect/internal/accountconnectmessageutils"
 	"account-connect/internal/clients"
 	"account-connect/internal/mappers"
 	"account-connect/internal/messages"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -24,13 +28,25 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var defaultQuoteAssets = []string{"USDT", "BUSD", "BTC", "ETH", "BNB"}
+var validBinanceIntervals = map[string]bool{
+	"1m": true, "3m": true, "5m": true, "15m": true, "30m": true,
+	"1h": true, "2h": true, "4h": true, "6h": true, "8h": true, "12h": true,
+	"1d": true, "3d": true, "1w": true, "1M": true,
+}
+
+const binanceAssetClass = "Crypto"
 
 const (
-	symbolsCacheTTL      = 24 * time.Hour
-	tradesCacheTTL       = 1 * time.Hour
-	workerPoolSize       = 10
-	workerCallIntervalMs = 1000
+	symbolsCacheTTL            = 24 * time.Hour
+	tradesCacheTTL             = 1 * time.Hour
+	workerPoolSize             = 10
+	workerCallIntervalMs       = 1000
+	maxTickLimit               = 1000
+	maxTickPages               = 200
+	pageDelayMs                = 25
+	tickWorkerPoolSize         = 15
+	tickChunkDuration          = 1 * time.Minute
+	maxFuturesWindowMs   int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
 // tradeResult carries the result of a single worker's symbol trade fetch.
@@ -38,18 +54,6 @@ type tradeResult struct {
 	symbol string
 	trades []messages.BinanceAccountConnectDeal
 	err    error
-}
-
-// MiniTickerEvent represents a miniTicker WebSocket message
-type MiniTickerEvent struct {
-	EventTime   int64  `json:"E"`
-	Symbol      string `json:"s"`
-	ClosePrice  string `json:"c"`
-	OpenPrice   string `json:"o"`
-	HighPrice   string `json:"h"`
-	LowPrice    string `json:"l"`
-	Volume      string `json:"v"`
-	QuoteVolume string `json:"q"`
 }
 
 // BinanceKlineEvent represents a kline/candlestick WebSocket message from Binance
@@ -80,65 +84,34 @@ type BinanceKline struct {
 	Ignore              string `json:"B"`
 }
 
-// WsMiniTickerServe connects to Binance miniTicker stream and streams updates
-func WsMiniTickerServe(
-	ctx context.Context,
-	symbol string,
-	wsHandler func(event *MiniTickerEvent),
-	errHandler func(err error),
-) (doneC chan struct{}, stopC chan struct{}, err error) {
-	doneC = make(chan struct{})
-	stopC = make(chan struct{})
+// BinanceAggTradeStreamEvent represents a raw aggTrade WebSocket push from Binance
+type BinanceAggTradeStreamEvent struct {
+	EventType    string `json:"e"`
+	EventTime    int64  `json:"E"`
+	Symbol       string `json:"s"`
+	AggTradeId   int64  `json:"a"`
+	Price        string `json:"p"`
+	Quantity     string `json:"q"`
+	FirstTradeId int64  `json:"f"`
+	LastTradeId  int64  `json:"l"`
+	TradeTime    int64  `json:"T"`
+	IsBuyerMaker bool   `json:"m"`
+}
 
-	wsURL := url.URL{
-		Scheme: "wss",
-		Host:   "stream.binance.com:9443",
-		Path:   fmt.Sprintf("/ws/%s@miniTicker", symbol),
-	}
+// BinanceDepthStreamEvent represents a partial book depth push (@depth5/10/20)
+type BinanceDepthStreamEvent struct {
+	LastUpdateId int64      `json:"lastUpdateId"`
+	Bids         [][]string `json:"bids"`
+	Asks         [][]string `json:"asks"`
+}
 
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect WebSocket: %w", err)
-	}
-	go func() {
-		defer close(doneC)
-		defer conn.Close()
-
-		for {
-			msgChan := make(chan []byte)
-			errChan := make(chan error)
-
-			go func() {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					errChan <- err
-					return
-				}
-				msgChan <- msg
-			}()
-
-			select {
-			case <-stopC:
-				log.Printf("Stopped miniTicker stream for %s", symbol)
-				return
-			case <-ctx.Done():
-				log.Printf("Context cancelled for %s", symbol)
-				return
-			case err := <-errChan:
-				errHandler(fmt.Errorf("read error for %s: %w", symbol, err))
-				return
-			case msg := <-msgChan:
-				var event MiniTickerEvent
-				if err := json.Unmarshal(msg, &event); err != nil {
-					errHandler(fmt.Errorf("unmarshal error for %s: %w", symbol, err))
-					return
-				}
-				wsHandler(&event)
-			}
-		}
-	}()
-
-	return doneC, stopC, nil
+type BinanceBookTickerEvent struct {
+	UpdateId int64  `json:"u"`
+	Symbol   string `json:"s"`
+	BidPrice string `json:"b"`
+	BidQty   string `json:"B"`
+	AskPrice string `json:"a"`
+	AskQty   string `json:"A"`
 }
 
 type BinanceConnection struct {
@@ -157,6 +130,13 @@ type BinanceConnection struct {
 	marginAccount   *binance.MarginAccount
 
 	cache persistence.AccountConnectCache
+
+	assets map[string]BinanceAssetInfo
+}
+
+type BinanceAssetInfo struct {
+	Symbol string `json:"symbol"`
+	Name   string `json:"name"`
 }
 
 func NewBinanceConnection(accountConnClient *clients.AccountConnectClient, cache persistence.AccountConnectCache) *BinanceConnection {
@@ -167,700 +147,891 @@ func NewBinanceConnection(accountConnClient *clients.AccountConnectClient, cache
 	}
 }
 
-func (b *BinanceConnection) Connect(ctx context.Context, apiKey, secretKey string, accountType messages.BinanceAccountType) error {
+func newAccountID() messages.AccountID {
+	var b [8]byte
+	for {
+		_, _ = rand.Read(b[:])
+		n := int64(binary.BigEndian.Uint64(b[:]) & math.MaxInt64) // mask sign bit, always positive
+		if n != 0 {
+			return messages.AccountID(n)
+		}
+	}
+}
+
+// account holds everything needed to service subsequent
+// requests for a single (apiKey, accountType) pair.
+type Naccount struct {
+	id          messages.AccountID
+	accountType messages.BinanceAccountType
+
+	spotClient     *binance.Client
+	futuresClient  *futures.Client
+	deliveryClient *delivery.Client
+
+	info any
+}
+
+// AccountRegistry owns the lifetime of allocated account IDs.
+// One registry per BinanceAdapter (i.e. per WS connection).
+type AccountRegistry struct {
+	mu       sync.RWMutex
+	accounts map[messages.AccountID]*Naccount
+}
+
+func NewAccountRegistry() *AccountRegistry {
+	return &AccountRegistry{
+		accounts: make(map[messages.AccountID]*Naccount),
+	}
+}
+
+func (r *AccountRegistry) put(a *Naccount) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.accounts[a.id] = a
+}
+
+func (r *AccountRegistry) Get(id messages.AccountID) (*Naccount, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	a, ok := r.accounts[id]
+	if !ok {
+		return nil, fmt.Errorf("unknown or expired account id: %s", id)
+	}
+	return a, nil
+}
+
+// Drop removes an account.
+func (r *AccountRegistry) Drop(id messages.AccountID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.accounts, id)
+}
+
+// All returns a snapshot of every currently registered account.
+func (r *AccountRegistry) All() []*Naccount {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]*Naccount, 0, len(r.accounts))
+	for _, a := range r.accounts {
+		out = append(out, a)
+	}
+	return out
+}
+
+// ConnectResult reports, per Binance account type, either an allocated
+// account ID or the error encountered authenticating against it.
+type ConnectResult struct {
+	Accounts map[messages.BinanceAccountType]messages.AccountID
+	Errors   map[messages.BinanceAccountType]error
+}
+
+func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegistry, apiKey, secretKey string) (*ConnectResult, error) {
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+
 	if apiKey == "" || secretKey == "" {
-		return fmt.Errorf("binance api key and secret key are required")
+		return nil, fmt.Errorf("binance api key and secret key are required")
 	}
 
 	binance.UseDemo = true
 	futures.UseDemo = true
 	delivery.UseDemo = true
 
-	switch accountType {
-	case messages.BinanceAccountTypeSpot:
-		client := binance.NewClient(apiKey, secretKey)
-		account, err := client.NewGetAccountService().Do(ctx)
+	result := &ConnectResult{
+		Accounts: make(map[messages.BinanceAccountType]messages.AccountID),
+		Errors:   make(map[messages.BinanceAccountType]error),
+	}
+
+	record := func(t messages.BinanceAccountType, id messages.AccountID, err error) {
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
-			return fmt.Errorf("failed to authenticate binance spot account: %w", err)
-		}
-		b.spotClient = client
-		b.account = account
-
-	case messages.BinanceAccountTypeFutures:
-		client := binance.NewFuturesClient(apiKey, secretKey)
-		account, err := client.NewGetAccountService().Do(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate binance futures account: %w", err)
-		}
-		b.futuresClient = client
-		b.futuresAccount = account
-
-	case messages.BinanceAccountTypeDelivery:
-		client := binance.NewDeliveryClient(apiKey, secretKey)
-		account, err := client.NewGetAccountService().Do(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate binance delivery account: %w", err)
-		}
-		b.deliveryClient = client
-		b.deliveryAccount = account
-
-	case messages.BinanceAccountTypeMargin:
-		client := binance.NewClient(apiKey, secretKey)
-		marginAccount, err := client.NewGetMarginAccountService().Do(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate binance margin account: %w", err)
-		}
-		b.spotClient = client
-		b.marginAccount = marginAccount
-
-	default:
-		return fmt.Errorf("unsupported binance account type: %s", accountType)
-	}
-
-	b.accountType = accountType
-	return nil
-}
-
-// accountScopedClientID returns a cache key prefix that scopes trades to
-// a specific client + account type combination, preventing collisions
-// between e.g. SPOT and FUTURES trades for the same client.
-func (b *BinanceConnection) accountScopedClientID() string {
-	return b.AccountConnClient.ID + ":" + string(b.accountType)
-}
-
-func (b *BinanceConnection) GetHistoricalTrades(ctx context.Context, payload messages.AccountConnectHistoricalDealsPayload) error {
-	quoteAssets := defaultQuoteAssets
-	var limitPerSymbol int = 500
-	if payload.Binance != nil {
-		if len(payload.Binance.QuoteAssets) > 0 {
-			quoteAssets = payload.Binance.QuoteAssets
-		}
-		if payload.Binance.LimitPerSymbol != nil {
-			limitPerSymbol = *payload.Binance.LimitPerSymbol
-		}
-	}
-
-	cacheKey := b.accountScopedClientID()
-
-	// fast path: fresh trades already cached for this client+accountType
-	cachedAll, err := b.cache.GetAllTrades(cacheKey, tradesCacheTTL)
-	if err != nil && err != persistence.ErrCacheExpired {
-		return fmt.Errorf("failed to read trades cache: %w", err)
-	}
-	if len(cachedAll) > 0 {
-		log.Printf("Returning cached trades for %s", cacheKey)
-		return b.sendAggregatedTrades(ctx, cachedAll)
-	}
-
-	// derive nonzero base assets from cached account info
-	baseAssets, err := b.getNonZeroBaseAssets()
-	if err != nil {
-		return err
-	}
-	if len(baseAssets) == 0 {
-		return fmt.Errorf("no nonzero balances found in account")
-	}
-	for _, v := range baseAssets {
-		log.Printf("Got asset: %v", v)
-	}
-	log.Printf("Derived %d nonzero base assets for %s", len(baseAssets), cacheKey)
-
-	// load cached symbol list to validate pairs — must have called GetTradingSymbols first
-	accountTypeKey := string(b.accountType)
-	symsB, err := b.cache.GetSymbols(accountTypeKey, symbolsCacheTTL)
-	if err == persistence.ErrCacheExpired || symsB == nil {
-		return fmt.Errorf("symbol list not available: call GetTradingSymbols first to populate the cache")
-	}
-	if err != nil {
-		return fmt.Errorf("failed to read symbols cache: %w", err)
-	}
-
-	var allSymbols []messages.AccountConnectSymbol
-	if err := json.Unmarshal(symsB, &allSymbols); err != nil {
-		return fmt.Errorf("failed to unmarshal cached symbols: %w", err)
-	}
-
-	// build validity set from cached symbols
-	validSymbols := make(map[string]bool, len(allSymbols))
-	for _, sym := range allSymbols {
-		if sym.SymbolName != nil {
-			validSymbols[*sym.SymbolName] = true
-		}
-	}
-
-	// derive candidate pairs: nonzero base asset × quote asset, validated against symbol list
-	var symbols []string
-	seen := make(map[string]bool)
-	for _, base := range baseAssets {
-		for _, quote := range quoteAssets {
-			if base == quote {
-				continue
-			}
-			candidate := base + quote
-			if validSymbols[candidate] && !seen[candidate] {
-				symbols = append(symbols, candidate)
-				seen[candidate] = true
-			}
-		}
-	}
-
-	if len(symbols) == 0 {
-		return fmt.Errorf("no valid trading pairs found for account balances")
-	}
-	log.Printf("Fetching trades for %d derived pairs for %s", len(symbols), cacheKey)
-
-	// fan out to worker pool — safe rate: 2 workers, 1.5s between calls
-	symbolsCh := make(chan string, len(symbols))
-	for _, sym := range symbols {
-		symbolsCh <- sym
-	}
-	close(symbolsCh)
-
-	resultsCh := make(chan tradeResult, len(symbols))
-
-	var wg sync.WaitGroup
-	for i := 0; i < workerPoolSize; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for symbol := range symbolsCh {
-				time.Sleep(time.Duration(workerCallIntervalMs) * time.Millisecond)
-
-				trades, err := b.fetchTradesForSymbol(ctx, symbol, limitPerSymbol, payload.FromTimestamp, payload.ToTimestamp)
-				if err != nil {
-					log.Printf("Worker: failed to fetch trades for %s: %v", symbol, err)
-					resultsCh <- tradeResult{symbol: symbol, err: err}
-					continue
-				}
-				if len(trades) == 0 {
-					continue
-				}
-
-				tradesB, err := json.Marshal(trades)
-				if err != nil {
-					log.Printf("Worker: failed to marshal trades for %s: %v", symbol, err)
-				} else {
-					if err := b.cache.PutTrades(cacheKey, symbol, tradesB); err != nil {
-						log.Printf("Worker: failed to cache trades for %s: %v", symbol, err)
-					}
-				}
-
-				resultsCh <- tradeResult{symbol: symbol, trades: trades}
-			}
-		}()
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultsCh)
-	}()
-
-	var allTrades []messages.BinanceAccountConnectDeal
-	for result := range resultsCh {
-		if result.err != nil {
-			continue
-		}
-		allTrades = append(allTrades, result.trades...)
-	}
-
-	res := messages.AccountConnectHistoricalDealsRes{
-		Binance: &messages.BinanceAccountConnectDealsRes{
-			Trades: allTrades,
-		},
-	}
-	resB, err := json.Marshal(res)
-	if err != nil {
-		return fmt.Errorf("failed to marshal historical trades: %w", err)
-	}
-
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeHistoricalTrades, messages.Binance, b.AccountConnClient.ID, resB)
-	msgB, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	b.AccountConnClient.Send <- msgB
-	return nil
-}
-
-// sendAggregatedTrades assembles and sends a cached trade result to the client.
-func (b *BinanceConnection) sendAggregatedTrades(ctx context.Context, cachedAll map[string][]byte) error {
-	var allTrades []messages.BinanceAccountConnectDeal
-	for _, tradesB := range cachedAll {
-		var trades []messages.BinanceAccountConnectDeal
-		if err := json.Unmarshal(tradesB, &trades); err != nil {
-			log.Printf("Failed to unmarshal cached trades: %v", err)
-			continue
-		}
-		allTrades = append(allTrades, trades...)
-	}
-
-	res := messages.AccountConnectHistoricalDealsRes{
-		Binance: &messages.BinanceAccountConnectDealsRes{
-			Trades: allTrades,
-		},
-	}
-	resB, err := json.Marshal(res)
-	if err != nil {
-		return fmt.Errorf("failed to marshal cached trades: %w", err)
-	}
-
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeHistoricalTrades, messages.Binance, b.AccountConnClient.ID, resB)
-	msgB, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	b.AccountConnClient.Send <- msgB
-	return nil
-}
-
-// StartSymbolPriceStream starts a real-time price stream for a symbol(trading pair)
-func (b *BinanceConnection) StartSymbolPriceStream(ctx context.Context, symbol string, strm chan []byte) error {
-	b.wsServeMux.Lock()
-	defer b.wsServeMux.Unlock()
-
-	doneChan := make(chan struct{})
-	b.doneChans[symbol] = doneChan
-
-	wsHandler := func(event *MiniTickerEvent) {
-		msg := messages.AccountConnectCryptoPrice{
-			Symbol: event.Symbol,
-			Price:  event.ClosePrice,
-		}
-		msgB, err := json.Marshal(msg)
-		if err != nil {
-			log.Printf("Failed to unmarshal crypto price: %v", err)
-		}
-		select {
-		case <-ctx.Done():
-			b.StopSymbolPriceStream(symbol)
+			result.Errors[t] = err
 			return
-		case strm <- msgB:
-		default:
-			log.Printf("Stream channel full for %s, dropping update", symbol)
+		}
+		result.Accounts[t] = id
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		spotClient := binance.NewClient(apiKey, secretKey)
+
+		spotAcct, err := spotClient.NewGetAccountService().Do(ctx)
+		if err != nil {
+			record(messages.BinanceAccountTypeSpot, 0, fmt.Errorf("failed to authenticate binance spot account: %w", err))
+		} else {
+			id := newAccountID()
+			registry.put(&Naccount{
+				id:          id,
+				accountType: messages.BinanceAccountTypeSpot,
+				spotClient:  spotClient,
+				info:        spotAcct,
+			})
+			record(messages.BinanceAccountTypeSpot, id, nil)
 		}
 
-	}
-
-	errHandler := func(err error) {
-		log.Printf("Error in price stream for %s: %v\n", symbol, err)
-		b.StopSymbolPriceStream(symbol)
-	}
-
-	doneC, stopC, err := WsMiniTickerServe(ctx, symbol, wsHandler, errHandler)
-	if err != nil {
-		delete(b.doneChans, symbol)
-		close(doneChan)
-		return fmt.Errorf("failed to start websocket: %v", err)
-	}
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			log.Printf("Context cancelled for %s: %v", symbol, ctx.Err())
-			stopC <- struct{}{}
-			delete(b.doneChans, symbol)
-			close(doneChan)
-		case <-doneC:
-			delete(b.doneChans, symbol)
-			close(doneChan)
+		// Margin reuses the spot client, but gets its own account ID.
+		marginAcct, err := spotClient.NewGetMarginAccountService().Do(ctx)
+		if err != nil {
+			record(messages.BinanceAccountTypeMargin, 0, fmt.Errorf("failed to authenticate binance margin account: %w", err))
+		} else {
+			id := newAccountID()
+			registry.put(&Naccount{
+				id:          id,
+				accountType: messages.BinanceAccountTypeMargin,
+				spotClient:  spotClient,
+				info:        marginAcct,
+			})
+			record(messages.BinanceAccountTypeMargin, id, nil)
 		}
 	}()
 
-	return nil
-}
-
-// StopSymbolPriceStream stops a running price stream
-func (b *BinanceConnection) StopSymbolPriceStream(symbol string) {
-	b.wsServeMux.Lock()
-	defer b.wsServeMux.Unlock()
-
-	if doneChan, exists := b.doneChans[symbol]; exists {
-		close(doneChan)
-		delete(b.doneChans, symbol)
-	}
-}
-
-// startMarketPriceStream will start a realtime market price stream for a given symbol(trading pair) for the specified stream id
-func (b *BinanceConnection) startMarketPriceStream(ctx context.Context, sym string, streamID string) error {
-	if stream, exists := b.AccountConnClient.Streams[streamID]; exists {
-		sym = strings.ToLower(sym)
-		err := b.StartSymbolPriceStream(ctx, sym, stream)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		client := futures.NewClient(apiKey, secretKey)
+		futuresAcct, err := client.NewGetAccountService().Do(ctx)
 		if err != nil {
-			log.Printf("Failed to start stream for symbol: %s and stream id: %s", sym, streamID)
-			return err
+			record(messages.BinanceAccountTypeFutures, 0, fmt.Errorf("failed to authenticate binance futures account: %w", err))
+			return
 		}
-		return nil
-	}
-	return fmt.Errorf("stream ID %s not found", streamID)
-}
+		id := newAccountID()
+		registry.put(&Naccount{
+			id:            id,
+			accountType:   messages.BinanceAccountTypeFutures,
+			futuresClient: client,
+			info:          futuresAcct,
+		})
+		record(messages.BinanceAccountTypeFutures, id, nil)
+	}()
 
-// getValidSymbols fetches exchange info and returns a set of currently trading symbols.
-func (b *BinanceConnection) getValidSymbols(ctx context.Context) (map[string]bool, error) {
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		exchangeInfo, err := b.spotClient.NewExchangeInfoService().Do(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		client := delivery.NewClient(apiKey, secretKey)
+		deliveryAcct, err := client.NewGetAccountService().Do(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch spot exchange info: %w", err)
+			record(messages.BinanceAccountTypeDelivery, 0, fmt.Errorf("failed to authenticate binance delivery account: %w", err))
+			return
 		}
-		valid := make(map[string]bool, len(exchangeInfo.Symbols))
-		for _, sym := range exchangeInfo.Symbols {
-			if sym.Status == "TRADING" {
-				valid[sym.Symbol] = true
-			}
-		}
-		return valid, nil
+		id := newAccountID()
+		registry.put(&Naccount{
+			id:             id,
+			accountType:    messages.BinanceAccountTypeDelivery,
+			deliveryClient: client,
+			info:           deliveryAcct,
+		})
+		record(messages.BinanceAccountTypeDelivery, id, nil)
+	}()
 
-	case messages.BinanceAccountTypeFutures:
-		exchangeInfo, err := b.futuresClient.NewExchangeInfoService().Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch futures exchange info: %w", err)
-		}
-		valid := make(map[string]bool, len(exchangeInfo.Symbols))
-		for _, sym := range exchangeInfo.Symbols {
-			if sym.Status == "TRADING" {
-				valid[sym.Symbol] = true
-			}
-		}
-		return valid, nil
+	wg.Wait()
 
-	case messages.BinanceAccountTypeDelivery:
-		exchangeInfo, err := b.deliveryClient.NewExchangeInfoService().Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch delivery exchange info: %w", err)
-		}
-		valid := make(map[string]bool, len(exchangeInfo.Symbols))
-		// for _,  := range exchangeInfo.Symbols {
-		// 	// if sym.Status == "TRADING" {
-		// 	// 	valid[sym.Symbol] = true
-		// 	// }
-		// }
-		return valid, nil
-
-	default:
-		return nil, fmt.Errorf("unsupported account type for exchange info: %s", b.accountType)
-	}
-}
-
-func (b *BinanceConnection) GetTraderInfo(ctx context.Context) error {
-	var info messages.AccountConnectBinanceTraderInfo
-
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		if b.account == nil {
-			return fmt.Errorf("no cached spot/margin account info")
-		}
-		var balances []messages.AccountConnectBinanceBalance
-		for _, bal := range b.account.Balances {
-			free, err := strconv.ParseFloat(bal.Free, 64)
-			if err != nil {
-				log.Printf("Failed to parse free balance for %s: %v", bal.Asset, err)
-				continue
-			}
-			locked, err := strconv.ParseFloat(bal.Locked, 64)
-			if err != nil {
-				log.Printf("Failed to parse locked balance for %s: %v", bal.Asset, err)
-				continue
-			}
-			if free == 0 && locked == 0 {
-				continue
-			}
-			balances = append(balances, messages.AccountConnectBinanceBalance{
-				Asset:  bal.Asset,
-				Free:   bal.Free,
-				Locked: bal.Locked,
-			})
-		}
-		info = messages.AccountConnectBinanceTraderInfo{
-			AccountType: string(b.accountType),
-			Spot: &messages.AccountConnectBinanceSpotInfo{
-				CanTrade:        b.account.CanTrade,
-				CanWithdraw:     b.account.CanWithdraw,
-				CanDeposit:      b.account.CanDeposit,
-				MakerCommission: b.account.MakerCommission,
-				TakerCommission: b.account.TakerCommission,
-				Balances:        balances,
-			},
-		}
-
-	case messages.BinanceAccountTypeFutures:
-		if b.futuresAccount == nil {
-			return fmt.Errorf("no cached futures account info")
-		}
-		var assets []messages.AccountConnectBinanceBalance
-		for _, a := range b.futuresAccount.Assets {
-			balance, err := strconv.ParseFloat(a.WalletBalance, 64)
-			if err != nil || balance == 0 {
-				continue
-			}
-			assets = append(assets, messages.AccountConnectBinanceBalance{
-				Asset:  a.Asset,
-				Free:   a.AvailableBalance,
-				Locked: a.WalletBalance,
-			})
-		}
-		info = messages.AccountConnectBinanceTraderInfo{
-			AccountType: string(b.accountType),
-			Futures: &messages.AccountConnectBinanceFuturesInfo{
-				CanTrade:              b.futuresAccount.CanTrade,
-				TotalWalletBalance:    b.futuresAccount.TotalWalletBalance,
-				TotalUnrealizedProfit: b.futuresAccount.TotalUnrealizedProfit,
-				TotalMarginBalance:    b.futuresAccount.TotalMarginBalance,
-				Assets:                assets,
-			},
-		}
-
-	case messages.BinanceAccountTypeDelivery:
-		if b.deliveryAccount == nil {
-			return fmt.Errorf("no cached delivery account info")
-		}
-		var assets []messages.AccountConnectBinanceBalance
-		for _, a := range b.deliveryAccount.Assets {
-			balance, err := strconv.ParseFloat(a.WalletBalance, 64)
-			if err != nil || balance == 0 {
-				continue
-			}
-			assets = append(assets, messages.AccountConnectBinanceBalance{
-				Asset:  a.Asset,
-				Free:   a.AvailableBalance,
-				Locked: a.WalletBalance,
-			})
-		}
-		info = messages.AccountConnectBinanceTraderInfo{
-			AccountType: string(b.accountType),
-			Delivery: &messages.AccountConnectBinanceDeliveryInfo{
-				CanTrade: b.deliveryAccount.CanTrade,
-				// TotalWalletBalance: b.deliveryAccount.TotalWalletBalance,
-				Assets: assets,
-			},
-		}
-
-	default:
-		return fmt.Errorf("unsupported account type for trader info: %s", b.accountType)
+	if len(result.Accounts) == 0 {
+		return result, fmt.Errorf("no binance account types could be authenticated")
 	}
 
-	infoB, err := json.Marshal(info)
-	if err != nil {
-		return fmt.Errorf("failed to marshal binance trader info: %w", err)
-	}
-
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTraderInfo, messages.Binance, b.AccountConnClient.ID, infoB)
-	msgB, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	b.AccountConnClient.Send <- msgB
-	return nil
+	return result, nil
 }
 
 func (b *BinanceConnection) GetAccountOrders(ctx context.Context, accountConnectPayload messages.AccountConnectOrderPayload) error {
 	return nil
 }
 
-// spotOrMarginClient returns the spot client, valid for both SPOT and MARGIN account types.
-// Returns an error if called on a futures/delivery connection.
-func (b *BinanceConnection) spotOrMarginClient() (*binance.Client, error) {
-	if b.spotClient == nil {
-		return nil, fmt.Errorf("operation requires a SPOT or MARGIN account, current type: %s", b.accountType)
-	}
-	return b.spotClient, nil
+func (b *BinanceConnection) GetHistoricalTrades(ctx context.Context, payload messages.AccountConnectHistoricalDealsPayload) error {
+	return nil
 }
 
-// futuresClient returns the USDT-M futures client.
-func (b *BinanceConnection) getFuturesClient() (*futures.Client, error) {
-	if b.futuresClient == nil {
-		return nil, fmt.Errorf("operation requires a FUTURES account, current type: %s", b.accountType)
-	}
-	return b.futuresClient, nil
-}
+// fetchAllFuturesAggTrades handles both the 2-day search window restriction
+// by chunking time windows AND inner page pagination via fromId.
+func (b *BinanceConnection) fetchAllFuturesAggTrades(
+	ctx context.Context,
+	client *futures.Client,
+	symbolName string,
+	from, to *int64,
+	limit int,
+) ([]*futures.AggTrade, error) {
+	var all []*futures.AggTrade
+	var fromId *int64
 
-// deliveryClient returns the Coin-M futures client.
-func (b *BinanceConnection) getDeliveryClient() (*delivery.Client, error) {
-	if b.deliveryClient == nil {
-		return nil, fmt.Errorf("operation requires a DELIVERY account, current type: %s", b.accountType)
-	}
-	return b.deliveryClient, nil
-}
-
-func (b *BinanceConnection) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) ([]byte, error) {
-	var (
-		ohlc []*binance.Kline
-		err  error
-	)
-
-	if trendbarsArgs.SymbolName == "" || trendbarsArgs.Period == "" {
-		return nil, fmt.Errorf("symbol name and period are required for trend bars")
-	}
-	if trendbarsArgs.FromTimestamp == nil || trendbarsArgs.ToTimestamp == nil {
-		return nil, fmt.Errorf("from and to timestamps are required for trend bars")
-	}
-
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		client, err := b.spotOrMarginClient()
-		if err != nil {
-			return nil, err
-		}
-		ohlc, err = client.NewKlinesService().
-			Symbol(trendbarsArgs.SymbolName).
-			Interval(trendbarsArgs.Period).
-			StartTime(*trendbarsArgs.FromTimestamp).
-			EndTime(*trendbarsArgs.ToTimestamp).
-			Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch klines: %w", err)
+	for page := 0; page < maxTickPages; page++ {
+		select {
+		case <-ctx.Done():
+			return all, ctx.Err()
+		default:
 		}
 
-	case messages.BinanceAccountTypeFutures:
-		fc, err := b.getFuturesClient()
-		if err != nil {
-			return nil, err
+		svc := client.NewAggTradesService().Symbol(symbolName).Limit(limit)
+
+		if fromId != nil {
+			// Pure FromID pagination bypasses the 2-day restriction completely
+			svc = svc.FromID(*fromId)
+		} else if from != nil {
+			// First call: pass ONLY StartTime to locate the initial trade ID
+			svc = svc.StartTime(*from)
 		}
-		futuresOhlc, err := fc.NewKlinesService().
-			Symbol(trendbarsArgs.SymbolName).
-			Interval(trendbarsArgs.Period).
-			StartTime(*trendbarsArgs.FromTimestamp).
-			EndTime(*trendbarsArgs.ToTimestamp).
-			Do(ctx)
+
+		batch, err := svc.Do(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch futures klines: %w", err)
+			return all, fmt.Errorf("failed to fetch futures agg trades page %d: %w", page, err)
 		}
-		ohlc = mappers.FuturesKlinesToBinanceKlines(futuresOhlc)
 
-	case messages.BinanceAccountTypeDelivery:
-		dc, err := b.getDeliveryClient()
-		if err != nil {
-			return nil, err
+		if len(batch) == 0 {
+			break
 		}
-		deliveryOhlc, err := dc.NewKlinesService().
-			Symbol(trendbarsArgs.SymbolName).
-			Interval(trendbarsArgs.Period).
-			StartTime(*trendbarsArgs.FromTimestamp).
-			EndTime(*trendbarsArgs.ToTimestamp).
-			Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch delivery klines: %w", err)
-		}
-		ohlc = mappers.DeliveryKlinesToBinanceKlines(deliveryOhlc)
 
-	default:
-		return nil, fmt.Errorf("unsupported account type for trend bars: %s", b.accountType)
-	}
-
-	acctrendbars, err := mappers.BinanceKlineDataToAccountConnectTrendBar(ohlc)
-	if err != nil {
-		return nil, err
-	}
-
-	acctrendbarsRes := messages.AccountConnectTrendBarRes{
-		Trendbars: acctrendbars,
-		Symbol:    trendbarsArgs.SymbolName,
-		Period:    trendbarsArgs.Period,
-	}
-	acctrendbarsB, err := json.Marshal(acctrendbarsRes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal trend bars: %w", err)
-	}
-	return acctrendbarsB, nil
-}
-
-// GetBinanceTradingSymbols retrieves tradable symbols, using the cache when available.
-func (b *BinanceConnection) GetBinanceTradingSymbols(ctx context.Context) ([]messages.AccountConnectSymbol, error) {
-	accountTypeKey := string(b.accountType)
-
-	// check cache first
-	cached, err := b.cache.GetSymbols(accountTypeKey, symbolsCacheTTL)
-	if err != nil && err != persistence.ErrCacheExpired {
-		return nil, fmt.Errorf("failed to read symbols cache: %w", err)
-	}
-	if cached != nil {
-		var syms []messages.AccountConnectSymbol
-		if err := json.Unmarshal(cached, &syms); err != nil {
-			log.Printf("Failed to unmarshal cached symbols, refetching: %v", err)
+		// Client-side enforcement of to_timestamp (EndTime)
+		if to != nil {
+			cutoff := len(batch)
+			hitCutoff := false
+			for i, t := range batch {
+				if t.Timestamp > *to {
+					cutoff = i
+					hitCutoff = true
+					break
+				}
+			}
+			batch = batch[:cutoff]
+			all = append(all, batch...)
+			if hitCutoff || len(batch) == 0 {
+				break
+			}
 		} else {
-			log.Printf("Returning cached symbols for account type: %s", accountTypeKey)
-			return syms, nil
+			all = append(all, batch...)
 		}
+
+		if len(batch) < limit {
+			break // Reached end of available trade history
+		}
+
+		// Increment last aggregate trade ID for the next page
+		last := batch[len(batch)-1]
+		next := last.AggTradeID + 1
+		fromId = &next
+
+		time.Sleep(time.Duration(pageDelayMs) * time.Millisecond)
 	}
 
-	// cache miss or expired — fetch from Binance
-	var syms []messages.AccountConnectSymbol
+	return all, nil
+}
 
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		client, err := b.spotOrMarginClient()
-		if err != nil {
-			return nil, err
-		}
-		exchangeInfo, err := client.NewExchangeInfoService().Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve binance spot trading symbols: %w", err)
-		}
-		syms = mappers.BinanceSymbolToAccountConnectSymbol(exchangeInfo.Symbols)
+// fetchAllSpotAggTrades pages through Binance Spot aggTrades using fromId continuation
+func (b *BinanceConnection) fetchAllSpotAggTrades(ctx context.Context, client *binance.Client, symbolName string, from, to *int64, limit int) ([]*binance.AggTrade, error) {
+	var all []*binance.AggTrade
+	var fromId *int64
 
-	case messages.BinanceAccountTypeFutures:
-		fc, err := b.getFuturesClient()
-		if err != nil {
-			return nil, err
+	for page := 0; page < maxTickPages; page++ {
+		select {
+		case <-ctx.Done():
+			return all, ctx.Err()
+		default:
 		}
-		exchangeInfo, err := fc.NewExchangeInfoService().Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve binance futures trading symbols: %w", err)
-		}
-		syms = mappers.FuturesSymbolToAccountConnectSymbol(exchangeInfo.Symbols)
 
-	case messages.BinanceAccountTypeDelivery:
-		dc, err := b.getDeliveryClient()
-		if err != nil {
-			return nil, err
+		svc := client.NewAggTradesService().Symbol(symbolName).Limit(limit)
+		if fromId != nil {
+			svc = svc.FromID(*fromId)
+		} else {
+			if from != nil {
+				svc = svc.StartTime(*from)
+			}
+			if to != nil {
+				svc = svc.EndTime(*to)
+			}
 		}
-		exchangeInfo, err := dc.NewExchangeInfoService().Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve binance delivery trading symbols: %w", err)
-		}
-		syms = mappers.DeliverySymbolToAccountConnectSymbol(exchangeInfo.Symbols)
 
-	default:
-		return nil, fmt.Errorf("unsupported account type for trading symbols: %s", b.accountType)
+		batch, err := svc.Do(ctx)
+		if err != nil {
+			return all, fmt.Errorf("failed to fetch agg trades page %d: %w", page, err)
+		}
+
+		if len(batch) == 0 {
+			break
+		}
+
+		// once paginating by fromId, trim anything past the originally-requested
+		// upper bound — this is the actual stopping condition for a bounded range
+		if fromId != nil && to != nil {
+			cutoff := len(batch)
+			hitCutoff := false
+			for i, t := range batch {
+				if t.Timestamp > *to {
+					cutoff = i
+					hitCutoff = true
+					break
+				}
+			}
+			batch = batch[:cutoff]
+			all = append(all, batch...)
+			if hitCutoff || len(batch) == 0 {
+				break
+			}
+		} else {
+			all = append(all, batch...)
+		}
+
+		if len(batch) < limit {
+			break // fewer than a full page — genuinely no more data
+		}
+
+		last := all[len(all)-1]
+		next := last.AggTradeID + 1
+		fromId = &next
+
+		time.Sleep(time.Duration(pageDelayMs) * time.Millisecond)
 	}
 
-	// store in cache for future calls
-	symsB, err := json.Marshal(syms)
+	return all, nil
+}
+
+// StartDepthStream starts a real-time partial-book-depth stream for the specified symbolName.
+func (b *BinanceConnection) StartDepthStream(ctx context.Context, accountType messages.BinanceAccountType, symbolName string, limit int, strm chan []byte) error {
+	host, err := depthStreamHost(accountType)
 	if err != nil {
-		log.Printf("Failed to marshal symbols for cache, skipping cache write: %v", err)
-	} else {
-		if err := b.cache.PutSymbols(accountTypeKey, symsB); err != nil {
-			log.Printf("Failed to write symbols to cache: %v", err)
-			// non-fatal — we still have the data, just won't be cached
-		}
+		return err
 	}
 
-	return syms, nil
+	symbol := strings.ToLower(symbolName)
+	streamKey := fmt.Sprintf("depth_%s_%d", symbol, limit)
+
+	b.wsServeMux.Lock()
+	doneChan := make(chan struct{})
+	b.doneChans[streamKey] = doneChan
+	b.wsServeMux.Unlock()
+
+	wsURL := url.URL{
+		Scheme: "wss",
+		Host:   host,
+		Path:   fmt.Sprintf("/ws/%s@depth%d", symbol, limit),
+	}
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
+	if err != nil {
+		b.wsServeMux.Lock()
+		delete(b.doneChans, streamKey)
+		b.wsServeMux.Unlock()
+		close(doneChan)
+		return fmt.Errorf("failed to connect depth stream WebSocket: %w", err)
+	}
+
+	go func() {
+		defer conn.Close()
+		cleanup := func() {
+			b.wsServeMux.Lock()
+			delete(b.doneChans, streamKey)
+			b.wsServeMux.Unlock()
+			close(doneChan)
+		}
+
+		for {
+			msgChan := make(chan []byte)
+			errChan := make(chan error)
+			go func() {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					errChan <- err
+					return
+				}
+				msgChan <- msg
+			}()
+
+			select {
+			case <-ctx.Done():
+				log.Printf("Context cancelled for depth stream %s", streamKey)
+				cleanup()
+				return
+			case err := <-errChan:
+				log.Printf("Error in depth stream %s: %v", streamKey, err)
+				cleanup()
+				return
+			case msg := <-msgChan:
+				var event BinanceDepthStreamEvent
+				if err := json.Unmarshal(msg, &event); err != nil {
+					log.Printf("Failed to unmarshal depth event for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				depth := messages.AccountConnectDepthRes{
+					Bids:         parseDepthLevels(event.Bids),
+					Asks:         parseDepthLevels(event.Asks),
+					LastUpdateId: event.LastUpdateId,
+					SymbolName:   symbolName,
+				}
+				depthB, err := json.Marshal(depth)
+				if err != nil {
+					log.Printf("Failed to marshal depth for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					cleanup()
+					return
+				case strm <- depthB:
+				default:
+					log.Printf("Depth stream channel full for %s, dropping update", streamKey)
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+func (b *BinanceConnection) StartBBOStream(ctx context.Context, accountType messages.BinanceAccountType, symbolName string, strm chan []byte) error {
+	var path string
+	var streamKey string
+	if symbolName == "" {
+		path = "/ws/!bookTicker"
+		streamKey = "bbo_all"
+	} else {
+		symbol := strings.ToLower(symbolName)
+		path = fmt.Sprintf("/ws/%s@bookTicker", symbol)
+		streamKey = "bbo_" + symbol
+	}
+
+	host, err := bboStreamHost(accountType)
+	if err != nil {
+		return err
+	}
+
+	b.wsServeMux.Lock()
+	doneChan := make(chan struct{})
+	b.doneChans[streamKey] = doneChan
+	b.wsServeMux.Unlock()
+
+	wsURL := url.URL{Scheme: "wss", Host: host, Path: path}
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
+	if err != nil {
+		b.wsServeMux.Lock()
+		delete(b.doneChans, streamKey)
+		b.wsServeMux.Unlock()
+		close(doneChan)
+		return fmt.Errorf("failed to connect BBO stream WebSocket: %w", err)
+	}
+
+	go func() {
+		defer conn.Close()
+		cleanup := func() {
+			b.wsServeMux.Lock()
+			delete(b.doneChans, streamKey)
+			b.wsServeMux.Unlock()
+			close(doneChan)
+		}
+
+		for {
+			msgChan := make(chan []byte)
+			errChan := make(chan error)
+			go func() {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					errChan <- err
+					return
+				}
+				msgChan <- msg
+			}()
+
+			select {
+			case <-ctx.Done():
+				log.Printf("Context cancelled for BBO stream %s", streamKey)
+				cleanup()
+				return
+			case err := <-errChan:
+				log.Printf("Error in BBO stream %s: %v", streamKey, err)
+				cleanup()
+				return
+			case msg := <-msgChan:
+				var event BinanceBookTickerEvent
+				if err := json.Unmarshal(msg, &event); err != nil {
+					log.Printf("Failed to unmarshal BBO event for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				bbo := messages.AccountConnectBBO{
+					SymbolName: event.Symbol,
+					BidPrice:   parseFloat(event.BidPrice),
+					BidQty:     parseFloat(event.BidQty),
+					AskPrice:   parseFloat(event.AskPrice),
+					AskQty:     parseFloat(event.AskQty),
+					UpdateId:   event.UpdateId,
+				}
+				bboB, err := json.Marshal(bbo)
+				if err != nil {
+					log.Printf("Failed to marshal BBO for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					cleanup()
+					return
+				case strm <- bboB:
+				default:
+					log.Printf("BBO stream channel full for %s, dropping update", streamKey)
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+// StartTickStream starts a real-time aggregate-trade stream for a symbol.
+func (b *BinanceConnection) StartTickStream(ctx context.Context, symbolName string, strm chan []byte) error {
+	symbol := strings.ToLower(symbolName)
+	streamKey := "ticks_" + symbol
+
+	b.wsServeMux.Lock()
+	doneChan := make(chan struct{})
+	b.doneChans[streamKey] = doneChan
+	b.wsServeMux.Unlock()
+
+	wsURL := url.URL{
+		Scheme: "wss",
+		Host:   "stream.binance.com:443",
+		Path:   fmt.Sprintf("/ws/%s@aggTrade", symbol),
+	}
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
+	if err != nil {
+		b.wsServeMux.Lock()
+		delete(b.doneChans, streamKey)
+		b.wsServeMux.Unlock()
+		close(doneChan)
+		return fmt.Errorf("failed to connect tick stream WebSocket: %w", err)
+	}
+
+	go func() {
+		defer conn.Close()
+
+		cleanup := func() {
+			b.wsServeMux.Lock()
+			delete(b.doneChans, streamKey)
+			b.wsServeMux.Unlock()
+			close(doneChan)
+		}
+
+		for {
+			msgChan := make(chan []byte)
+			errChan := make(chan error)
+			go func() {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					errChan <- err
+					return
+				}
+				msgChan <- msg
+			}()
+
+			select {
+			case <-ctx.Done():
+				log.Printf("Context cancelled for tick stream %s", streamKey)
+				cleanup()
+				return
+			case err := <-errChan:
+				log.Printf("Error in tick stream %s: %v", streamKey, err)
+				cleanup()
+				return
+			case msg := <-msgChan:
+				var event BinanceAggTradeStreamEvent
+				if err := json.Unmarshal(msg, &event); err != nil {
+					log.Printf("Failed to unmarshal aggTrade event for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				tick := messages.AccountConnectTickStreamMsg{
+					SymbolName: event.Symbol,
+					Price:      parseFloat(event.Price),
+					Quantity:   parseFloat(event.Quantity),
+					Timestamp:  event.TradeTime,
+				}
+				tickB, err := json.Marshal(tick)
+				if err != nil {
+					log.Printf("Failed to marshal tick for %s, skipping frame: %v", streamKey, err)
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					cleanup()
+					return
+				case strm <- tickB:
+				default:
+					log.Printf("Tick stream channel full for %s, dropping update", streamKey)
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+func bboStreamHost(accountType messages.BinanceAccountType) (string, error) {
+	switch accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		return "stream.binance.com:443", nil
+	case messages.BinanceAccountTypeFutures:
+		return "fstream.binance.com", nil
+	case messages.BinanceAccountTypeDelivery:
+		return "dstream.binance.com", nil
+	default:
+		return "", fmt.Errorf("unsupported account type for BBO stream: %s", accountType)
+	}
+}
+
+func depthStreamHost(accountType messages.BinanceAccountType) (string, error) {
+	switch accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		return "stream.binance.com:443", nil
+	case messages.BinanceAccountTypeFutures:
+		return "fstream.binance.com", nil
+	case messages.BinanceAccountTypeDelivery:
+		return "dstream.binance.com", nil
+	default:
+		return "", fmt.Errorf("unsupported account type for depth stream: %s", accountType)
+	}
 }
 
 type BinanceAdapter struct {
-	binanceConn *BinanceConnection
-}
-
-func NewBinanceAdapter(accountConnClient *clients.AccountConnectClient, cache persistence.AccountConnectCache) *BinanceAdapter {
-	return &BinanceAdapter{
-		binanceConn: NewBinanceConnection(accountConnClient, cache),
-	}
+	AccountConnClient *clients.AccountConnectClient
+	assetProvider     assetmeta.Provider
+	registry          *AccountRegistry
+	binanceConn       *BinanceConnection
+	wsServeMux        sync.Mutex
+	doneChans         map[string]chan struct{}
 }
 
 func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
-	conn := NewBinanceConnection(b.binanceConn.AccountConnClient, b.binanceConn.cache)
-	if err := conn.Connect(ctx, cfg.Binance.ApiKey, cfg.Binance.SecretKey, cfg.Binance.AccountType); err != nil {
+	registry := NewAccountRegistry()
+
+	result, err := b.binanceConn.Connect(ctx, registry, cfg.Binance.ApiKey, cfg.Binance.SecretKey)
+	if err != nil {
 		return err
 	}
-	b.binanceConn = conn
+	b.registry = registry
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeConnect, messages.Binance, b.binanceConn.AccountConnClient.ID, nil)
+	info, err := b.buildAccountInfo(result)
+	if err != nil {
+		return fmt.Errorf("connected but failed to build account info: %w", err)
+	}
+
+	res := messages.AccountConnectAccountInfoRes{
+		Binance: &info,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeConnect, messages.Binance, b.AccountConnClient.ID, resB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	b.binanceConn.AccountConnClient.Send <- msgB
+	b.AccountConnClient.Send <- msgB
 	return nil
+}
+
+// buildAccountInfo constructs the unified account-info shape from every
+// account type that successfully connected, using the registry entries
+// allocated by Connect.
+func (b *BinanceAdapter) buildAccountInfo(result *ConnectResult) (messages.AccountConnectBinanceAccountInfo, error) {
+	info := messages.AccountConnectBinanceAccountInfo{
+		Accounts: make(map[messages.BinanceAccountType]messages.AccountConnectBinanceAccount),
+		Errors:   make(map[messages.BinanceAccountType]string),
+	}
+
+	for accountType, connID := range result.Accounts {
+		conn, err := b.registry.Get(connID)
+		if err != nil {
+			return info, err
+		}
+
+		entry := messages.AccountConnectBinanceAccount{
+			AccountID: int64(conn.id),
+		}
+
+		switch accountType {
+		case messages.BinanceAccountTypeSpot:
+			acct, ok := conn.info.(*binance.Account)
+			if !ok || acct == nil {
+				return info, fmt.Errorf("no cached spot account info")
+			}
+			entry.Spot = buildSpotInfo(acct)
+
+		case messages.BinanceAccountTypeMargin:
+			acct, ok := conn.info.(*binance.MarginAccount)
+			if !ok || acct == nil {
+				return info, fmt.Errorf("no cached margin account info")
+			}
+			entry.Margin = buildMarginInfo(acct)
+
+		case messages.BinanceAccountTypeFutures:
+			acct, ok := conn.info.(*futures.Account)
+			if !ok || acct == nil {
+				return info, fmt.Errorf("no cached futures account info")
+			}
+			entry.Futures = buildFuturesInfo(acct)
+
+		case messages.BinanceAccountTypeDelivery:
+			acct, ok := conn.info.(*delivery.Account)
+			if !ok || acct == nil {
+				return info, fmt.Errorf("no cached delivery account info")
+			}
+			entry.Delivery = buildDeliveryInfo(acct)
+
+		default:
+			return info, fmt.Errorf("unsupported account type for account info: %s", accountType)
+		}
+
+		info.Accounts[accountType] = entry
+	}
+
+	for accountType, err := range result.Errors {
+		info.Errors[accountType] = err.Error()
+	}
+
+	return info, nil
+}
+
+func buildSpotInfo(acct *binance.Account) *messages.AccountConnectBinanceSpotInfo {
+	var balances []messages.AccountConnectBinanceBalance
+	for _, bal := range acct.Balances {
+		free, err := strconv.ParseFloat(bal.Free, 64)
+		if err != nil {
+			log.Printf("failed to parse free balance for %s: %v", bal.Asset, err)
+			continue
+		}
+		locked, err := strconv.ParseFloat(bal.Locked, 64)
+		if err != nil {
+			log.Printf("failed to parse locked balance for %s: %v", bal.Asset, err)
+			continue
+		}
+		if free == 0 && locked == 0 {
+			continue
+		}
+		balances = append(balances, messages.AccountConnectBinanceBalance{
+			Asset:  bal.Asset,
+			Free:   bal.Free,
+			Locked: bal.Locked,
+		})
+	}
+	return &messages.AccountConnectBinanceSpotInfo{
+		CanTrade:        acct.CanTrade,
+		CanWithdraw:     acct.CanWithdraw,
+		CanDeposit:      acct.CanDeposit,
+		MakerCommission: acct.MakerCommission,
+		TakerCommission: acct.TakerCommission,
+		Balances:        balances,
+	}
+}
+
+func buildMarginInfo(acct *binance.MarginAccount) *messages.AccountConnectBinanceMarginInfo {
+	var assets []messages.AccountConnectBinanceMarginAsset
+	for _, a := range acct.UserAssets {
+		free, err := strconv.ParseFloat(a.Free, 64)
+		if err != nil {
+			log.Printf("failed to parse free margin balance for %s: %v", a.Asset, err)
+			continue
+		}
+		locked, err := strconv.ParseFloat(a.Locked, 64)
+		if err != nil {
+			log.Printf("failed to parse locked margin balance for %s: %v", a.Asset, err)
+			continue
+		}
+		borrowed, _ := strconv.ParseFloat(a.Borrowed, 64) // borrowed/interest can legitimately be "0", no need to skip on parse-zero
+		if free == 0 && locked == 0 && borrowed == 0 {
+			continue
+		}
+		assets = append(assets, messages.AccountConnectBinanceMarginAsset{
+			Asset:    a.Asset,
+			Free:     a.Free,
+			Locked:   a.Locked,
+			Borrowed: a.Borrowed,
+			Interest: a.Interest,
+			NetAsset: a.NetAsset,
+		})
+	}
+	return &messages.AccountConnectBinanceMarginInfo{
+		BorrowEnabled:     acct.BorrowEnabled,
+		TradeEnabled:      acct.TradeEnabled,
+		TransferEnabled:   acct.TransferOutEnabled,
+		MarginLevel:       acct.MarginLevel,
+		TotalAssetBTC:     acct.TotalAssetOfBTC,
+		TotalLiabilityBTC: acct.TotalLiabilityOfBTC,
+		TotalNetAssetBTC:  acct.TotalNetAssetOfBTC,
+		Assets:            assets,
+	}
+}
+
+func buildFuturesInfo(acct *futures.Account) *messages.AccountConnectBinanceFuturesInfo {
+	var assets []messages.AccountConnectBinanceFuturesAsset
+	for _, a := range acct.Assets {
+		balance, err := strconv.ParseFloat(a.WalletBalance, 64)
+		if err != nil {
+			log.Printf("failed to parse wallet balance for %s: %v", a.Asset, err)
+			continue
+		}
+		if balance == 0 {
+			continue
+		}
+		assets = append(assets, messages.AccountConnectBinanceFuturesAsset{
+			Asset:            a.Asset,
+			WalletBalance:    a.WalletBalance,
+			UnrealizedProfit: a.UnrealizedProfit,
+			MarginBalance:    a.MarginBalance,
+			AvailableBalance: a.AvailableBalance,
+		})
+	}
+	var positions []messages.AccountConnectBinanceFuturesPosition
+	for _, p := range acct.Positions {
+		amt, err := strconv.ParseFloat(p.PositionAmt, 64)
+		if err != nil {
+			log.Printf("failed to parse position amount for %s: %v", p.Symbol, err)
+			continue
+		}
+		if amt == 0 {
+			continue
+		}
+		positions = append(positions, messages.AccountConnectBinanceFuturesPosition{
+			Symbol:           p.Symbol,
+			PositionAmt:      p.PositionAmt,
+			EntryPrice:       p.EntryPrice,
+			UnrealizedProfit: p.UnrealizedProfit,
+			PositionSide:     string(p.PositionSide),
+		})
+	}
+	return &messages.AccountConnectBinanceFuturesInfo{
+		CanTrade:              acct.CanTrade,
+		TotalWalletBalance:    acct.TotalWalletBalance,
+		TotalUnrealizedProfit: acct.TotalUnrealizedProfit,
+		TotalMarginBalance:    acct.TotalMarginBalance,
+		// Assets:                acct.Assets,
+		// Positions:             acct.Positions,
+	}
+}
+
+func buildDeliveryInfo(acct *delivery.Account) *messages.AccountConnectBinanceDeliveryInfo {
+	var assets []messages.AccountConnectBinanceDeliveryAsset
+	for _, a := range acct.Assets {
+		balance, err := strconv.ParseFloat(a.WalletBalance, 64)
+		if err != nil {
+			log.Printf("failed to parse delivery wallet balance for %s: %v", a.Asset, err)
+			continue
+		}
+		if balance == 0 {
+			continue
+		}
+		assets = append(assets, messages.AccountConnectBinanceDeliveryAsset{
+			Asset:            a.Asset,
+			WalletBalance:    a.WalletBalance,
+			AvailableBalance: a.AvailableBalance,
+		})
+	}
+	return &messages.AccountConnectBinanceDeliveryInfo{
+		CanTrade: acct.CanTrade,
+		// Assets:   assets,
+	}
+}
+
+func NewBinanceAdapter(accountConnClient *clients.AccountConnectClient, cache persistence.AccountConnectCache, assetProvider assetmeta.Provider) *BinanceAdapter {
+	return &BinanceAdapter{
+		binanceConn:       NewBinanceConnection(accountConnClient, cache),
+		AccountConnClient: accountConnClient,
+		assetProvider:     assetProvider,
+		doneChans:         make(map[string]chan struct{}),
+	}
 }
 
 func (b *BinanceAdapter) AuthorizeAccount(ctx context.Context, payload messages.AccountConnectAuthorizeTradingAccountPayload) error {
@@ -872,27 +1043,28 @@ func (b *BinanceAdapter) GetUserAccounts(ctx context.Context) error {
 }
 
 func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error {
-	binanceSyms, err := b.binanceConn.GetBinanceTradingSymbols(ctx)
+	binanceSyms, err := b.GetBinanceTradingSymbols(ctx, payload.AccountID)
 	if err != nil {
 		return err
 	}
+
 	accconnectsyms := messages.AccountConnectSymbolRes{
 		AccountConnectSymbols: binanceSyms,
 	}
 
 	accconnectsymsB, err := json.Marshal(accconnectsyms)
 	if err != nil {
-		log.Printf("Failed to marshal symbol list data: %v", err)
+		log.Printf("failed to marshal symbol list data: %v", err)
 		return err
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Binance, b.binanceConn.AccountConnClient.ID, accconnectsymsB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Binance, b.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	b.binanceConn.AccountConnClient.Send <- msgB
+	b.AccountConnClient.Send <- msgB
 	return nil
 }
 
@@ -900,114 +1072,400 @@ func (b *BinanceAdapter) GetHistoricalTrades(ctx context.Context, payload messag
 	return b.binanceConn.GetHistoricalTrades(ctx, payload)
 }
 
-func (b *BinanceAdapter) GetTraderInfo(ctx context.Context, payload messages.AccountConnectTraderInfoPayload) error {
-	return b.binanceConn.GetTraderInfo(ctx)
-}
+// GetHistoricalTicks fetches historical aggregate trades for a symbol.
+func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
+	if payload.Binance == nil {
+		return fmt.Errorf("binance payload is required for historical tick data")
+	}
+	bp := payload.Binance
+	if bp.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for historical tick data")
+	}
 
-func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error {
-	trendbars, err := b.binanceConn.GetSymbolTrendBars(ctx, payload)
+	acct, err := b.registry.Get(bp.AccountID)
 	if err != nil {
-		log.Printf("Failed to retrieve binance ohlc data: %v", err)
 		return err
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTrendBars, messages.Binance, b.binanceConn.AccountConnClient.ID, trendbars)
 
+	limit := 500
+	if bp.Limit != nil {
+		limit = *bp.Limit
+		if limit > maxTickLimit {
+			limit = maxTickLimit
+		}
+	}
+
+	go func() {
+		var ticks []messages.AccountConnectTick
+
+		switch acct.accountType {
+		case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+			if acct.spotClient == nil {
+				log.Printf("no spot client for account %d", acct.id)
+				return
+			}
+			trades, err := b.binanceConn.fetchAllSpotAggTrades(ctx, acct.spotClient, bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp, limit)
+			if err != nil {
+				log.Printf("failed to fetch spot agg trades: %v", err)
+				return
+			}
+			ticks = mappers.BinanceAggTradesToTicks(trades)
+
+		case messages.BinanceAccountTypeFutures:
+			if acct.futuresClient == nil {
+				log.Printf("no futures client for account %d", acct.id)
+				return
+			}
+			svc := acct.futuresClient.NewAggTradesService().Symbol(bp.SymbolName).Limit(limit)
+			if bp.FromTimestamp != nil {
+				svc = svc.StartTime(*bp.FromTimestamp)
+			}
+			if bp.ToTimestamp != nil {
+				svc = svc.EndTime(*bp.ToTimestamp)
+			}
+
+			trades, err := b.binanceConn.fetchAllFuturesAggTrades(ctx, acct.futuresClient, bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp, limit)
+			// trades, err := svc.Do(ctx)
+			if err != nil {
+				log.Printf("failed to fetch futures agg trades: %v", err)
+				return
+			}
+			ticks = mappers.BinanceFuturesAggTradesToTicks(trades)
+
+		case messages.BinanceAccountTypeDelivery:
+			log.Printf("historical tick data not yet supported for delivery accounts")
+			return
+
+		default:
+			log.Printf("unsupported account type for historical tick data: %s", acct.accountType)
+			return
+		}
+
+		res := messages.AccountConnectTickDataRes{
+			Ticks:      ticks,
+			HasMore:    len(ticks) == limit,
+			SymbolName: bp.SymbolName,
+		}
+		resB, err := json.Marshal(res)
+		if err != nil {
+			log.Printf("failed to marshal tick data response: %v", err)
+			return
+		}
+
+		msg := messageutils.CreateSuccessResponse(ctx, messages.TypeHistoricalTicks, messages.Binance, b.AccountConnClient.ID, resB)
+		msgB, err := json.Marshal(msg)
+		if err != nil {
+			log.Printf("failed to marshal final message: %v", err)
+			return
+		}
+		b.AccountConnClient.Send <- msgB
+	}()
+
+	return nil
+}
+
+func (b *BinanceAdapter) GetAccountInfo(ctx context.Context, payload messages.AccountConnectAccountInfoPayload) error {
+	var info messages.AccountConnectBinanceAccountInfo
+	var err error
+
+	if payload.AccountID != nil {
+		info, err = b.buildAccountInfoForID(*payload.AccountID)
+	} else {
+		info, err = b.buildAccountInfoFromRegistry()
+	}
+	if err != nil {
+		return err
+	}
+
+	infoB, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("failed to marshal binance account info: %w", err)
+	}
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTraderInfo, messages.Binance, b.AccountConnClient.ID, infoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	b.binanceConn.AccountConnClient.Send <- msgB
+	b.AccountConnClient.Send <- msgB
 	return nil
 }
 
-func (b *BinanceAdapter) GetAccountOrders(ctx context.Context, payload messages.AccountConnectOrderPayload) error {
-	return nil
+// buildAccountInfoFromRegistry builds info for every currently connected account.
+func (b *BinanceAdapter) buildAccountInfoFromRegistry() (messages.AccountConnectBinanceAccountInfo, error) {
+	info := messages.AccountConnectBinanceAccountInfo{
+		Accounts: make(map[messages.BinanceAccountType]messages.AccountConnectBinanceAccount),
+	}
+	for _, acct := range b.registry.All() {
+		entry, err := buildAccountEntry(acct)
+		if err != nil {
+			return info, err
+		}
+		info.Accounts[acct.accountType] = entry
+	}
+	return info, nil
 }
 
-// InitializeClientStream will initialize a stream of real time market prices for the specified stream id for a particular symbol
-func (b *BinanceAdapter) InitializeClientStream(ctx context.Context, payload messages.AccountConnectStreamPayload) error {
-	streamType := payload.StreamType
-	symbolId := payload.SymbolId
-	if streamType == "" || symbolId == "" {
-		return fmt.Errorf("required streamid or symbolid is missing")
+// buildAccountInfoForID builds info for a single account, identified by id.
+func (b *BinanceAdapter) buildAccountInfoForID(id messages.AccountID) (messages.AccountConnectBinanceAccountInfo, error) {
+	acct, err := b.registry.Get(id)
+	if err != nil {
+		return messages.AccountConnectBinanceAccountInfo{}, err
 	}
-	streamId := streamType + "_" + symbolId
+	entry, err := buildAccountEntry(acct)
+	if err != nil {
+		return messages.AccountConnectBinanceAccountInfo{}, err
+	}
+	return messages.AccountConnectBinanceAccountInfo{
+		Accounts: map[messages.BinanceAccountType]messages.AccountConnectBinanceAccount{
+			acct.accountType: entry,
+		},
+	}, nil
+}
 
-	err := b.binanceConn.AccountConnClient.AddStream(ctx, streamId)
+// buildAccountEntry converts a single registry account into its response shape.
+func buildAccountEntry(acct *Naccount) (messages.AccountConnectBinanceAccount, error) {
+	entry := messages.AccountConnectBinanceAccount{AccountID: int64(acct.id)}
+
+	switch acct.accountType {
+	case messages.BinanceAccountTypeSpot:
+		entry.Spot = buildSpotInfo(acct.info.(*binance.Account))
+	case messages.BinanceAccountTypeMargin:
+		entry.Margin = buildMarginInfo(acct.info.(*binance.MarginAccount))
+	case messages.BinanceAccountTypeFutures:
+		entry.Futures = buildFuturesInfo(acct.info.(*futures.Account))
+	case messages.BinanceAccountTypeDelivery:
+		entry.Delivery = buildDeliveryInfo(acct.info.(*delivery.Account))
+	default:
+		return entry, fmt.Errorf("unsupported account type for account info: %s", acct.accountType)
+	}
+
+	return entry, nil
+}
+
+func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, trendbarsArgs messages.AccountConnectTrendBarsPayload) error {
+	if trendbarsArgs.SymbolName == "" || trendbarsArgs.Period == "" {
+		return fmt.Errorf("symbol name and period are required for trend bars")
+	}
+	if trendbarsArgs.FromTimestamp == nil || trendbarsArgs.ToTimestamp == nil {
+		return fmt.Errorf("from and to timestamps are required for trend bars")
+	}
+
+	acct, err := b.registry.Get(trendbarsArgs.AccountID)
 	if err != nil {
 		return err
 	}
-	log.Printf("Initialized a new stream with id: %s stream len now: %d", streamId, len(b.binanceConn.AccountConnClient.Streams))
-	payloadB, err := json.Marshal(map[string]string{
-		"messsage":  "stream initialized",
-		"stream_id": streamId,
-		"symbol_id": symbolId,
-	})
+
+	var ohlc []*binance.Kline
+
+	switch acct.accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		if acct.spotClient == nil {
+			return fmt.Errorf("no spot client for account %d", acct.id)
+		}
+		ohlc, err = acct.spotClient.NewKlinesService().
+			Symbol(trendbarsArgs.SymbolName).
+			Interval(trendbarsArgs.Period).
+			StartTime(*trendbarsArgs.FromTimestamp).
+			EndTime(*trendbarsArgs.ToTimestamp).
+			Do(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch klines: %w", err)
+		}
+
+	case messages.BinanceAccountTypeFutures:
+		if acct.futuresClient == nil {
+			return fmt.Errorf("no futures client for account %d", acct.id)
+		}
+		futuresOhlc, err := acct.futuresClient.NewKlinesService().
+			Symbol(trendbarsArgs.SymbolName).
+			Interval(trendbarsArgs.Period).
+			StartTime(*trendbarsArgs.FromTimestamp).
+			EndTime(*trendbarsArgs.ToTimestamp).
+			Do(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch futures klines: %w", err)
+		}
+		ohlc = mappers.FuturesKlinesToBinanceKlines(futuresOhlc)
+
+	case messages.BinanceAccountTypeDelivery:
+		if acct.deliveryClient == nil {
+			return fmt.Errorf("no delivery client for account %d", acct.id)
+		}
+		deliveryOhlc, err := acct.deliveryClient.NewKlinesService().
+			Symbol(trendbarsArgs.SymbolName).
+			Interval(trendbarsArgs.Period).
+			StartTime(*trendbarsArgs.FromTimestamp).
+			EndTime(*trendbarsArgs.ToTimestamp).
+			Do(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch delivery klines: %w", err)
+		}
+		ohlc = mappers.DeliveryKlinesToBinanceKlines(deliveryOhlc)
+
+	default:
+		return fmt.Errorf("unsupported account type for trend bars: %s", acct.accountType)
+	}
+
+	acctrendbars, err := mappers.BinanceKlineDataToAccountConnectTrendBar(ohlc)
 	if err != nil {
 		return err
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeStream, messages.Binance, b.binanceConn.AccountConnClient.ID, payloadB)
+
+	acctrendbarsRes := messages.AccountConnectTrendBarRes{
+		Trendbars: acctrendbars,
+		Symbol:    trendbarsArgs.SymbolName,
+		Period:    trendbarsArgs.Period,
+	}
+	acctrendbarsB, err := json.Marshal(acctrendbarsRes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal trend bars: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTrendBars, messages.Binance, b.AccountConnClient.ID, acctrendbarsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	b.binanceConn.AccountConnClient.Send <- msgB
-	err = b.binanceConn.startMarketPriceStream(ctx, payload.SymbolId, streamId)
-	if err != nil {
-		return err
-	}
+
+	b.AccountConnClient.Send <- msgB
 	return nil
 }
 
-// StartCandlestickStream starts a real-time candlestick/kline stream for a given symbol and interval
-func (b *BinanceConnection) StartCandlestickStream(ctx context.Context, payload messages.BinanceCandlestickStreamPayload, strm chan []byte) error {
+// GetBinanceTradingSymbols retrieves tradable symbols for the specified account.
+func (b *BinanceAdapter) GetBinanceTradingSymbols(ctx context.Context, id messages.AccountID) ([]messages.AccountConnectSymbol, error) {
+	acct, err := b.registry.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	var syms []messages.AccountConnectSymbol
+
+	switch acct.accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		if acct.spotClient == nil {
+			return nil, fmt.Errorf("no spot client for account %d", id)
+		}
+		exchangeInfo, err := acct.spotClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve binance spot trading symbols: %w", err)
+		}
+		syms = mappers.BinanceSymbolToAccountConnectSymbol(exchangeInfo.Symbols)
+
+	case messages.BinanceAccountTypeFutures:
+		if acct.futuresClient == nil {
+			return nil, fmt.Errorf("no futures client for account %d", id)
+		}
+		exchangeInfo, err := acct.futuresClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve binance futures trading symbols: %w", err)
+		}
+		syms = mappers.FuturesSymbolToAccountConnectSymbol(exchangeInfo.Symbols)
+
+	case messages.BinanceAccountTypeDelivery:
+		if acct.deliveryClient == nil {
+			return nil, fmt.Errorf("no delivery client for account %d", id)
+		}
+		exchangeInfo, err := acct.deliveryClient.NewExchangeInfoService().Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve binance delivery trading symbols: %w", err)
+		}
+		syms = mappers.DeliverySymbolToAccountConnectSymbol(exchangeInfo.Symbols)
+
+	default:
+		return nil, fmt.Errorf("unsupported account type for trading symbols: %s", acct.accountType)
+	}
+
+	b.enrichSymbolsWithAssetInfo(syms)
+
+	return syms, nil
+}
+
+// enrichSymbolsWithAssetInfo attaches full asset names (e.g. "Bitcoin" for
+// "BTC") from the shared asset metadata provider.
+func (b *BinanceAdapter) enrichSymbolsWithAssetInfo(syms []messages.AccountConnectSymbol) {
+	for i := range syms {
+		if syms[i].Binance == nil {
+			continue
+		}
+		bs := syms[i].Binance
+
+		bs.AssetClass = binanceAssetClass
+
+		if info, ok := b.assetProvider.GetAssetInfo(bs.BaseAsset); ok {
+			bs.BaseAssetFullName = info.FullName
+		}
+		if info, ok := b.assetProvider.GetAssetInfo(bs.QuoteAsset); ok {
+			bs.QuoteAssetFullName = info.FullName
+		}
+
+		switch {
+		case bs.BaseAssetFullName != "" && bs.QuoteAssetFullName != "":
+			syms[i].SymbolName = fmt.Sprintf("%s / %s", bs.BaseAssetFullName, bs.QuoteAssetFullName)
+		default:
+			syms[i].SymbolName = syms[i].SymbolAbbreviation
+		}
+	}
+}
+
+// StartCandlestickStream starts a real-time candlestick/kline stream for a given symbol and period.
+func (b *BinanceAdapter) StartCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload, strm chan []byte) error {
 	b.wsServeMux.Lock()
-	defer b.wsServeMux.Unlock()
-	symbol := strings.ToLower(payload.Symbol)
-	streamKey := symbol + "_" + payload.Interval
+	symbol := strings.ToLower(payload.SymbolName)
+	streamKey := symbol + "_" + payload.Period
 	doneChan := make(chan struct{})
 	b.doneChans[streamKey] = doneChan
+	b.wsServeMux.Unlock()
+
 	wsURL := url.URL{
 		Scheme: "wss",
 		Host:   "stream.binance.com:443",
-		Path:   fmt.Sprintf("/ws/%s@kline_%s", symbol, payload.Interval),
+		Path:   fmt.Sprintf("/ws/%s@kline_%s", symbol, payload.Period),
 	}
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
 	if err != nil {
+		b.wsServeMux.Lock()
 		delete(b.doneChans, streamKey)
+		b.wsServeMux.Unlock()
 		close(doneChan)
 		return fmt.Errorf("failed to connect candlestick WebSocket: %w", err)
 	}
+
 	go func() {
 		defer conn.Close()
+
+		cleanup := func() {
+			b.wsServeMux.Lock()
+			delete(b.doneChans, streamKey)
+			b.wsServeMux.Unlock()
+			close(doneChan)
+		}
+
 		for {
 			msgChan := make(chan []byte)
 			errChan := make(chan error)
 			go func() {
 				_, msg, err := conn.ReadMessage()
 				if err != nil {
-					fmt.Printf("Error here: %s", err)
 					errChan <- err
 					return
 				}
 				msgChan <- msg
 			}()
+
 			select {
 			case <-ctx.Done():
 				log.Printf("Context cancelled for candlestick stream %s", streamKey)
-				delete(b.doneChans, streamKey)
-				close(doneChan)
+				cleanup()
 				return
 			case err := <-errChan:
 				log.Printf("Error in candlestick stream %s: %v", streamKey, err)
-				delete(b.doneChans, streamKey)
-				close(doneChan)
+				cleanup()
 				return
 			case msg := <-msgChan:
 				var event BinanceKlineEvent
 				if err := json.Unmarshal(msg, &event); err != nil {
-					log.Printf("Failed to unmarshal kline event for %s: %v", streamKey, err)
-					return
+					log.Printf("Failed to unmarshal kline event for %s, skipping frame: %v", streamKey, err)
+					continue
 				}
 				bar := messages.AccountConnectCandlestickBar{
 					OpenTime:  event.Kline.StartTime,
@@ -1021,16 +1479,17 @@ func (b *BinanceConnection) StartCandlestickStream(ctx context.Context, payload 
 				}
 				barRes := messages.AccountConnectCandlestickBarRes{
 					Bars:     []messages.AccountConnectCandlestickBar{bar},
-					Symbol:   payload.Symbol,
-					Interval: payload.Interval,
+					Symbol:   payload.SymbolName,
+					Interval: payload.Period,
 				}
 				barB, err := json.Marshal(barRes)
 				if err != nil {
-					log.Printf("Failed to marshal candlestick bar: %v", err)
-					return
+					log.Printf("Failed to marshal candlestick bar for %s, skipping frame: %v", streamKey, err)
+					continue
 				}
 				select {
 				case <-ctx.Done():
+					cleanup()
 					return
 				case strm <- barB:
 				default:
@@ -1042,36 +1501,223 @@ func (b *BinanceConnection) StartCandlestickStream(ctx context.Context, payload 
 	return nil
 }
 
-func (b *BinanceAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+func (b *BinanceAdapter) GetTickStream(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
 	if payload.Binance == nil {
-		return fmt.Errorf("missing binance payload for candlestick stream")
+		return fmt.Errorf("binance payload is required for tick stream")
 	}
-	bp := payload.Binance
-	if bp.Symbol == "" || bp.Interval == "" {
-		return fmt.Errorf("required symbol or interval is missing")
+	if payload.Binance.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for tick stream")
 	}
-	streamId := "candlestick_" + strings.ToLower(bp.Symbol) + "_" + bp.Interval
-	err := b.binanceConn.AccountConnClient.AddStream(ctx, streamId)
-	if err != nil {
+
+	streamId := "ticks_" + strings.ToLower(payload.Binance.SymbolName)
+	if err := b.binanceConn.AccountConnClient.AddStream(ctx, streamId); err != nil {
 		return err
 	}
 	stream := b.binanceConn.AccountConnClient.Streams[streamId]
+
 	go func() {
-		for barB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeCandlestickStream, messages.Binance, b.binanceConn.AccountConnClient.ID, barB)
+		for tickB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeLiveTicks, messages.Binance, b.binanceConn.AccountConnClient.ID, tickB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
-				log.Printf("Failed to marshal candlestick stream message: %v", err)
+				log.Printf("Failed to marshal tick stream message: %v", err)
 				continue
 			}
 			b.binanceConn.AccountConnClient.Send <- msgB
 		}
 	}()
-	return b.binanceConn.StartCandlestickStream(ctx, *bp, stream)
+
+	return b.binanceConn.StartTickStream(ctx, payload.Binance.SymbolName, stream)
+}
+
+func (b *BinanceAdapter) GetAccountOrders(ctx context.Context, payload messages.AccountConnectOrderPayload) error {
+	return nil
+}
+
+func (b *BinanceAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+	if payload.AccountID == 0 {
+		return fmt.Errorf("account_id is required for binance candlestick stream")
+	}
+	if payload.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for binance candlestick stream")
+	}
+	if payload.Period == "" {
+		return fmt.Errorf("period is required for binance candlestick stream")
+	}
+
+	if !validBinanceIntervals[payload.Period] {
+		return fmt.Errorf("invalid period %q for binance candlestick stream — must be one of 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M", payload.Period)
+	}
+
+	if _, err := b.registry.Get(payload.AccountID); err != nil {
+		return err
+	}
+
+	streamId := fmt.Sprintf("candlestick_binance_%d_%s", payload.AccountID, payload.SymbolName)
+	if err := b.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	stream := b.AccountConnClient.Streams[streamId]
+
+	go func() {
+		for barB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeCandlestickStream, messages.Binance, b.AccountConnClient.ID, barB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal candlestick stream message: %v", err)
+				continue
+			}
+			b.AccountConnClient.Send <- msgB
+		}
+	}()
+	return b.StartCandlestickStream(ctx, payload, stream)
 }
 
 func (b *BinanceAdapter) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func (b *BinanceAdapter) GetOrderBookDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
+	if payload.Binance == nil {
+		return fmt.Errorf("binance payload is required for order book depth")
+	}
+	bp := payload.Binance
+	if bp.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for order book depth")
+	}
+
+	acct, err := b.registry.Get(bp.AccountID)
+	if err != nil {
+		return err
+	}
+
+	limit := 100
+	if bp.Limit != nil {
+		limit = *bp.Limit
+	}
+
+	var res messages.AccountConnectDepthRes
+
+	switch acct.accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		if acct.spotClient == nil {
+			return fmt.Errorf("no spot client for account %d", acct.id)
+		}
+		depth, err := acct.spotClient.NewDepthService().Symbol(bp.SymbolName).Limit(limit).Do(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch spot order book depth: %w", err)
+		}
+		res = mappers.BinanceDepthToAccountConnectDepth(depth.Bids, depth.Asks, depth.LastUpdateID)
+
+	case messages.BinanceAccountTypeFutures:
+		if acct.futuresClient == nil {
+			return fmt.Errorf("no futures client for account %d", acct.id)
+		}
+		depth, err := acct.futuresClient.NewDepthService().Symbol(bp.SymbolName).Limit(limit).Do(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch futures order book depth: %w", err)
+		}
+		res = mappers.BinanceDepthToAccountConnectDepth(depth.Bids, depth.Asks, depth.LastUpdateID)
+
+	default:
+		return fmt.Errorf("unsupported account type for order book depth: %s", acct.accountType)
+	}
+
+	res.SymbolName = bp.SymbolName
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal depth response: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOrderBookDepth, messages.Binance, b.AccountConnClient.ID, resB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	b.AccountConnClient.Send <- msgB
+	return nil
+}
+
+func (b *BinanceAdapter) GetDepthStream(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
+	if payload.Binance == nil {
+		return fmt.Errorf("binance payload is required for depth stream")
+	}
+	bp := payload.Binance
+	if bp.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for depth stream")
+	}
+	limit := 20
+	if bp.Limit != nil {
+		limit = *bp.Limit
+	}
+	if limit != 5 && limit != 10 && limit != 20 {
+		return fmt.Errorf("depth stream limit must be 5, 10, or 20, got %d", limit)
+	}
+
+	acct, err := b.registry.Get(bp.AccountID)
+	if err != nil {
+		return err
+	}
+
+	streamId := fmt.Sprintf("depth_%s_%d", strings.ToLower(bp.SymbolName), limit)
+	if err := b.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	stream := b.AccountConnClient.Streams[streamId]
+
+	go func() {
+		for depthB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthStream, messages.Binance, b.AccountConnClient.ID, depthB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal depth stream message: %v", err)
+				continue
+			}
+			b.AccountConnClient.Send <- msgB
+		}
+	}()
+
+	return b.binanceConn.StartDepthStream(ctx, acct.accountType, bp.SymbolName, limit, stream)
+}
+
+func (b *BinanceAdapter) GetBBOStream(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
+	if payload.Binance == nil {
+		return fmt.Errorf("binance payload is required for BBO stream")
+	}
+	bp := payload.Binance
+
+	acct, err := b.registry.Get(bp.AccountID)
+	if err != nil {
+		return err
+	}
+
+	symbolName := bp.SymbolName
+
+	var streamId string
+	if symbolName == "" {
+		streamId = "bbo_all"
+	} else {
+		streamId = "bbo_" + strings.ToLower(symbolName)
+	}
+
+	if err := b.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	stream := b.AccountConnClient.Streams[streamId]
+
+	go func() {
+		for bboB := range stream {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeBBOStream, messages.Binance, b.AccountConnClient.ID, bboB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal BBO stream message: %v", err)
+				continue
+			}
+			b.AccountConnClient.Send <- msgB
+		}
+	}()
+
+	return b.binanceConn.StartBBOStream(ctx, acct.accountType, symbolName, stream)
 }
 
 func parseFloat(s string) float64 {
@@ -1083,126 +1729,17 @@ func parseFloat(s string) float64 {
 	return val
 }
 
-// getNonZeroBaseAssets returns assets with nonzero balances for the current account type.
-func (b *BinanceConnection) getNonZeroBaseAssets() ([]string, error) {
-	var baseAssets []string
-
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		if b.account == nil {
-			return nil, fmt.Errorf("no cached spot/margin account info")
+// parseDepthLevels converts Binance's [price, qty] string-pair arrays into typed levels.
+func parseDepthLevels(raw [][]string) []messages.AccountConnectDepthLevel {
+	levels := make([]messages.AccountConnectDepthLevel, 0, len(raw))
+	for _, lvl := range raw {
+		if len(lvl) != 2 {
+			continue
 		}
-		for _, bal := range b.account.Balances {
-			free, err := strconv.ParseFloat(bal.Free, 64)
-			if err != nil {
-				continue
-			}
-			locked, err := strconv.ParseFloat(bal.Locked, 64)
-			if err != nil {
-				continue
-			}
-			if free == 0 && locked == 0 {
-				continue
-			}
-			baseAssets = append(baseAssets, bal.Asset)
-		}
-
-	case messages.BinanceAccountTypeFutures:
-		if b.futuresAccount == nil {
-			return nil, fmt.Errorf("no cached futures account info")
-		}
-		for _, asset := range b.futuresAccount.Assets {
-			balance, err := strconv.ParseFloat(asset.WalletBalance, 64)
-			if err != nil {
-				continue
-			}
-			if balance == 0 {
-				continue
-			}
-			baseAssets = append(baseAssets, asset.Asset)
-		}
-
-	case messages.BinanceAccountTypeDelivery:
-		if b.deliveryAccount == nil {
-			return nil, fmt.Errorf("no cached delivery account info")
-		}
-		for _, asset := range b.deliveryAccount.Assets {
-			balance, err := strconv.ParseFloat(asset.WalletBalance, 64)
-			if err != nil {
-				continue
-			}
-			if balance == 0 {
-				continue
-			}
-			baseAssets = append(baseAssets, asset.Asset)
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported account type for historical trades: %s", b.accountType)
+		levels = append(levels, messages.AccountConnectDepthLevel{
+			Price:    parseFloat(lvl[0]),
+			Quantity: parseFloat(lvl[1]),
+		})
 	}
-
-	return baseAssets, nil
-}
-
-// fetchTradesForSymbol fetches account trades for a single symbol using the correct
-// service for the current account type.
-func (b *BinanceConnection) fetchTradesForSymbol(ctx context.Context, symbol string, limit int, from, to *int64) ([]messages.BinanceAccountConnectDeal, error) {
-	var trades []messages.BinanceAccountConnectDeal
-
-	switch b.accountType {
-	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-		fmt.Printf("Fetching trade for symbol: %v", symbol)
-		svc := b.spotClient.NewListTradesService().Symbol(symbol).Limit(limit)
-		if from != nil {
-			svc = svc.StartTime(*from)
-		}
-		if to != nil {
-			svc = svc.EndTime(*to)
-		}
-		result, err := svc.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Printf("Got results here: %v", len(result))
-		for _, t := range result {
-			trades = append(trades, mappers.BinanceTradeToAccountConnectDeal(t, symbol))
-		}
-
-	case messages.BinanceAccountTypeFutures:
-		svc := b.futuresClient.NewListAccountTradeService().Symbol(symbol).Limit(limit)
-		if from != nil {
-			svc = svc.StartTime(*from)
-		}
-		if to != nil {
-			svc = svc.EndTime(*to)
-		}
-		result, err := svc.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range result {
-			trades = append(trades, mappers.BinanceFuturesTradeToAccountConnectDeal(t))
-		}
-
-	case messages.BinanceAccountTypeDelivery:
-		// svc := b.deliveryClient.NewA().Symbol(symbol).Limit(limit)
-		// if from != nil {
-		// 	svc = svc.StartTime(*from)
-		// }
-		// if to != nil {
-		// 	svc = svc.EndTime(*to)
-		// }
-		// result, err := svc.Do(ctx)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// for _, t := range result {
-		// 	trades = append(trades, mappers.BinanceDeliveryTradeToAccountConnectDeal(t))
-		// }
-
-	default:
-		return nil, fmt.Errorf("unsupported account type for trade fetch: %s", b.accountType)
-	}
-
-	return trades, nil
+	return levels
 }
