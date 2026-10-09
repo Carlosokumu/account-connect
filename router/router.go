@@ -1,10 +1,12 @@
 package router
 
 import (
+	"account-connect/assetmeta"
 	"account-connect/config"
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/adapters"
-	"account-connect/internal/applications"
+	providers "account-connect/internal/providers"
+
 	"account-connect/internal/clients"
 	messages "account-connect/internal/messages"
 	db "account-connect/persistence"
@@ -15,15 +17,17 @@ import (
 )
 
 type Router struct {
-	db      db.AccountConnectDb
-	Clients map[string]*clients.AccountConnectClient
+	db            db.AccountConnectCache
+	Clients       map[string]*clients.AccountConnectClient
+	assetProvider assetmeta.Provider
 }
 
 // NewRouter creates a new Router instance
-func NewRouter(accdb db.AccountConnectDb) *Router {
+func NewRouter(accdb db.AccountConnectCache, assetProvider assetmeta.Provider) *Router {
 	return &Router{
-		Clients: make(map[string]*clients.AccountConnectClient),
-		db:      accdb,
+		Clients:       make(map[string]*clients.AccountConnectClient),
+		db:            accdb,
+		assetProvider: assetProvider,
 	}
 }
 
@@ -36,11 +40,11 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 
 	switch msg.AccountConnectMessageType {
 	case messages.TypeConnect:
-		return handler.handleConnect(ctx, client, msg)
+		return handler.handleConnect(ctx, client, r.db, msg)
 	case messages.TypeAuthorizeAccount:
 		return handler.handleAccountAuthorize(ctx, msg)
-	case messages.TypeHistorical:
-		return handler.handleHistoricalDeals(ctx, msg)
+	case messages.TypeHistoricalTrades:
+		return handler.handleHistoricalTrades(ctx, msg)
 	case messages.TypeTraderInfo:
 		return handler.handleTraderInfo(ctx, msg)
 	case messages.TypeTrendBars:
@@ -49,8 +53,20 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 		return handler.handleAccountSymbols(ctx, msg)
 	case messages.TypeDisconnect:
 		return handler.handleClientDisconnect(ctx)
-	case messages.TypeStream:
-		return handler.handleClientSubcribeToStream(ctx, msg)
+	case messages.TypeCandlestickStream:
+		return handler.handleCandlestickStream(ctx, msg)
+	case messages.TypeAccountOrders:
+		return handler.handleAccountOrders(ctx, msg)
+	case messages.TypeHistoricalTicks:
+		return handler.handleHistoricalTicks(ctx, msg)
+	case messages.TypeLiveTicks:
+		return handler.handleLiveTickStream(ctx, msg)
+	case messages.TypeDepthStream:
+		return handler.handleBookDepthStream(ctx, msg)
+	case messages.TypeOrderBookDepth:
+		return handler.handleOrderBookDepth(ctx, msg)
+	case messages.TypeBBOStream:
+		return handler.handleBBOStream(ctx, msg)
 
 	default:
 		return fmt.Errorf("unknown message type: %s", msg.AccountConnectMessageType)
@@ -58,7 +74,7 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 }
 
 // RequestHistoricalDeals requests  a trader's past trades from the underlying trading platform
-func (r *Router) RequestHistoricalDeals(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
+func (r *Router) RequestHistoricalTrades(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
 	var req messages.AccountConnectHistoricalDealsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -75,8 +91,26 @@ func (r *Router) RequestHistoricalDeals(ctx context.Context, platformadapter ada
 	return nil
 }
 
+// RequestAccountOrders requests  a trader's current  account pending orders
+func (r *Router) RequestAccountOrders(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectOrderPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal trader info payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetAccountOrders(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical deals: %v", err)
+		return err
+	}
+	return nil
+}
+
 // AuthorizeAccount performs  any neccessary account-specific authorization if required by the data provider API
-func (r *Router) AuthorizeAccount(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
+func (r *Router) AuthorizeAccount(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
 	var req messages.AccountConnectAuthorizeTradingAccountPayload
 	err := json.Unmarshal(payload, &req)
 	if err != nil {
@@ -94,8 +128,8 @@ func (r *Router) AuthorizeAccount(ctx context.Context, platformadapter adapters.
 }
 
 // RequestTraderInfo will request the trader's information if  supported by the trading platform's api
-func (r *Router) RequestTraderInfo(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
-	var req messages.AccountConnectTraderInfoPayload
+func (r *Router) RequestTraderInfo(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectAccountInfoPayload
 
 	err := json.Unmarshal(payload, &req)
 	if err != nil {
@@ -103,7 +137,7 @@ func (r *Router) RequestTraderInfo(ctx context.Context, platformadapter adapters
 		return err
 	}
 
-	err = platformadapter.GetTraderInfo(ctx, req)
+	err = platformadapter.GetAccountInfo(ctx, req)
 	if err != nil {
 		log.Printf("Failed to retreive trader info: %v", err)
 		return err
@@ -113,7 +147,7 @@ func (r *Router) RequestTraderInfo(ctx context.Context, platformadapter adapters
 }
 
 // RequestAccountSymbols will fetch all of the available trading symbols(tradable assets) for a given trading platform
-func (r *Router) RequestAccountSymbols(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
+func (r *Router) RequestAccountSymbols(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
 	var req messages.AccountConnectSymbolsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -131,7 +165,7 @@ func (r *Router) RequestAccountSymbols(ctx context.Context, platformadapter adap
 }
 
 // RequestTrendBars will request trendbars for a particular symbol(trading pair)
-func (r *Router) RequestTrendBars(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
+func (r *Router) RequestTrendBars(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
 	var req messages.AccountConnectTrendBarsPayload
 
 	err := json.Unmarshal(payload, &req)
@@ -140,9 +174,9 @@ func (r *Router) RequestTrendBars(ctx context.Context, platformadapter adapters.
 		return fmt.Errorf("failed to unmarshal account connect trend bars requests: %w", err)
 	}
 	trendBarArgs := messages.AccountConnectTrendBarsPayload{
-		SymbolId:      req.SymbolId,
+		// SymbolId:      req.SymbolId,
 		SymbolName:    req.SymbolName,
-		Ctid:          req.Ctid,
+		AccountID:     req.AccountID,
 		Period:        req.Period,
 		FromTimestamp: req.FromTimestamp,
 		ToTimestamp:   req.ToTimestamp,
@@ -157,30 +191,119 @@ func (r *Router) RequestTrendBars(ctx context.Context, platformadapter adapters.
 	return nil
 }
 
-// InitializeClientStream initializes a stream of messages to be sent through the specified channel
-func (r *Router) InitializeClientStream(ctx context.Context, platformadapter adapters.PlatformAdapter, payload json.RawMessage) error {
-	var req messages.AccountConnectStreamPayload
+// RequestCandlestickStream initializes a real-time candlestick/kline stream for a given symbol and interval
+func (r *Router) RequestCandlestickStream(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectCandlestickStreamPayload
 
 	err := json.Unmarshal(payload, &req)
 	if err != nil {
-		log.Printf("Failed to unmarshal account-connect stream request: %v", err)
-		return fmt.Errorf("failed to unmarshal account connect trend bars requests: %w", err)
+		log.Printf("Failed to unmarshal candlestick stream request: %v", err)
+		return fmt.Errorf("failed to unmarshal candlestick stream request: %w", err)
 	}
 
-	err = platformadapter.InitializeClientStream(ctx, req)
+	err = platformadapter.GetCandlestickStream(ctx, req)
 	if err != nil {
-		log.Printf("Failed to initialize client's stream: %v", err)
+		log.Printf("Failed to initialize candlestick stream: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (r *Router) RequestLiveTradesStream(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectTickDataPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal live tick stream request: %v", err)
+		return fmt.Errorf("failed to unmarshal live tick stream request: %w", err)
+	}
+
+	err = platformadapter.GetTickStream(ctx, req)
+	if err != nil {
+		log.Printf("Failed to initialize live tick stream: %v", err)
+		return err
+	}
+	return nil
+}
+
+// RequestHistoricalTicks requests a trader's historical tick (trade) data from the underlying trading platform
+func (r *Router) RequestHistoricalTicks(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectTickDataPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal tick data payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetHistoricalTicks(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical ticks: %v", err)
+		return err
+	}
+	return nil
+}
+
+// RequestOrderBookDepth requests a  book depth stream
+func (r *Router) RequestOrderBookDepth(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectDepthPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal tick data payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetOrderBookDepth(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical ticks: %v", err)
+		return err
+	}
+	return nil
+}
+
+// RequestOrderBookDepthStream requests a  book depth stream
+func (r *Router) RequestOrderBookDepthStream(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectDepthPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal tick data payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetDepthStream(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical ticks: %v", err)
+		return err
+	}
+	return nil
+}
+
+// RequestBBOStream requests a  book depth stream
+func (r *Router) RequestBBOStream(ctx context.Context, platformadapter adapters.ProvidersAdapter, payload json.RawMessage) error {
+	var req messages.AccountConnectBBOPayload
+
+	err := json.Unmarshal(payload, &req)
+	if err != nil {
+		log.Printf("Failed to unmarshal tick data payload request: %v", err)
+		return err
+	}
+
+	err = platformadapter.GetBBOStream(ctx, req)
+	if err != nil {
+		log.Printf("Failed to fetch account historical ticks: %v", err)
 		return err
 	}
 	return nil
 }
 
 // DisconnectPlatformConnection  handles graceful disconnection  of the underlying platform connection for the client
-func (r *Router) DisconnectPlatformConnection(ctx context.Context, platformadapter adapters.PlatformAdapter) error {
+func (r *Router) DisconnectPlatformConnection(ctx context.Context, platformadapter adapters.ProvidersAdapter) error {
 	return platformadapter.Disconnect(ctx)
 }
 
-func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *clients.AccountConnectClient, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *clients.AccountConnectClient, cache db.AccountConnectCache, msg messages.AccountConnectMsg) error {
 	var (
 		err error
 	)
@@ -188,9 +311,11 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *c
 
 	switch msg.Platform {
 	case messages.Binance:
-		_, err = h.handleBinanceConnect(ctx, accountConnClient, msg.Payload)
+		_, err = h.handleBinanceConnect(ctx, accountConnClient, cache, msg.Payload)
 	case messages.Ctrader:
 		_, err = h.handleCtraderConnect(ctx, accountConnClient, msg.Payload)
+	case messages.Alpaca:
+		_, err = h.handleAlpacaConnect(ctx, accountConnClient, msg.Payload)
 	default:
 		return fmt.Errorf("unsupported platform: %s", msg.Platform)
 	}
@@ -222,19 +347,29 @@ func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg message
 	return nil
 }
 
-// handleBinanceConnect will establish a connection to binance
 func (h *messageHandler) handleBinanceConnect(
 	ctx context.Context,
 	accountConnClient *clients.AccountConnectClient,
+	cache db.AccountConnectCache,
 	payload json.RawMessage,
-) (adapters.PlatformAdapter, error) {
+) (adapters.ProvidersAdapter, error) {
 	var binanceMsg messages.BinanceConnectPayload
 	if err := json.Unmarshal(payload, &binanceMsg); err != nil {
 		return nil, fmt.Errorf("invalid Binance payload: %w", err)
 	}
 
-	adapter := applications.NewBinanceAdapter(accountConnClient)
-	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{}); err != nil {
+	// if binanceMsg.AccountType == "" {
+	// 	return nil, fmt.Errorf("account_type is required for binance connection")
+	// }
+
+	adapter := providers.NewBinanceAdapter(accountConnClient, cache, h.router.assetProvider)
+	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
+		Binance: config.BinanceConfig{
+			ApiKey:      binanceMsg.APIKey,
+			SecretKey:   binanceMsg.APISecret,
+			AccountType: binanceMsg.AccountType,
+		},
+	}); err != nil {
 		return nil, err
 	}
 	accountConnClient.PlatformConns[messages.Binance] = adapter
@@ -246,7 +381,7 @@ func (h *messageHandler) handleCtraderConnect(
 	ctx context.Context,
 	accountConnClient *clients.AccountConnectClient,
 	payload json.RawMessage,
-) (adapters.PlatformAdapter, error) {
+) (adapters.ProvidersAdapter, error) {
 	var ctraderMsg messages.CTraderConnectPayload
 	if err := json.Unmarshal(payload, &ctraderMsg); err != nil {
 		return nil, fmt.Errorf("invalid cTrader payload: %w", err)
@@ -257,7 +392,7 @@ func (h *messageHandler) handleCtraderConnect(
 		ClientSecret: ctraderMsg.ClientSecret,
 		AccessToken:  ctraderMsg.AccessToken,
 	}
-	adapter := applications.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
+	adapter := providers.NewCtraderAdapter(h.router.db, accountConnClient, &cfg)
 	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
 		Ctrader: config.CtraderConfig{
 			ClientId:     ctraderMsg.ClientId,
@@ -272,6 +407,30 @@ func (h *messageHandler) handleCtraderConnect(
 	return adapter, nil
 }
 
+func (h *messageHandler) handleAlpacaConnect(
+	ctx context.Context,
+	accountConnClient *clients.AccountConnectClient,
+	payload json.RawMessage,
+) (adapters.ProvidersAdapter, error) {
+	var alpacaMsg messages.AlpacaConnectPayload
+	if err := json.Unmarshal(payload, &alpacaMsg); err != nil {
+		return nil, fmt.Errorf("invalid alpaca payload: %w", err)
+	}
+
+	adapter := providers.NewAlpacaAdapter(accountConnClient, h.router.assetProvider)
+	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
+		Alpaca: config.AlpacaConfig{
+			ApiKey:    alpacaMsg.APIKey,
+			SecretKey: alpacaMsg.APISecret,
+			Paper:     alpacaMsg.Paper,
+		},
+	}); err != nil {
+		return nil, err
+	}
+	accountConnClient.PlatformConns[messages.Alpaca] = adapter
+	return adapter, nil
+}
+
 func (h *messageHandler) handleClientDisconnect(ctx context.Context) error {
 	var disconnecterr error
 	client := h.client
@@ -283,10 +442,17 @@ func (h *messageHandler) handleClientDisconnect(ctx context.Context) error {
 		}
 	}
 
+	client.StreamsMutex.Lock()
+	for streamID, stream := range client.Streams {
+		close(stream)
+		delete(client.Streams, streamID)
+	}
+	client.StreamsMutex.Unlock()
+
 	return disconnecterr
 }
 
-func (h *messageHandler) handleHistoricalDeals(ctx context.Context, msg messages.AccountConnectMsg) error {
+func (h *messageHandler) handleHistoricalTrades(ctx context.Context, msg messages.AccountConnectMsg) error {
 	payload := msg.Payload
 	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 
@@ -300,7 +466,24 @@ func (h *messageHandler) handleHistoricalDeals(ctx context.Context, msg messages
 		return err
 	}
 
-	return h.router.RequestHistoricalDeals(ctx, platformadapter, payload)
+	return h.router.RequestHistoricalTrades(ctx, platformadapter, payload)
+}
+
+func (h *messageHandler) handleAccountOrders(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	return h.router.RequestAccountOrders(ctx, platformadapter, payload)
 }
 
 func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.AccountConnectMsg) error {
@@ -322,26 +505,6 @@ func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.Acco
 		return h.writeErrorResponse(messages.TypeTraderInfo, err)
 	}
 
-	return nil
-}
-
-func (h *messageHandler) handleClientSubcribeToStream(ctx context.Context, msg messages.AccountConnectMsg) error {
-	payload := msg.Payload
-	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
-
-	err := h.getClient(msg)
-	if err != nil {
-		return err
-	}
-
-	platformadapter, err := h.getAdapter(msg)
-	if err != nil {
-		return err
-	}
-
-	if err := h.router.InitializeClientStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTraderInfo, err)
-	}
 	return nil
 }
 
@@ -385,6 +548,125 @@ func (h *messageHandler) handleAccountSymbols(ctx context.Context, msg messages.
 	return nil
 }
 
+func (h *messageHandler) handleCandlestickStream(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	if err := h.getClient(msg); err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestCandlestickStream(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeCandlestickStream, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleHistoricalTicks(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestHistoricalTicks(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeHistoricalTicks, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleLiveTickStream(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestLiveTradesStream(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleOrderBookDepth(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestOrderBookDepth(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleBookDepthStream(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestOrderBookDepthStream(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+	}
+	return nil
+}
+
+func (h *messageHandler) handleBBOStream(ctx context.Context, msg messages.AccountConnectMsg) error {
+	payload := msg.Payload
+	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
+
+	err := h.getClient(msg)
+	if err != nil {
+		return err
+	}
+
+	platformadapter, err := h.getAdapter(msg)
+	if err != nil {
+		return err
+	}
+
+	if err := h.router.RequestBBOStream(ctx, platformadapter, payload); err != nil {
+		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+	}
+	return nil
+}
+
 func (h *messageHandler) writeErrorResponse(msgType messages.MessageType, err error) error {
 	accErr := messages.AccountConnectError{
 		Description: err.Error(),
@@ -423,7 +705,7 @@ func (h *messageHandler) getClient(msg messages.AccountConnectMsg) error {
 	return nil
 }
 
-func (h *messageHandler) getAdapter(msg messages.AccountConnectMsg) (adapters.PlatformAdapter, error) {
+func (h *messageHandler) getAdapter(msg messages.AccountConnectMsg) (adapters.ProvidersAdapter, error) {
 	adapter, ok := h.client.PlatformConns[msg.Platform]
 	if !ok {
 		return nil, fmt.Errorf("no adapter for platform %s on client %s", msg.Platform, h.client.ID)

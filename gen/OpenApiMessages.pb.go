@@ -25,8 +25,8 @@ const (
 type ProtoOAApplicationAuthReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2100" json:"payloadType,omitempty"`
-	ClientId      *string                `protobuf:"bytes,2,req,name=clientId" json:"clientId,omitempty"`         //The unique Client ID provided during the registration.
-	ClientSecret  *string                `protobuf:"bytes,3,req,name=clientSecret" json:"clientSecret,omitempty"` //The unique Client Secret provided during the registration
+	ClientId      *string                `protobuf:"bytes,2,req,name=clientId" json:"clientId,omitempty"`         // The unique Client ID provided during the registration.
+	ClientSecret  *string                `protobuf:"bytes,3,req,name=clientSecret" json:"clientSecret,omitempty"` // The unique Client Secret provided during the registration.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,37 +137,35 @@ func (x *ProtoOAApplicationAuthRes) GetPayloadType() ProtoOAPayloadType {
 	return Default_ProtoOAApplicationAuthRes_PayloadType
 }
 
-// * Request for getting Trader's deals historical data (execution details).
-type ProtoOADealListReq struct {
+// * Request for authorizing of the trading account session. Requires established authorized connection with the client application using ProtoOAApplicationAuthReq.
+type ProtoOAAccountAuthReq struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2133" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	FromTimestamp       *int64                 `protobuf:"varint,3,req,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The UNIX time from which the search starts >=0 (1-1-1970). Validation: toTimestamp - fromTimestamp <= 604800000 (1 week).
-	ToTimestamp         *int64                 `protobuf:"varint,4,req,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The UNIX time where to stop searching <= 2147483646000 (19-1-2038).
-	MaxRows             *int32                 `protobuf:"varint,5,opt,name=maxRows" json:"maxRows,omitempty"`                         // The maximum number of the deals to return.
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2102" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	AccessToken         *string                `protobuf:"bytes,3,req,name=accessToken" json:"accessToken,omitempty"`                  // The Access Token issued for providing access to the Trader's Account.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOADealListReq fields.
+// Default values for ProtoOAAccountAuthReq fields.
 const (
-	Default_ProtoOADealListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_REQ
+	Default_ProtoOAAccountAuthReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_REQ
 )
 
-func (x *ProtoOADealListReq) Reset() {
-	*x = ProtoOADealListReq{}
+func (x *ProtoOAAccountAuthReq) Reset() {
+	*x = ProtoOAAccountAuthReq{}
 	mi := &file_OpenApiMessages_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOADealListReq) String() string {
+func (x *ProtoOAAccountAuthReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOADealListReq) ProtoMessage() {}
+func (*ProtoOAAccountAuthReq) ProtoMessage() {}
 
-func (x *ProtoOADealListReq) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAAccountAuthReq) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -179,76 +177,60 @@ func (x *ProtoOADealListReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOADealListReq.ProtoReflect.Descriptor instead.
-func (*ProtoOADealListReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAAccountAuthReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountAuthReq) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ProtoOADealListReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAAccountAuthReq) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOADealListReq_PayloadType
+	return Default_ProtoOAAccountAuthReq_PayloadType
 }
 
-func (x *ProtoOADealListReq) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAAccountAuthReq) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOADealListReq) GetFromTimestamp() int64 {
-	if x != nil && x.FromTimestamp != nil {
-		return *x.FromTimestamp
+func (x *ProtoOAAccountAuthReq) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
 	}
-	return 0
+	return ""
 }
 
-func (x *ProtoOADealListReq) GetToTimestamp() int64 {
-	if x != nil && x.ToTimestamp != nil {
-		return *x.ToTimestamp
-	}
-	return 0
-}
-
-func (x *ProtoOADealListReq) GetMaxRows() int32 {
-	if x != nil && x.MaxRows != nil {
-		return *x.MaxRows
-	}
-	return 0
-}
-
-// * The response to the ProtoOADealListRes request.
-type ProtoOADealListRes struct {
+// * Response to the ProtoOAApplicationAuthRes request.
+type ProtoOAAccountAuthRes struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2134" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Deal                []*ProtoOADeal         `protobuf:"bytes,3,rep,name=deal" json:"deal,omitempty"`                                // The list of the deals.
-	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2103" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOADealListRes fields.
+// Default values for ProtoOAAccountAuthRes fields.
 const (
-	Default_ProtoOADealListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES
+	Default_ProtoOAAccountAuthRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES
 )
 
-func (x *ProtoOADealListRes) Reset() {
-	*x = ProtoOADealListRes{}
+func (x *ProtoOAAccountAuthRes) Reset() {
+	*x = ProtoOAAccountAuthRes{}
 	mi := &file_OpenApiMessages_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOADealListRes) String() string {
+func (x *ProtoOAAccountAuthRes) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOADealListRes) ProtoMessage() {}
+func (*ProtoOAAccountAuthRes) ProtoMessage() {}
 
-func (x *ProtoOADealListRes) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAAccountAuthRes) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -260,47 +242,34 @@ func (x *ProtoOADealListRes) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOADealListRes.ProtoReflect.Descriptor instead.
-func (*ProtoOADealListRes) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAAccountAuthRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountAuthRes) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ProtoOADealListRes) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAAccountAuthRes) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOADealListRes_PayloadType
+	return Default_ProtoOAAccountAuthRes_PayloadType
 }
 
-func (x *ProtoOADealListRes) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAAccountAuthRes) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
-}
-
-func (x *ProtoOADealListRes) GetDeal() []*ProtoOADeal {
-	if x != nil {
-		return x.Deal
-	}
-	return nil
-}
-
-func (x *ProtoOADealListRes) GetHasMore() bool {
-	if x != nil && x.HasMore != nil {
-		return *x.HasMore
-	}
-	return false
 }
 
 // * Generic response when an ERROR occurred.
 type ProtoOAErrorRes struct {
 	state                   protoimpl.MessageState `protogen:"open.v1"`
 	PayloadType             *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2142" json:"payloadType,omitempty"`
-	CtidTraderAccountId     *int64                 `protobuf:"varint,2,opt,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`         //The unique identifier of the trader's account in cTrader platform.
+	CtidTraderAccountId     *int64                 `protobuf:"varint,2,opt,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`         // The unique identifier of the trader's account in cTrader platform.
 	ErrorCode               *string                `protobuf:"bytes,3,req,name=errorCode" json:"errorCode,omitempty"`                              // The name of the ProtoErrorCode or the other custom ErrorCodes (e.g. ProtoCHErrorCode).
 	Description             *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`                          // The error description.
-	MaintenanceEndTimestamp *int64                 `protobuf:"varint,5,opt,name=maintenanceEndTimestamp" json:"maintenanceEndTimestamp,omitempty"` // The timestamp in seconds when the current maintenance session will be ended.
+	MaintenanceEndTimestamp *int64                 `protobuf:"varint,5,opt,name=maintenanceEndTimestamp" json:"maintenanceEndTimestamp,omitempty"` // The Unix time in seconds when the current maintenance session will be ended.
+	RetryAfter              *uint64                `protobuf:"varint,6,opt,name=retryAfter" json:"retryAfter,omitempty"`                           // When you hit rate limit with errorCode=BLOCKED_PAYLOAD_TYPE, this field will contain amount of seconds until related payload type will be unlocked.
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -375,34 +344,41 @@ func (x *ProtoOAErrorRes) GetMaintenanceEndTimestamp() int64 {
 	return 0
 }
 
-// * Request for getting data of Trader's Account.
-type ProtoOATraderReq struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2121" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+func (x *ProtoOAErrorRes) GetRetryAfter() uint64 {
+	if x != nil && x.RetryAfter != nil {
+		return *x.RetryAfter
+	}
+	return 0
 }
 
-// Default values for ProtoOATraderReq fields.
+// * Event that is sent when the connection with the client application is cancelled by the server. All the sessions for the traders' accounts will be terminated.
+type ProtoOAClientDisconnectEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2148" json:"payloadType,omitempty"`
+	Reason        *string                `protobuf:"bytes,2,opt,name=reason" json:"reason,omitempty"` // The disconnection reason explained. For example: The application access was blocked by cTrader Administrator.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAClientDisconnectEvent fields.
 const (
-	Default_ProtoOATraderReq_PayloadType = ProtoOAPayloadType_PROTO_OA_TRADER_REQ
+	Default_ProtoOAClientDisconnectEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_CLIENT_DISCONNECT_EVENT
 )
 
-func (x *ProtoOATraderReq) Reset() {
-	*x = ProtoOATraderReq{}
+func (x *ProtoOAClientDisconnectEvent) Reset() {
+	*x = ProtoOAClientDisconnectEvent{}
 	mi := &file_OpenApiMessages_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOATraderReq) String() string {
+func (x *ProtoOAClientDisconnectEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOATraderReq) ProtoMessage() {}
+func (*ProtoOAClientDisconnectEvent) ProtoMessage() {}
 
-func (x *ProtoOATraderReq) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAClientDisconnectEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -414,54 +390,54 @@ func (x *ProtoOATraderReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOATraderReq.ProtoReflect.Descriptor instead.
-func (*ProtoOATraderReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAClientDisconnectEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAClientDisconnectEvent) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ProtoOATraderReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAClientDisconnectEvent) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOATraderReq_PayloadType
+	return Default_ProtoOAClientDisconnectEvent_PayloadType
 }
 
-func (x *ProtoOATraderReq) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
+func (x *ProtoOAClientDisconnectEvent) GetReason() string {
+	if x != nil && x.Reason != nil {
+		return *x.Reason
 	}
-	return 0
+	return ""
 }
 
-// * Response to the ProtoOATraderReq request.
-type ProtoOATraderRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2122" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Trader              *ProtoOATrader         `protobuf:"bytes,3,req,name=trader" json:"trader,omitempty"`                            // The Trader account information.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+// * Event that is sent when a session to a specific trader's account is terminated by the server but the existing connections with the other trader's accounts are maintained. Reasons to trigger: account was deleted, cTID was deleted, token was refreshed, token was revoked.
+type ProtoOAAccountsTokenInvalidatedEvent struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType          *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2147" json:"payloadType,omitempty"`
+	CtidTraderAccountIds []int64                `protobuf:"varint,2,rep,name=ctidTraderAccountIds" json:"ctidTraderAccountIds,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	Reason               *string                `protobuf:"bytes,3,opt,name=reason" json:"reason,omitempty"`                              // The disconnection reason explained. For example: Access Token is expired or recalled.
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
-// Default values for ProtoOATraderRes fields.
+// Default values for ProtoOAAccountsTokenInvalidatedEvent fields.
 const (
-	Default_ProtoOATraderRes_PayloadType = ProtoOAPayloadType_PROTO_OA_TRADER_RES
+	Default_ProtoOAAccountsTokenInvalidatedEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNTS_TOKEN_INVALIDATED_EVENT
 )
 
-func (x *ProtoOATraderRes) Reset() {
-	*x = ProtoOATraderRes{}
+func (x *ProtoOAAccountsTokenInvalidatedEvent) Reset() {
+	*x = ProtoOAAccountsTokenInvalidatedEvent{}
 	mi := &file_OpenApiMessages_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOATraderRes) String() string {
+func (x *ProtoOAAccountsTokenInvalidatedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOATraderRes) ProtoMessage() {}
+func (*ProtoOAAccountsTokenInvalidatedEvent) ProtoMessage() {}
 
-func (x *ProtoOATraderRes) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAAccountsTokenInvalidatedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -473,60 +449,59 @@ func (x *ProtoOATraderRes) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOATraderRes.ProtoReflect.Descriptor instead.
-func (*ProtoOATraderRes) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAAccountsTokenInvalidatedEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountsTokenInvalidatedEvent) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ProtoOATraderRes) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAAccountsTokenInvalidatedEvent) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOATraderRes_PayloadType
+	return Default_ProtoOAAccountsTokenInvalidatedEvent_PayloadType
 }
 
-func (x *ProtoOATraderRes) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-func (x *ProtoOATraderRes) GetTrader() *ProtoOATrader {
+func (x *ProtoOAAccountsTokenInvalidatedEvent) GetCtidTraderAccountIds() []int64 {
 	if x != nil {
-		return x.Trader
+		return x.CtidTraderAccountIds
 	}
 	return nil
 }
 
-// * Request for getting the list of granted trader's account for the access token.
-type ProtoOAGetAccountListByAccessTokenReq struct {
+func (x *ProtoOAAccountsTokenInvalidatedEvent) GetReason() string {
+	if x != nil && x.Reason != nil {
+		return *x.Reason
+	}
+	return ""
+}
+
+// * Request for getting the proxy version. Can be used to check the current version of the Open API scheme.
+type ProtoOAVersionReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2149" json:"payloadType,omitempty"`
-	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"` // The Access Token issued for providing access to the Trader's Account.
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2104" json:"payloadType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-// Default values for ProtoOAGetAccountListByAccessTokenReq fields.
+// Default values for ProtoOAVersionReq fields.
 const (
-	Default_ProtoOAGetAccountListByAccessTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ
+	Default_ProtoOAVersionReq_PayloadType = ProtoOAPayloadType_PROTO_OA_VERSION_REQ
 )
 
-func (x *ProtoOAGetAccountListByAccessTokenReq) Reset() {
-	*x = ProtoOAGetAccountListByAccessTokenReq{}
+func (x *ProtoOAVersionReq) Reset() {
+	*x = ProtoOAVersionReq{}
 	mi := &file_OpenApiMessages_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenReq) String() string {
+func (x *ProtoOAVersionReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAGetAccountListByAccessTokenReq) ProtoMessage() {}
+func (*ProtoOAVersionReq) ProtoMessage() {}
 
-func (x *ProtoOAGetAccountListByAccessTokenReq) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAVersionReq) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -538,55 +513,46 @@ func (x *ProtoOAGetAccountListByAccessTokenReq) ProtoReflect() protoreflect.Mess
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAGetAccountListByAccessTokenReq.ProtoReflect.Descriptor instead.
-func (*ProtoOAGetAccountListByAccessTokenReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAVersionReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAVersionReq) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAVersionReq) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAGetAccountListByAccessTokenReq_PayloadType
+	return Default_ProtoOAVersionReq_PayloadType
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenReq) GetAccessToken() string {
-	if x != nil && x.AccessToken != nil {
-		return *x.AccessToken
-	}
-	return ""
+// * Response to the ProtoOAVersionReq request.
+type ProtoOAVersionRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2105" json:"payloadType,omitempty"`
+	Version       *string                `protobuf:"bytes,2,req,name=version" json:"version,omitempty"` // The current version of the server application.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-// * Response to the ProtoOAGetAccountListByAccessTokenReq request.
-type ProtoOAGetAccountListByAccessTokenRes struct {
-	state             protoimpl.MessageState        `protogen:"open.v1"`
-	PayloadType       *ProtoOAPayloadType           `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2150" json:"payloadType,omitempty"`
-	AccessToken       *string                       `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"`                                                     // The Access Token issued for providing access to the Trader's Account.
-	PermissionScope   *ProtoOAClientPermissionScope `protobuf:"varint,3,opt,name=permissionScope,enum=messages.ProtoOAClientPermissionScope" json:"permissionScope,omitempty"` // SCOPE_VIEW, SCOPE_TRADE.
-	CtidTraderAccount []*ProtoOACtidTraderAccount   `protobuf:"bytes,4,rep,name=ctidTraderAccount" json:"ctidTraderAccount,omitempty"`                                         // The list of the accounts.
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-// Default values for ProtoOAGetAccountListByAccessTokenRes fields.
+// Default values for ProtoOAVersionRes fields.
 const (
-	Default_ProtoOAGetAccountListByAccessTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES
+	Default_ProtoOAVersionRes_PayloadType = ProtoOAPayloadType_PROTO_OA_VERSION_RES
 )
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) Reset() {
-	*x = ProtoOAGetAccountListByAccessTokenRes{}
+func (x *ProtoOAVersionRes) Reset() {
+	*x = ProtoOAVersionRes{}
 	mi := &file_OpenApiMessages_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) String() string {
+func (x *ProtoOAVersionRes) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAGetAccountListByAccessTokenRes) ProtoMessage() {}
+func (*ProtoOAVersionRes) ProtoMessage() {}
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) ProtoReflect() protoreflect.Message {
+func (x *ProtoOAVersionRes) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -598,72 +564,76 @@ func (x *ProtoOAGetAccountListByAccessTokenRes) ProtoReflect() protoreflect.Mess
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAGetAccountListByAccessTokenRes.ProtoReflect.Descriptor instead.
-func (*ProtoOAGetAccountListByAccessTokenRes) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOAVersionRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAVersionRes) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAVersionRes) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAGetAccountListByAccessTokenRes_PayloadType
+	return Default_ProtoOAVersionRes_PayloadType
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) GetAccessToken() string {
-	if x != nil && x.AccessToken != nil {
-		return *x.AccessToken
+func (x *ProtoOAVersionRes) GetVersion() string {
+	if x != nil && x.Version != nil {
+		return *x.Version
 	}
 	return ""
 }
 
-func (x *ProtoOAGetAccountListByAccessTokenRes) GetPermissionScope() ProtoOAClientPermissionScope {
-	if x != nil && x.PermissionScope != nil {
-		return *x.PermissionScope
-	}
-	return ProtoOAClientPermissionScope_SCOPE_VIEW
-}
-
-func (x *ProtoOAGetAccountListByAccessTokenRes) GetCtidTraderAccount() []*ProtoOACtidTraderAccount {
-	if x != nil {
-		return x.CtidTraderAccount
-	}
-	return nil
-}
-
-// * Request for getting historical trend bars for the symbol.
-type ProtoOAGetTrendbarsReq struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2137" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	FromTimestamp       *int64                 `protobuf:"varint,3,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`                       // The Unix time in milliseconds from which the search starts. Must be bigger or equal to zero (1st Jan 1970).
-	ToTimestamp         *int64                 `protobuf:"varint,4,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                           // The Unix time in milliseconds of finishing the search. Smaller or equal to 2147483646000 (19th Jan 2038).
-	Period              *ProtoOATrendbarPeriod `protobuf:"varint,5,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
-	SymbolId            *int64                 `protobuf:"varint,6,req,name=symbolId" json:"symbolId,omitempty"`                                 // Unique identifier of the Symbol in cTrader platform.
-	Count               *uint32                `protobuf:"varint,7,opt,name=count" json:"count,omitempty"`                                       // Limit number of trend bars in response back from toTimestamp.
+// * Request for sending a new trading order. Allowed only if the accessToken has the "trade" permissions for the trading account.
+type ProtoOANewOrderReq struct {
+	state               protoimpl.MessageState     `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType        `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2106" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                     `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`                                            // The unique identifier of the trader's account in cTrader platform.
+	SymbolId            *int64                     `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                                                                  // The unique identifier of a symbol in cTrader platform.
+	OrderType           *ProtoOAOrderType          `protobuf:"varint,4,req,name=orderType,enum=messages.ProtoOAOrderType" json:"orderType,omitempty"`                                 // The type of an order - MARKET, LIMIT, STOP, MARKET_RANGE, STOP_LIMIT.
+	TradeSide           *ProtoOATradeSide          `protobuf:"varint,5,req,name=tradeSide,enum=messages.ProtoOATradeSide" json:"tradeSide,omitempty"`                                 // The trade direction - BUY or SELL.
+	Volume              *int64                     `protobuf:"varint,6,req,name=volume" json:"volume,omitempty"`                                                                      // The volume represented in 0.01 of a unit (e.g. 1000 in protocol means 10.00 units).
+	LimitPrice          *float64                   `protobuf:"fixed64,7,opt,name=limitPrice" json:"limitPrice,omitempty"`                                                             // The limit price, can be specified for the LIMIT order only.
+	StopPrice           *float64                   `protobuf:"fixed64,8,opt,name=stopPrice" json:"stopPrice,omitempty"`                                                               // Stop Price, can be specified for the STOP and the STOP_LIMIT orders only.
+	TimeInForce         *ProtoOATimeInForce        `protobuf:"varint,9,opt,name=timeInForce,enum=messages.ProtoOATimeInForce,def=2" json:"timeInForce,omitempty"`                     // The specific order execution or expiration instruction - GOOD_TILL_DATE, GOOD_TILL_CANCEL, IMMEDIATE_OR_CANCEL, FILL_OR_KILL, MARKET_ON_OPEN.
+	ExpirationTimestamp *int64                     `protobuf:"varint,10,opt,name=expirationTimestamp" json:"expirationTimestamp,omitempty"`                                           // The Unix time in milliseconds of Order expiration. Should be set for the Good Till Date orders.
+	StopLoss            *float64                   `protobuf:"fixed64,11,opt,name=stopLoss" json:"stopLoss,omitempty"`                                                                // The absolute Stop Loss price (1.23456 for example). Not supported for MARKET orders.
+	TakeProfit          *float64                   `protobuf:"fixed64,12,opt,name=takeProfit" json:"takeProfit,omitempty"`                                                            // The absolute Take Profit price (1.23456 for example). Unsupported for MARKET orders.
+	Comment             *string                    `protobuf:"bytes,13,opt,name=comment" json:"comment,omitempty"`                                                                    // User-specified comment. MaxLength = 512.
+	BaseSlippagePrice   *float64                   `protobuf:"fixed64,14,opt,name=baseSlippagePrice" json:"baseSlippagePrice,omitempty"`                                              // Base price to calculate relative slippage price for MARKET_RANGE order.
+	SlippageInPoints    *int32                     `protobuf:"varint,15,opt,name=slippageInPoints" json:"slippageInPoints,omitempty"`                                                 // Slippage distance for MARKET_RANGE and STOP_LIMIT order.
+	Label               *string                    `protobuf:"bytes,16,opt,name=label" json:"label,omitempty"`                                                                        // User-specified label. MaxLength = 100.
+	PositionId          *int64                     `protobuf:"varint,17,opt,name=positionId" json:"positionId,omitempty"`                                                             // Reference to the existing position if the Order is intended to modify it.
+	ClientOrderId       *string                    `protobuf:"bytes,18,opt,name=clientOrderId" json:"clientOrderId,omitempty"`                                                        // Optional user-specific clientOrderId (similar to FIX ClOrderID). MaxLength = 50.
+	RelativeStopLoss    *int64                     `protobuf:"varint,19,opt,name=relativeStopLoss" json:"relativeStopLoss,omitempty"`                                                 // Relative Stop Loss that can be specified instead of the absolute as one. Specified in 1/100000 of unit of a price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782) For BUY stopLoss = entryPrice - relativeStopLoss, for SELL stopLoss = entryPrice + relativeStopLoss.
+	RelativeTakeProfit  *int64                     `protobuf:"varint,20,opt,name=relativeTakeProfit" json:"relativeTakeProfit,omitempty"`                                             // Relative Take Profit that can be specified instead of the absolute one. Specified in 1/100000 of unit of a price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782) For BUY takeProfit = entryPrice + relativeTakeProfit, for SELL takeProfit = entryPrice - relativeTakeProfit.
+	GuaranteedStopLoss  *bool                      `protobuf:"varint,21,opt,name=guaranteedStopLoss" json:"guaranteedStopLoss,omitempty"`                                             // If TRUE then stopLoss is guaranteed. Required to be set to TRUE for the Limited Risk accounts (ProtoOATrader.isLimitedRisk=true).
+	TrailingStopLoss    *bool                      `protobuf:"varint,22,opt,name=trailingStopLoss" json:"trailingStopLoss,omitempty"`                                                 // If TRUE then the Stop Loss is Trailing.
+	StopTriggerMethod   *ProtoOAOrderTriggerMethod `protobuf:"varint,23,opt,name=stopTriggerMethod,enum=messages.ProtoOAOrderTriggerMethod,def=1" json:"stopTriggerMethod,omitempty"` // Trigger method for the STOP or the STOP_LIMIT pending order.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOAGetTrendbarsReq fields.
+// Default values for ProtoOANewOrderReq fields.
 const (
-	Default_ProtoOAGetTrendbarsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_REQ
+	Default_ProtoOANewOrderReq_PayloadType       = ProtoOAPayloadType_PROTO_OA_NEW_ORDER_REQ
+	Default_ProtoOANewOrderReq_TimeInForce       = ProtoOATimeInForce_GOOD_TILL_CANCEL
+	Default_ProtoOANewOrderReq_StopTriggerMethod = ProtoOAOrderTriggerMethod_TRADE
 )
 
-func (x *ProtoOAGetTrendbarsReq) Reset() {
-	*x = ProtoOAGetTrendbarsReq{}
+func (x *ProtoOANewOrderReq) Reset() {
+	*x = ProtoOANewOrderReq{}
 	mi := &file_OpenApiMessages_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAGetTrendbarsReq) String() string {
+func (x *ProtoOANewOrderReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAGetTrendbarsReq) ProtoMessage() {}
+func (*ProtoOANewOrderReq) ProtoMessage() {}
 
-func (x *ProtoOAGetTrendbarsReq) ProtoReflect() protoreflect.Message {
+func (x *ProtoOANewOrderReq) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -675,190 +645,209 @@ func (x *ProtoOAGetTrendbarsReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAGetTrendbarsReq.ProtoReflect.Descriptor instead.
-func (*ProtoOAGetTrendbarsReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOANewOrderReq.ProtoReflect.Descriptor instead.
+func (*ProtoOANewOrderReq) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *ProtoOAGetTrendbarsReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOANewOrderReq) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAGetTrendbarsReq_PayloadType
+	return Default_ProtoOANewOrderReq_PayloadType
 }
 
-func (x *ProtoOAGetTrendbarsReq) GetCtidTraderAccountId() int64 {
+func (x *ProtoOANewOrderReq) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOAGetTrendbarsReq) GetFromTimestamp() int64 {
-	if x != nil && x.FromTimestamp != nil {
-		return *x.FromTimestamp
-	}
-	return 0
-}
-
-func (x *ProtoOAGetTrendbarsReq) GetToTimestamp() int64 {
-	if x != nil && x.ToTimestamp != nil {
-		return *x.ToTimestamp
-	}
-	return 0
-}
-
-func (x *ProtoOAGetTrendbarsReq) GetPeriod() ProtoOATrendbarPeriod {
-	if x != nil && x.Period != nil {
-		return *x.Period
-	}
-	return ProtoOATrendbarPeriod_M1
-}
-
-func (x *ProtoOAGetTrendbarsReq) GetSymbolId() int64 {
+func (x *ProtoOANewOrderReq) GetSymbolId() int64 {
 	if x != nil && x.SymbolId != nil {
 		return *x.SymbolId
 	}
 	return 0
 }
 
-func (x *ProtoOAGetTrendbarsReq) GetCount() uint32 {
-	if x != nil && x.Count != nil {
-		return *x.Count
+func (x *ProtoOANewOrderReq) GetOrderType() ProtoOAOrderType {
+	if x != nil && x.OrderType != nil {
+		return *x.OrderType
+	}
+	return ProtoOAOrderType_MARKET
+}
+
+func (x *ProtoOANewOrderReq) GetTradeSide() ProtoOATradeSide {
+	if x != nil && x.TradeSide != nil {
+		return *x.TradeSide
+	}
+	return ProtoOATradeSide_BUY
+}
+
+func (x *ProtoOANewOrderReq) GetVolume() int64 {
+	if x != nil && x.Volume != nil {
+		return *x.Volume
 	}
 	return 0
 }
 
-// * Response to the ProtoOAGetTrendbarsReq request.
-type ProtoOAGetTrendbarsRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2138" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Period              *ProtoOATrendbarPeriod `protobuf:"varint,3,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
-	// Deprecated: Marked as deprecated in OpenApiMessages.proto.
-	Timestamp     *int64             `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"` // Simply don't use this field, as your original request already contains toTimestamp.
-	Trendbar      []*ProtoOATrendbar `protobuf:"bytes,5,rep,name=trendbar" json:"trendbar,omitempty"`    // The list of trend bars.
-	SymbolId      *int64             `protobuf:"varint,6,opt,name=symbolId" json:"symbolId,omitempty"`   // Unique identifier of the Symbol in cTrader platform.
-	HasMore       *bool              `protobuf:"varint,7,opt,name=hasMore" json:"hasMore,omitempty"`     // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-// Default values for ProtoOAGetTrendbarsRes fields.
-const (
-	Default_ProtoOAGetTrendbarsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES
-)
-
-func (x *ProtoOAGetTrendbarsRes) Reset() {
-	*x = ProtoOAGetTrendbarsRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOAGetTrendbarsRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOAGetTrendbarsRes) ProtoMessage() {}
-
-func (x *ProtoOAGetTrendbarsRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOAGetTrendbarsRes.ProtoReflect.Descriptor instead.
-func (*ProtoOAGetTrendbarsRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *ProtoOAGetTrendbarsRes) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOAGetTrendbarsRes_PayloadType
-}
-
-func (x *ProtoOAGetTrendbarsRes) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
+func (x *ProtoOANewOrderReq) GetLimitPrice() float64 {
+	if x != nil && x.LimitPrice != nil {
+		return *x.LimitPrice
 	}
 	return 0
 }
 
-func (x *ProtoOAGetTrendbarsRes) GetPeriod() ProtoOATrendbarPeriod {
-	if x != nil && x.Period != nil {
-		return *x.Period
-	}
-	return ProtoOATrendbarPeriod_M1
-}
-
-// Deprecated: Marked as deprecated in OpenApiMessages.proto.
-func (x *ProtoOAGetTrendbarsRes) GetTimestamp() int64 {
-	if x != nil && x.Timestamp != nil {
-		return *x.Timestamp
+func (x *ProtoOANewOrderReq) GetStopPrice() float64 {
+	if x != nil && x.StopPrice != nil {
+		return *x.StopPrice
 	}
 	return 0
 }
 
-func (x *ProtoOAGetTrendbarsRes) GetTrendbar() []*ProtoOATrendbar {
-	if x != nil {
-		return x.Trendbar
+func (x *ProtoOANewOrderReq) GetTimeInForce() ProtoOATimeInForce {
+	if x != nil && x.TimeInForce != nil {
+		return *x.TimeInForce
 	}
-	return nil
+	return Default_ProtoOANewOrderReq_TimeInForce
 }
 
-func (x *ProtoOAGetTrendbarsRes) GetSymbolId() int64 {
-	if x != nil && x.SymbolId != nil {
-		return *x.SymbolId
+func (x *ProtoOANewOrderReq) GetExpirationTimestamp() int64 {
+	if x != nil && x.ExpirationTimestamp != nil {
+		return *x.ExpirationTimestamp
 	}
 	return 0
 }
 
-func (x *ProtoOAGetTrendbarsRes) GetHasMore() bool {
-	if x != nil && x.HasMore != nil {
-		return *x.HasMore
+func (x *ProtoOANewOrderReq) GetStopLoss() float64 {
+	if x != nil && x.StopLoss != nil {
+		return *x.StopLoss
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetTakeProfit() float64 {
+	if x != nil && x.TakeProfit != nil {
+		return *x.TakeProfit
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetComment() string {
+	if x != nil && x.Comment != nil {
+		return *x.Comment
+	}
+	return ""
+}
+
+func (x *ProtoOANewOrderReq) GetBaseSlippagePrice() float64 {
+	if x != nil && x.BaseSlippagePrice != nil {
+		return *x.BaseSlippagePrice
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetSlippageInPoints() int32 {
+	if x != nil && x.SlippageInPoints != nil {
+		return *x.SlippageInPoints
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetLabel() string {
+	if x != nil && x.Label != nil {
+		return *x.Label
+	}
+	return ""
+}
+
+func (x *ProtoOANewOrderReq) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetClientOrderId() string {
+	if x != nil && x.ClientOrderId != nil {
+		return *x.ClientOrderId
+	}
+	return ""
+}
+
+func (x *ProtoOANewOrderReq) GetRelativeStopLoss() int64 {
+	if x != nil && x.RelativeStopLoss != nil {
+		return *x.RelativeStopLoss
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetRelativeTakeProfit() int64 {
+	if x != nil && x.RelativeTakeProfit != nil {
+		return *x.RelativeTakeProfit
+	}
+	return 0
+}
+
+func (x *ProtoOANewOrderReq) GetGuaranteedStopLoss() bool {
+	if x != nil && x.GuaranteedStopLoss != nil {
+		return *x.GuaranteedStopLoss
 	}
 	return false
 }
 
-// * Request for the authorizing trading account session. Requires established authorized connection with the client application using ProtoOAApplicationAuthReq.
-type ProtoOAAccountAuthReq struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2102" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
-	AccessToken         *string                `protobuf:"bytes,3,req,name=accessToken" json:"accessToken,omitempty"`                  // The Access Token issued for providing access to the Trader's Account.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+func (x *ProtoOANewOrderReq) GetTrailingStopLoss() bool {
+	if x != nil && x.TrailingStopLoss != nil {
+		return *x.TrailingStopLoss
+	}
+	return false
 }
 
-// Default values for ProtoOAAccountAuthReq fields.
+func (x *ProtoOANewOrderReq) GetStopTriggerMethod() ProtoOAOrderTriggerMethod {
+	if x != nil && x.StopTriggerMethod != nil {
+		return *x.StopTriggerMethod
+	}
+	return Default_ProtoOANewOrderReq_StopTriggerMethod
+}
+
+// * Event that is sent following the successful order acceptance or execution by the server. Acts as response to the ProtoOANewOrderReq, ProtoOACancelOrderReq, ProtoOAAmendOrderReq, ProtoOAAmendPositionSLTPReq, ProtoOAClosePositionReq requests. Also, the event is sent when a Deposit/Withdrawal took place.
+type ProtoOAExecutionEvent struct {
+	state                protoimpl.MessageState       `protogen:"open.v1"`
+	PayloadType          *ProtoOAPayloadType          `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2126" json:"payloadType,omitempty"`
+	CtidTraderAccountId  *int64                       `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`                        // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	ExecutionType        *ProtoOAExecutionType        `protobuf:"varint,3,req,name=executionType,enum=messages.ProtoOAExecutionType" json:"executionType,omitempty"` // Type of the order operation. For example: ACCEPTED, FILLED, etc.
+	Position             *ProtoOAPosition             `protobuf:"bytes,4,opt,name=position" json:"position,omitempty"`                                               // Reference to the position linked with the execution
+	Order                *ProtoOAOrder                `protobuf:"bytes,5,opt,name=order" json:"order,omitempty"`                                                     // Reference to the initial order.
+	Deal                 *ProtoOADeal                 `protobuf:"bytes,6,opt,name=deal" json:"deal,omitempty"`                                                       // Reference to the deal (execution).
+	BonusDepositWithdraw *ProtoOABonusDepositWithdraw `protobuf:"bytes,7,opt,name=bonusDepositWithdraw" json:"bonusDepositWithdraw,omitempty"`                       // Reference to the Bonus Deposit or Withdrawal operation.
+	DepositWithdraw      *ProtoOADepositWithdraw      `protobuf:"bytes,8,opt,name=depositWithdraw" json:"depositWithdraw,omitempty"`                                 // Reference to the Deposit or Withdrawal operation.
+	ErrorCode            *string                      `protobuf:"bytes,9,opt,name=errorCode" json:"errorCode,omitempty"`                                             // The name of the ProtoErrorCode or the other custom ErrorCodes (e.g. ProtoCHErrorCode).
+	IsServerEvent        *bool                        `protobuf:"varint,10,opt,name=isServerEvent" json:"isServerEvent,omitempty"`                                   // If TRUE then the event generated by the server logic instead of the trader's request. (e.g. stop-out).
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+// Default values for ProtoOAExecutionEvent fields.
 const (
-	Default_ProtoOAAccountAuthReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_REQ
+	Default_ProtoOAExecutionEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_EXECUTION_EVENT
 )
 
-func (x *ProtoOAAccountAuthReq) Reset() {
-	*x = ProtoOAAccountAuthReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[11]
+func (x *ProtoOAExecutionEvent) Reset() {
+	*x = ProtoOAExecutionEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAAccountAuthReq) String() string {
+func (x *ProtoOAExecutionEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAAccountAuthReq) ProtoMessage() {}
+func (*ProtoOAExecutionEvent) ProtoMessage() {}
 
-func (x *ProtoOAAccountAuthReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[11]
+func (x *ProtoOAExecutionEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -869,251 +858,111 @@ func (x *ProtoOAAccountAuthReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAAccountAuthReq.ProtoReflect.Descriptor instead.
-func (*ProtoOAAccountAuthReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{11}
+// Deprecated: Use ProtoOAExecutionEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAExecutionEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *ProtoOAAccountAuthReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAExecutionEvent) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAAccountAuthReq_PayloadType
+	return Default_ProtoOAExecutionEvent_PayloadType
 }
 
-func (x *ProtoOAAccountAuthReq) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAExecutionEvent) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOAAccountAuthReq) GetAccessToken() string {
-	if x != nil && x.AccessToken != nil {
-		return *x.AccessToken
+func (x *ProtoOAExecutionEvent) GetExecutionType() ProtoOAExecutionType {
+	if x != nil && x.ExecutionType != nil {
+		return *x.ExecutionType
 	}
-	return ""
+	return ProtoOAExecutionType_ORDER_ACCEPTED
 }
 
-// * Response to the ProtoOAApplicationAuthRes request.
-type ProtoOAAccountAuthRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2103" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOAAccountAuthRes fields.
-const (
-	Default_ProtoOAAccountAuthRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_AUTH_RES
-)
-
-func (x *ProtoOAAccountAuthRes) Reset() {
-	*x = ProtoOAAccountAuthRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOAAccountAuthRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOAAccountAuthRes) ProtoMessage() {}
-
-func (x *ProtoOAAccountAuthRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOAAccountAuthRes.ProtoReflect.Descriptor instead.
-func (*ProtoOAAccountAuthRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *ProtoOAAccountAuthRes) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOAAccountAuthRes_PayloadType
-}
-
-func (x *ProtoOAAccountAuthRes) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-// * Request for getting Trader's current open positions and pending orders data.
-type ProtoOAReconcileReq struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2124" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOAReconcileReq fields.
-const (
-	Default_ProtoOAReconcileReq_PayloadType = ProtoOAPayloadType_PROTO_OA_RECONCILE_REQ
-)
-
-func (x *ProtoOAReconcileReq) Reset() {
-	*x = ProtoOAReconcileReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOAReconcileReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOAReconcileReq) ProtoMessage() {}
-
-func (x *ProtoOAReconcileReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOAReconcileReq.ProtoReflect.Descriptor instead.
-func (*ProtoOAReconcileReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *ProtoOAReconcileReq) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOAReconcileReq_PayloadType
-}
-
-func (x *ProtoOAReconcileReq) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-// * The response to the ProtoOAReconcileReq request.
-type ProtoOAReconcileRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2125" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Position            []*ProtoOAPosition     `protobuf:"bytes,3,rep,name=position" json:"position,omitempty"`                        // The list of trader's account open positions.
-	Order               []*ProtoOAOrder        `protobuf:"bytes,4,rep,name=order" json:"order,omitempty"`                              // The list of trader's account pending orders.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOAReconcileRes fields.
-const (
-	Default_ProtoOAReconcileRes_PayloadType = ProtoOAPayloadType_PROTO_OA_RECONCILE_RES
-)
-
-func (x *ProtoOAReconcileRes) Reset() {
-	*x = ProtoOAReconcileRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOAReconcileRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOAReconcileRes) ProtoMessage() {}
-
-func (x *ProtoOAReconcileRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOAReconcileRes.ProtoReflect.Descriptor instead.
-func (*ProtoOAReconcileRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *ProtoOAReconcileRes) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOAReconcileRes_PayloadType
-}
-
-func (x *ProtoOAReconcileRes) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-func (x *ProtoOAReconcileRes) GetPosition() []*ProtoOAPosition {
+func (x *ProtoOAExecutionEvent) GetPosition() *ProtoOAPosition {
 	if x != nil {
 		return x.Position
 	}
 	return nil
 }
 
-func (x *ProtoOAReconcileRes) GetOrder() []*ProtoOAOrder {
+func (x *ProtoOAExecutionEvent) GetOrder() *ProtoOAOrder {
 	if x != nil {
 		return x.Order
 	}
 	return nil
 }
 
-// * Request to refresh the access token using refresh token of granted trader's account.
-type ProtoOARefreshTokenReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2173" json:"payloadType,omitempty"`
-	RefreshToken  *string                `protobuf:"bytes,2,req,name=refreshToken" json:"refreshToken,omitempty"` // The Refresh Token issued for updating Access Token.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+func (x *ProtoOAExecutionEvent) GetDeal() *ProtoOADeal {
+	if x != nil {
+		return x.Deal
+	}
+	return nil
 }
 
-// Default values for ProtoOARefreshTokenReq fields.
+func (x *ProtoOAExecutionEvent) GetBonusDepositWithdraw() *ProtoOABonusDepositWithdraw {
+	if x != nil {
+		return x.BonusDepositWithdraw
+	}
+	return nil
+}
+
+func (x *ProtoOAExecutionEvent) GetDepositWithdraw() *ProtoOADepositWithdraw {
+	if x != nil {
+		return x.DepositWithdraw
+	}
+	return nil
+}
+
+func (x *ProtoOAExecutionEvent) GetErrorCode() string {
+	if x != nil && x.ErrorCode != nil {
+		return *x.ErrorCode
+	}
+	return ""
+}
+
+func (x *ProtoOAExecutionEvent) GetIsServerEvent() bool {
+	if x != nil && x.IsServerEvent != nil {
+		return *x.IsServerEvent
+	}
+	return false
+}
+
+// * Request for cancelling existing pending order. Allowed only if the accessToken has "trade" permissions for the trading account.
+type ProtoOACancelOrderReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2108" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	OrderId             *int64                 `protobuf:"varint,3,req,name=orderId" json:"orderId,omitempty"`                         // The unique ID of the order.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOACancelOrderReq fields.
 const (
-	Default_ProtoOARefreshTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_REQ
+	Default_ProtoOACancelOrderReq_PayloadType = ProtoOAPayloadType_PROTO_OA_CANCEL_ORDER_REQ
 )
 
-func (x *ProtoOARefreshTokenReq) Reset() {
-	*x = ProtoOARefreshTokenReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[15]
+func (x *ProtoOACancelOrderReq) Reset() {
+	*x = ProtoOACancelOrderReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOARefreshTokenReq) String() string {
+func (x *ProtoOACancelOrderReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOARefreshTokenReq) ProtoMessage() {}
+func (*ProtoOACancelOrderReq) ProtoMessage() {}
 
-func (x *ProtoOARefreshTokenReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[15]
+func (x *ProtoOACancelOrderReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,105 +973,729 @@ func (x *ProtoOARefreshTokenReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOARefreshTokenReq.ProtoReflect.Descriptor instead.
-func (*ProtoOARefreshTokenReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{15}
+// Deprecated: Use ProtoOACancelOrderReq.ProtoReflect.Descriptor instead.
+func (*ProtoOACancelOrderReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *ProtoOARefreshTokenReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOACancelOrderReq) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOARefreshTokenReq_PayloadType
+	return Default_ProtoOACancelOrderReq_PayloadType
 }
 
-func (x *ProtoOARefreshTokenReq) GetRefreshToken() string {
-	if x != nil && x.RefreshToken != nil {
-		return *x.RefreshToken
-	}
-	return ""
-}
-
-// * Response to the ProtoOARefreshTokenReq request.
-type ProtoOARefreshTokenRes struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2174" json:"payloadType,omitempty"`
-	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"`   // The Access Token issued for providing access to the Trader's Account.
-	TokenType     *string                `protobuf:"bytes,3,req,name=tokenType" json:"tokenType,omitempty"`       // bearer
-	ExpiresIn     *int64                 `protobuf:"varint,4,req,name=expiresIn" json:"expiresIn,omitempty"`      // Access Token expiration in seconds.
-	RefreshToken  *string                `protobuf:"bytes,5,req,name=refreshToken" json:"refreshToken,omitempty"` // Your new Refresh Token.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-// Default values for ProtoOARefreshTokenRes fields.
-const (
-	Default_ProtoOARefreshTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES
-)
-
-func (x *ProtoOARefreshTokenRes) Reset() {
-	*x = ProtoOARefreshTokenRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOARefreshTokenRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOARefreshTokenRes) ProtoMessage() {}
-
-func (x *ProtoOARefreshTokenRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOARefreshTokenRes.ProtoReflect.Descriptor instead.
-func (*ProtoOARefreshTokenRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *ProtoOARefreshTokenRes) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOARefreshTokenRes_PayloadType
-}
-
-func (x *ProtoOARefreshTokenRes) GetAccessToken() string {
-	if x != nil && x.AccessToken != nil {
-		return *x.AccessToken
-	}
-	return ""
-}
-
-func (x *ProtoOARefreshTokenRes) GetTokenType() string {
-	if x != nil && x.TokenType != nil {
-		return *x.TokenType
-	}
-	return ""
-}
-
-func (x *ProtoOARefreshTokenRes) GetExpiresIn() int64 {
-	if x != nil && x.ExpiresIn != nil {
-		return *x.ExpiresIn
+func (x *ProtoOACancelOrderReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOARefreshTokenRes) GetRefreshToken() string {
-	if x != nil && x.RefreshToken != nil {
-		return *x.RefreshToken
+func (x *ProtoOACancelOrderReq) GetOrderId() int64 {
+	if x != nil && x.OrderId != nil {
+		return *x.OrderId
 	}
-	return ""
+	return 0
+}
+
+// * Request for amending the existing pending order. Allowed only if the Access Token has "trade" permissions for the trading account.
+type ProtoOAAmendOrderReq struct {
+	state               protoimpl.MessageState     `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType        `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2109" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                     `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`                                            // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	OrderId             *int64                     `protobuf:"varint,3,req,name=orderId" json:"orderId,omitempty"`                                                                    // The unique ID of the order.
+	Volume              *int64                     `protobuf:"varint,4,opt,name=volume" json:"volume,omitempty"`                                                                      // Volume, represented in 0.01 of a unit (e.g. 1000 in protocol means 10.00 units).
+	LimitPrice          *float64                   `protobuf:"fixed64,5,opt,name=limitPrice" json:"limitPrice,omitempty"`                                                             // The Limit Price, can be specified for the LIMIT order only.
+	StopPrice           *float64                   `protobuf:"fixed64,6,opt,name=stopPrice" json:"stopPrice,omitempty"`                                                               // The Stop Price, can be specified for the STOP and the STOP_LIMIT orders.
+	ExpirationTimestamp *int64                     `protobuf:"varint,7,opt,name=expirationTimestamp" json:"expirationTimestamp,omitempty"`                                            // The Unix timestamp in milliseconds of Order expiration. Should be set for the Good Till Date orders.
+	StopLoss            *float64                   `protobuf:"fixed64,8,opt,name=stopLoss" json:"stopLoss,omitempty"`                                                                 // The absolute Stop Loss price (e.g. 1.23456). Not supported for MARKET orders.
+	TakeProfit          *float64                   `protobuf:"fixed64,9,opt,name=takeProfit" json:"takeProfit,omitempty"`                                                             // The absolute Take Profit price (e.g. 1.23456). Not supported for MARKET orders.
+	SlippageInPoints    *int32                     `protobuf:"varint,10,opt,name=slippageInPoints" json:"slippageInPoints,omitempty"`                                                 // Slippage distance for the MARKET_RANGE and the STOP_LIMIT orders.
+	RelativeStopLoss    *int64                     `protobuf:"varint,11,opt,name=relativeStopLoss" json:"relativeStopLoss,omitempty"`                                                 // The relative Stop Loss can be specified instead of the absolute one. Specified in 1/100000 of a unit of price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782) For BUY stopLoss = entryPrice - relativeStopLoss, for SELL stopLoss = entryPrice + relativeStopLoss.
+	RelativeTakeProfit  *int64                     `protobuf:"varint,12,opt,name=relativeTakeProfit" json:"relativeTakeProfit,omitempty"`                                             // The relative Take Profit can be specified instead of the absolute one. Specified in 1/100000 of a unit of price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782) For BUY takeProfit = entryPrice + relativeTakeProfit, for SELL takeProfit = entryPrice - relativeTakeProfit.
+	GuaranteedStopLoss  *bool                      `protobuf:"varint,13,opt,name=guaranteedStopLoss" json:"guaranteedStopLoss,omitempty"`                                             // If TRUE then the Stop Loss is guaranteed. Available for the French Risk or the Guaranteed Stop Loss Accounts.
+	TrailingStopLoss    *bool                      `protobuf:"varint,14,opt,name=trailingStopLoss" json:"trailingStopLoss,omitempty"`                                                 // If TRUE then the Trailing Stop Loss is applied.
+	StopTriggerMethod   *ProtoOAOrderTriggerMethod `protobuf:"varint,15,opt,name=stopTriggerMethod,enum=messages.ProtoOAOrderTriggerMethod,def=1" json:"stopTriggerMethod,omitempty"` // Trigger method for the STOP or the STOP_LIMIT pending order.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAmendOrderReq fields.
+const (
+	Default_ProtoOAAmendOrderReq_PayloadType       = ProtoOAPayloadType_PROTO_OA_AMEND_ORDER_REQ
+	Default_ProtoOAAmendOrderReq_StopTriggerMethod = ProtoOAOrderTriggerMethod_TRADE
+)
+
+func (x *ProtoOAAmendOrderReq) Reset() {
+	*x = ProtoOAAmendOrderReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAmendOrderReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAmendOrderReq) ProtoMessage() {}
+
+func (x *ProtoOAAmendOrderReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAmendOrderReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAmendOrderReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ProtoOAAmendOrderReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAmendOrderReq_PayloadType
+}
+
+func (x *ProtoOAAmendOrderReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetOrderId() int64 {
+	if x != nil && x.OrderId != nil {
+		return *x.OrderId
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetVolume() int64 {
+	if x != nil && x.Volume != nil {
+		return *x.Volume
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetLimitPrice() float64 {
+	if x != nil && x.LimitPrice != nil {
+		return *x.LimitPrice
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetStopPrice() float64 {
+	if x != nil && x.StopPrice != nil {
+		return *x.StopPrice
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetExpirationTimestamp() int64 {
+	if x != nil && x.ExpirationTimestamp != nil {
+		return *x.ExpirationTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetStopLoss() float64 {
+	if x != nil && x.StopLoss != nil {
+		return *x.StopLoss
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetTakeProfit() float64 {
+	if x != nil && x.TakeProfit != nil {
+		return *x.TakeProfit
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetSlippageInPoints() int32 {
+	if x != nil && x.SlippageInPoints != nil {
+		return *x.SlippageInPoints
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetRelativeStopLoss() int64 {
+	if x != nil && x.RelativeStopLoss != nil {
+		return *x.RelativeStopLoss
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetRelativeTakeProfit() int64 {
+	if x != nil && x.RelativeTakeProfit != nil {
+		return *x.RelativeTakeProfit
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendOrderReq) GetGuaranteedStopLoss() bool {
+	if x != nil && x.GuaranteedStopLoss != nil {
+		return *x.GuaranteedStopLoss
+	}
+	return false
+}
+
+func (x *ProtoOAAmendOrderReq) GetTrailingStopLoss() bool {
+	if x != nil && x.TrailingStopLoss != nil {
+		return *x.TrailingStopLoss
+	}
+	return false
+}
+
+func (x *ProtoOAAmendOrderReq) GetStopTriggerMethod() ProtoOAOrderTriggerMethod {
+	if x != nil && x.StopTriggerMethod != nil {
+		return *x.StopTriggerMethod
+	}
+	return Default_ProtoOAAmendOrderReq_StopTriggerMethod
+}
+
+// * Request for amending StopLoss and TakeProfit of existing position. Allowed only if the accessToken has "trade" permissions for the trading account.
+type ProtoOAAmendPositionSLTPReq struct {
+	state                 protoimpl.MessageState     `protogen:"open.v1"`
+	PayloadType           *ProtoOAPayloadType        `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2110" json:"payloadType,omitempty"`
+	CtidTraderAccountId   *int64                     `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`                                                   // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId            *int64                     `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                                                                     // The unique ID of the position to amend.
+	StopLoss              *float64                   `protobuf:"fixed64,4,opt,name=stopLoss" json:"stopLoss,omitempty"`                                                                        // Absolute Stop Loss price (1.23456 for example).
+	TakeProfit            *float64                   `protobuf:"fixed64,5,opt,name=takeProfit" json:"takeProfit,omitempty"`                                                                    // Absolute Take Profit price (1.26543 for example).
+	GuaranteedStopLoss    *bool                      `protobuf:"varint,7,opt,name=guaranteedStopLoss" json:"guaranteedStopLoss,omitempty"`                                                     //If TRUE then the Stop Loss is guaranteed. Available for the French Risk or the Guaranteed Stop Loss Accounts.
+	TrailingStopLoss      *bool                      `protobuf:"varint,8,opt,name=trailingStopLoss" json:"trailingStopLoss,omitempty"`                                                         //If TRUE then the Trailing Stop Loss is applied.
+	StopLossTriggerMethod *ProtoOAOrderTriggerMethod `protobuf:"varint,9,opt,name=stopLossTriggerMethod,enum=messages.ProtoOAOrderTriggerMethod,def=1" json:"stopLossTriggerMethod,omitempty"` // The Stop trigger method for the Stop Loss/Take Profit order.
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAmendPositionSLTPReq fields.
+const (
+	Default_ProtoOAAmendPositionSLTPReq_PayloadType           = ProtoOAPayloadType_PROTO_OA_AMEND_POSITION_SLTP_REQ
+	Default_ProtoOAAmendPositionSLTPReq_StopLossTriggerMethod = ProtoOAOrderTriggerMethod_TRADE
+)
+
+func (x *ProtoOAAmendPositionSLTPReq) Reset() {
+	*x = ProtoOAAmendPositionSLTPReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAmendPositionSLTPReq) ProtoMessage() {}
+
+func (x *ProtoOAAmendPositionSLTPReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAmendPositionSLTPReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAmendPositionSLTPReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAmendPositionSLTPReq_PayloadType
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetStopLoss() float64 {
+	if x != nil && x.StopLoss != nil {
+		return *x.StopLoss
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetTakeProfit() float64 {
+	if x != nil && x.TakeProfit != nil {
+		return *x.TakeProfit
+	}
+	return 0
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetGuaranteedStopLoss() bool {
+	if x != nil && x.GuaranteedStopLoss != nil {
+		return *x.GuaranteedStopLoss
+	}
+	return false
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetTrailingStopLoss() bool {
+	if x != nil && x.TrailingStopLoss != nil {
+		return *x.TrailingStopLoss
+	}
+	return false
+}
+
+func (x *ProtoOAAmendPositionSLTPReq) GetStopLossTriggerMethod() ProtoOAOrderTriggerMethod {
+	if x != nil && x.StopLossTriggerMethod != nil {
+		return *x.StopLossTriggerMethod
+	}
+	return Default_ProtoOAAmendPositionSLTPReq_StopLossTriggerMethod
+}
+
+// * Request for closing or partially closing of an existing position. Allowed only if the accessToken has "trade" permissions for the trading account.
+type ProtoOAClosePositionReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2111" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId          *int64                 `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                   // The unique ID of the position to close.
+	Volume              *int64                 `protobuf:"varint,4,req,name=volume" json:"volume,omitempty"`                           // Volume to close, represented in 0.01 of a unit (e.g. 1000 in protocol means 10.00 units).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAClosePositionReq fields.
+const (
+	Default_ProtoOAClosePositionReq_PayloadType = ProtoOAPayloadType_PROTO_OA_CLOSE_POSITION_REQ
+)
+
+func (x *ProtoOAClosePositionReq) Reset() {
+	*x = ProtoOAClosePositionReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAClosePositionReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAClosePositionReq) ProtoMessage() {}
+
+func (x *ProtoOAClosePositionReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAClosePositionReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAClosePositionReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ProtoOAClosePositionReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAClosePositionReq_PayloadType
+}
+
+func (x *ProtoOAClosePositionReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAClosePositionReq) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOAClosePositionReq) GetVolume() int64 {
+	if x != nil && x.Volume != nil {
+		return *x.Volume
+	}
+	return 0
+}
+
+// * Event that is sent when the level of the Trailing Stop Loss is changed due to the price level changes.
+type ProtoOATrailingSLChangedEvent struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType            *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2107" json:"payloadType,omitempty"`
+	CtidTraderAccountId    *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`       // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId             *int64                 `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                         // The unique ID of the position.
+	OrderId                *int64                 `protobuf:"varint,4,req,name=orderId" json:"orderId,omitempty"`                               // The unique ID of the order.
+	StopPrice              *float64               `protobuf:"fixed64,5,req,name=stopPrice" json:"stopPrice,omitempty"`                          // New value of the Stop Loss price.
+	UtcLastUpdateTimestamp *int64                 `protobuf:"varint,6,req,name=utcLastUpdateTimestamp" json:"utcLastUpdateTimestamp,omitempty"` // The Unix time in milliseconds when the Stop Loss was updated.
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+// Default values for ProtoOATrailingSLChangedEvent fields.
+const (
+	Default_ProtoOATrailingSLChangedEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_TRAILING_SL_CHANGED_EVENT
+)
+
+func (x *ProtoOATrailingSLChangedEvent) Reset() {
+	*x = ProtoOATrailingSLChangedEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOATrailingSLChangedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOATrailingSLChangedEvent) ProtoMessage() {}
+
+func (x *ProtoOATrailingSLChangedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOATrailingSLChangedEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOATrailingSLChangedEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOATrailingSLChangedEvent_PayloadType
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetOrderId() int64 {
+	if x != nil && x.OrderId != nil {
+		return *x.OrderId
+	}
+	return 0
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetStopPrice() float64 {
+	if x != nil && x.StopPrice != nil {
+		return *x.StopPrice
+	}
+	return 0
+}
+
+func (x *ProtoOATrailingSLChangedEvent) GetUtcLastUpdateTimestamp() int64 {
+	if x != nil && x.UtcLastUpdateTimestamp != nil {
+		return *x.UtcLastUpdateTimestamp
+	}
+	return 0
+}
+
+// * Request for the list of assets available for a trader's account.
+type ProtoOAAssetListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2112" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAssetListReq fields.
+const (
+	Default_ProtoOAAssetListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_LIST_REQ
+)
+
+func (x *ProtoOAAssetListReq) Reset() {
+	*x = ProtoOAAssetListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAssetListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAssetListReq) ProtoMessage() {}
+
+func (x *ProtoOAAssetListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAssetListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAssetListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ProtoOAAssetListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAssetListReq_PayloadType
+}
+
+func (x *ProtoOAAssetListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response to the ProtoOAAssetListReq request.
+type ProtoOAAssetListRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2113" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Asset               []*ProtoOAAsset        `protobuf:"bytes,3,rep,name=asset" json:"asset,omitempty"`                              // The list of assets.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAssetListRes fields.
+const (
+	Default_ProtoOAAssetListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_LIST_RES
+)
+
+func (x *ProtoOAAssetListRes) Reset() {
+	*x = ProtoOAAssetListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAssetListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAssetListRes) ProtoMessage() {}
+
+func (x *ProtoOAAssetListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAssetListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAAssetListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ProtoOAAssetListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAssetListRes_PayloadType
+}
+
+func (x *ProtoOAAssetListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAAssetListRes) GetAsset() []*ProtoOAAsset {
+	if x != nil {
+		return x.Asset
+	}
+	return nil
+}
+
+// * Request for a list of symbols available for a trading account. Symbol entries are returned with the limited set of fields.
+type ProtoOASymbolsListReq struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType            *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2114" json:"payloadType,omitempty"`
+	CtidTraderAccountId    *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`             // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	IncludeArchivedSymbols *bool                  `protobuf:"varint,3,opt,name=includeArchivedSymbols,def=0" json:"includeArchivedSymbols,omitempty"` // Whether to include old archived symbols into response.
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+// Default values for ProtoOASymbolsListReq fields.
+const (
+	Default_ProtoOASymbolsListReq_PayloadType            = ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_REQ
+	Default_ProtoOASymbolsListReq_IncludeArchivedSymbols = bool(false)
+)
+
+func (x *ProtoOASymbolsListReq) Reset() {
+	*x = ProtoOASymbolsListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASymbolsListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASymbolsListReq) ProtoMessage() {}
+
+func (x *ProtoOASymbolsListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASymbolsListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOASymbolsListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ProtoOASymbolsListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASymbolsListReq_PayloadType
+}
+
+func (x *ProtoOASymbolsListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASymbolsListReq) GetIncludeArchivedSymbols() bool {
+	if x != nil && x.IncludeArchivedSymbols != nil {
+		return *x.IncludeArchivedSymbols
+	}
+	return Default_ProtoOASymbolsListReq_IncludeArchivedSymbols
+}
+
+// * Response to the ProtoOASymbolsListReq request.
+type ProtoOASymbolsListRes struct {
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType      `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2115" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                   `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Symbol              []*ProtoOALightSymbol    `protobuf:"bytes,3,rep,name=symbol" json:"symbol,omitempty"`                            // The list of symbols.
+	ArchivedSymbol      []*ProtoOAArchivedSymbol `protobuf:"bytes,4,rep,name=archivedSymbol" json:"archivedSymbol,omitempty"`            // The list of archived symbols.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASymbolsListRes fields.
+const (
+	Default_ProtoOASymbolsListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES
+)
+
+func (x *ProtoOASymbolsListRes) Reset() {
+	*x = ProtoOASymbolsListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASymbolsListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASymbolsListRes) ProtoMessage() {}
+
+func (x *ProtoOASymbolsListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASymbolsListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOASymbolsListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ProtoOASymbolsListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASymbolsListRes_PayloadType
+}
+
+func (x *ProtoOASymbolsListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASymbolsListRes) GetSymbol() []*ProtoOALightSymbol {
+	if x != nil {
+		return x.Symbol
+	}
+	return nil
+}
+
+func (x *ProtoOASymbolsListRes) GetArchivedSymbol() []*ProtoOAArchivedSymbol {
+	if x != nil {
+		return x.ArchivedSymbol
+	}
+	return nil
 }
 
 // * Request for getting a full symbol entity.
@@ -1242,7 +1715,7 @@ const (
 
 func (x *ProtoOASymbolByIdReq) Reset() {
 	*x = ProtoOASymbolByIdReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	mi := &file_OpenApiMessages_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1254,7 +1727,7 @@ func (x *ProtoOASymbolByIdReq) String() string {
 func (*ProtoOASymbolByIdReq) ProtoMessage() {}
 
 func (x *ProtoOASymbolByIdReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[17]
+	mi := &file_OpenApiMessages_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1267,7 +1740,7 @@ func (x *ProtoOASymbolByIdReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolByIdReq.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolByIdReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{17}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ProtoOASymbolByIdReq) GetPayloadType() ProtoOAPayloadType {
@@ -1293,10 +1766,11 @@ func (x *ProtoOASymbolByIdReq) GetSymbolId() []int64 {
 
 // * Response to the ProtoOASymbolByIdReq request.
 type ProtoOASymbolByIdRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2117" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Symbol              []*ProtoOASymbol       `protobuf:"bytes,3,rep,name=symbol" json:"symbol,omitempty"`                            // Symbol entity with the full set of fields.
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType      `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2117" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                   `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Symbol              []*ProtoOASymbol         `protobuf:"bytes,3,rep,name=symbol" json:"symbol,omitempty"`                            // Symbol entity with the full set of fields.
+	ArchivedSymbol      []*ProtoOAArchivedSymbol `protobuf:"bytes,4,rep,name=archivedSymbol" json:"archivedSymbol,omitempty"`            // Archived symbols.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1308,7 +1782,7 @@ const (
 
 func (x *ProtoOASymbolByIdRes) Reset() {
 	*x = ProtoOASymbolByIdRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	mi := &file_OpenApiMessages_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1320,7 +1794,7 @@ func (x *ProtoOASymbolByIdRes) String() string {
 func (*ProtoOASymbolByIdRes) ProtoMessage() {}
 
 func (x *ProtoOASymbolByIdRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[18]
+	mi := &file_OpenApiMessages_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1333,7 +1807,7 @@ func (x *ProtoOASymbolByIdRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtoOASymbolByIdRes.ProtoReflect.Descriptor instead.
 func (*ProtoOASymbolByIdRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{18}
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ProtoOASymbolByIdRes) GetPayloadType() ProtoOAPayloadType {
@@ -1357,229 +1831,14 @@ func (x *ProtoOASymbolByIdRes) GetSymbol() []*ProtoOASymbol {
 	return nil
 }
 
-// * Request for subscribing on spot events of the specified symbol.
-type ProtoOASubscribeSpotsReq struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2127" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	SymbolId            []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOASubscribeSpotsReq fields.
-const (
-	Default_ProtoOASubscribeSpotsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_REQ
-)
-
-func (x *ProtoOASubscribeSpotsReq) Reset() {
-	*x = ProtoOASubscribeSpotsReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[19]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOASubscribeSpotsReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOASubscribeSpotsReq) ProtoMessage() {}
-
-func (x *ProtoOASubscribeSpotsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[19]
+func (x *ProtoOASymbolByIdRes) GetArchivedSymbol() []*ProtoOAArchivedSymbol {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOASubscribeSpotsReq.ProtoReflect.Descriptor instead.
-func (*ProtoOASubscribeSpotsReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{19}
-}
-
-func (x *ProtoOASubscribeSpotsReq) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOASubscribeSpotsReq_PayloadType
-}
-
-func (x *ProtoOASubscribeSpotsReq) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-func (x *ProtoOASubscribeSpotsReq) GetSymbolId() []int64 {
-	if x != nil {
-		return x.SymbolId
+		return x.ArchivedSymbol
 	}
 	return nil
 }
 
-// * Response to the ProtoOASubscribeSpotsReq request.
-type ProtoOASubscribeSpotsRes struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2128" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOASubscribeSpotsRes fields.
-const (
-	Default_ProtoOASubscribeSpotsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_RES
-)
-
-func (x *ProtoOASubscribeSpotsRes) Reset() {
-	*x = ProtoOASubscribeSpotsRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[20]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOASubscribeSpotsRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOASubscribeSpotsRes) ProtoMessage() {}
-
-func (x *ProtoOASubscribeSpotsRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[20]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOASubscribeSpotsRes.ProtoReflect.Descriptor instead.
-func (*ProtoOASubscribeSpotsRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{20}
-}
-
-func (x *ProtoOASubscribeSpotsRes) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOASubscribeSpotsRes_PayloadType
-}
-
-func (x *ProtoOASubscribeSpotsRes) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-// * Event that is sent when a new spot event is generated on the server side. Requires subscription on the spot events, see ProtoOASubscribeSpotsReq.
-type ProtoOASpotEvent struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2131" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	SymbolId            *int64                 `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
-	Bid                 *uint64                `protobuf:"varint,4,opt,name=bid" json:"bid,omitempty"`                                 // Bid price. Specified in 1/100_000 of unit of a price. (e.g. 1.23 -> 123_000)
-	Ask                 *uint64                `protobuf:"varint,5,opt,name=ask" json:"ask,omitempty"`                                 // Ask price. Specified in 1/100_000 of unit of a price.
-	Trendbar            []*ProtoOATrendbar     `protobuf:"bytes,6,rep,name=trendbar" json:"trendbar,omitempty"`                        // Returns live trend bar. Requires subscription on the trend bars.
-	SessionClose        *uint64                `protobuf:"varint,7,opt,name=sessionClose" json:"sessionClose,omitempty"`               //Last session close. Specified in 1/100_000 of unit of a price.
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
-}
-
-// Default values for ProtoOASpotEvent fields.
-const (
-	Default_ProtoOASpotEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_SPOT_EVENT
-)
-
-func (x *ProtoOASpotEvent) Reset() {
-	*x = ProtoOASpotEvent{}
-	mi := &file_OpenApiMessages_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProtoOASpotEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProtoOASpotEvent) ProtoMessage() {}
-
-func (x *ProtoOASpotEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProtoOASpotEvent.ProtoReflect.Descriptor instead.
-func (*ProtoOASpotEvent) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *ProtoOASpotEvent) GetPayloadType() ProtoOAPayloadType {
-	if x != nil && x.PayloadType != nil {
-		return *x.PayloadType
-	}
-	return Default_ProtoOASpotEvent_PayloadType
-}
-
-func (x *ProtoOASpotEvent) GetCtidTraderAccountId() int64 {
-	if x != nil && x.CtidTraderAccountId != nil {
-		return *x.CtidTraderAccountId
-	}
-	return 0
-}
-
-func (x *ProtoOASpotEvent) GetSymbolId() int64 {
-	if x != nil && x.SymbolId != nil {
-		return *x.SymbolId
-	}
-	return 0
-}
-
-func (x *ProtoOASpotEvent) GetBid() uint64 {
-	if x != nil && x.Bid != nil {
-		return *x.Bid
-	}
-	return 0
-}
-
-func (x *ProtoOASpotEvent) GetAsk() uint64 {
-	if x != nil && x.Ask != nil {
-		return *x.Ask
-	}
-	return 0
-}
-
-func (x *ProtoOASpotEvent) GetTrendbar() []*ProtoOATrendbar {
-	if x != nil {
-		return x.Trendbar
-	}
-	return nil
-}
-
-func (x *ProtoOASpotEvent) GetSessionClose() uint64 {
-	if x != nil && x.SessionClose != nil {
-		return *x.SessionClose
-	}
-	return 0
-}
-
-// * Request for getting a conversion chain between two assets that consists of several symbols. Use when no direct quote is available
+// * Request for getting a conversion chain between two assets that consists of several symbols. Use when no direct quote is available.
 type ProtoOASymbolsForConversionReq struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2118" json:"payloadType,omitempty"`
@@ -1719,34 +1978,35 @@ func (x *ProtoOASymbolsForConversionRes) GetSymbol() []*ProtoOALightSymbol {
 	return nil
 }
 
-// * Request for the list of assets available for a trader's account.
-type ProtoOAAssetListReq struct {
+// * Event that is sent when the symbol is changed on the Server side.
+type ProtoOASymbolChangedEvent struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2112" json:"payloadType,omitempty"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2120" json:"payloadType,omitempty"`
 	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOAAssetListReq fields.
+// Default values for ProtoOASymbolChangedEvent fields.
 const (
-	Default_ProtoOAAssetListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_LIST_REQ
+	Default_ProtoOASymbolChangedEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOL_CHANGED_EVENT
 )
 
-func (x *ProtoOAAssetListReq) Reset() {
-	*x = ProtoOAAssetListReq{}
+func (x *ProtoOASymbolChangedEvent) Reset() {
+	*x = ProtoOASymbolChangedEvent{}
 	mi := &file_OpenApiMessages_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAAssetListReq) String() string {
+func (x *ProtoOASymbolChangedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAAssetListReq) ProtoMessage() {}
+func (*ProtoOASymbolChangedEvent) ProtoMessage() {}
 
-func (x *ProtoOAAssetListReq) ProtoReflect() protoreflect.Message {
+func (x *ProtoOASymbolChangedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_OpenApiMessages_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1758,19 +2018,84 @@ func (x *ProtoOAAssetListReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAAssetListReq.ProtoReflect.Descriptor instead.
-func (*ProtoOAAssetListReq) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProtoOASymbolChangedEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOASymbolChangedEvent) Descriptor() ([]byte, []int) {
 	return file_OpenApiMessages_proto_rawDescGZIP(), []int{24}
 }
 
-func (x *ProtoOAAssetListReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOASymbolChangedEvent) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAAssetListReq_PayloadType
+	return Default_ProtoOASymbolChangedEvent_PayloadType
 }
 
-func (x *ProtoOAAssetListReq) GetCtidTraderAccountId() int64 {
+func (x *ProtoOASymbolChangedEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASymbolChangedEvent) GetSymbolId() []int64 {
+	if x != nil {
+		return x.SymbolId
+	}
+	return nil
+}
+
+// * Request for a list of asset classes available for the trader's account.
+type ProtoOAAssetClassListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2153" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAssetClassListReq fields.
+const (
+	Default_ProtoOAAssetClassListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_CLASS_LIST_REQ
+)
+
+func (x *ProtoOAAssetClassListReq) Reset() {
+	*x = ProtoOAAssetClassListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAssetClassListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAssetClassListReq) ProtoMessage() {}
+
+func (x *ProtoOAAssetClassListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAssetClassListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAssetClassListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ProtoOAAssetClassListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAssetClassListReq_PayloadType
+}
+
+func (x *ProtoOAAssetClassListReq) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
@@ -1778,35 +2103,35 @@ func (x *ProtoOAAssetListReq) GetCtidTraderAccountId() int64 {
 }
 
 // * Response to the ProtoOAAssetListReq request.
-type ProtoOAAssetListRes struct {
+type ProtoOAAssetClassListRes struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2113" json:"payloadType,omitempty"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2154" json:"payloadType,omitempty"`
 	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Asset               []*ProtoOAAsset        `protobuf:"bytes,3,rep,name=asset" json:"asset,omitempty"`                              // The list of assets.
+	AssetClass          []*ProtoOAAssetClass   `protobuf:"bytes,3,rep,name=assetClass" json:"assetClass,omitempty"`                    // List of the asset classes.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOAAssetListRes fields.
+// Default values for ProtoOAAssetClassListRes fields.
 const (
-	Default_ProtoOAAssetListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_LIST_RES
+	Default_ProtoOAAssetClassListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ASSET_CLASS_LIST_RES
 )
 
-func (x *ProtoOAAssetListRes) Reset() {
-	*x = ProtoOAAssetListRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[25]
+func (x *ProtoOAAssetClassListRes) Reset() {
+	*x = ProtoOAAssetClassListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOAAssetListRes) String() string {
+func (x *ProtoOAAssetClassListRes) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOAAssetListRes) ProtoMessage() {}
+func (*ProtoOAAssetClassListRes) ProtoMessage() {}
 
-func (x *ProtoOAAssetListRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[25]
+func (x *ProtoOAAssetClassListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1817,62 +2142,252 @@ func (x *ProtoOAAssetListRes) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOAAssetListRes.ProtoReflect.Descriptor instead.
-func (*ProtoOAAssetListRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{25}
+// Deprecated: Use ProtoOAAssetClassListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAAssetClassListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{26}
 }
 
-func (x *ProtoOAAssetListRes) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAAssetClassListRes) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOAAssetListRes_PayloadType
+	return Default_ProtoOAAssetClassListRes_PayloadType
 }
 
-func (x *ProtoOAAssetListRes) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAAssetClassListRes) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOAAssetListRes) GetAsset() []*ProtoOAAsset {
+func (x *ProtoOAAssetClassListRes) GetAssetClass() []*ProtoOAAssetClass {
 	if x != nil {
-		return x.Asset
+		return x.AssetClass
 	}
 	return nil
 }
 
-// * Request for a list of symbols available for a trading account. Symbol entries are returned with the limited set of fields.
-type ProtoOASymbolsListReq struct {
+// * Request for getting data of Trader's Account.
+type ProtoOATraderReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2121" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOATraderReq fields.
+const (
+	Default_ProtoOATraderReq_PayloadType = ProtoOAPayloadType_PROTO_OA_TRADER_REQ
+)
+
+func (x *ProtoOATraderReq) Reset() {
+	*x = ProtoOATraderReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOATraderReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOATraderReq) ProtoMessage() {}
+
+func (x *ProtoOATraderReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOATraderReq.ProtoReflect.Descriptor instead.
+func (*ProtoOATraderReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ProtoOATraderReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOATraderReq_PayloadType
+}
+
+func (x *ProtoOATraderReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response to the ProtoOATraderReq request.
+type ProtoOATraderRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2122" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Trader              *ProtoOATrader         `protobuf:"bytes,3,req,name=trader" json:"trader,omitempty"`                            // The Trader account information.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOATraderRes fields.
+const (
+	Default_ProtoOATraderRes_PayloadType = ProtoOAPayloadType_PROTO_OA_TRADER_RES
+)
+
+func (x *ProtoOATraderRes) Reset() {
+	*x = ProtoOATraderRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOATraderRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOATraderRes) ProtoMessage() {}
+
+func (x *ProtoOATraderRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOATraderRes.ProtoReflect.Descriptor instead.
+func (*ProtoOATraderRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ProtoOATraderRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOATraderRes_PayloadType
+}
+
+func (x *ProtoOATraderRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOATraderRes) GetTrader() *ProtoOATrader {
+	if x != nil {
+		return x.Trader
+	}
+	return nil
+}
+
+// * Event that is sent when a Trader is updated on Server side.
+type ProtoOATraderUpdatedEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2123" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Trader              *ProtoOATrader         `protobuf:"bytes,3,req,name=trader" json:"trader,omitempty"`                            // The Trader account information.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOATraderUpdatedEvent fields.
+const (
+	Default_ProtoOATraderUpdatedEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_TRADER_UPDATE_EVENT
+)
+
+func (x *ProtoOATraderUpdatedEvent) Reset() {
+	*x = ProtoOATraderUpdatedEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOATraderUpdatedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOATraderUpdatedEvent) ProtoMessage() {}
+
+func (x *ProtoOATraderUpdatedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOATraderUpdatedEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOATraderUpdatedEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ProtoOATraderUpdatedEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOATraderUpdatedEvent_PayloadType
+}
+
+func (x *ProtoOATraderUpdatedEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOATraderUpdatedEvent) GetTrader() *ProtoOATrader {
+	if x != nil {
+		return x.Trader
+	}
+	return nil
+}
+
+// * Request for getting Trader's current open positions and pending orders data.
+type ProtoOAReconcileReq struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
-	PayloadType            *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2114" json:"payloadType,omitempty"`
-	CtidTraderAccountId    *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	IncludeArchivedSymbols *bool                  `protobuf:"varint,3,opt,name=includeArchivedSymbols" json:"includeArchivedSymbols,omitempty"`
+	PayloadType            *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2124" json:"payloadType,omitempty"`
+	CtidTraderAccountId    *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`       // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	ReturnProtectionOrders *bool                  `protobuf:"varint,3,opt,name=returnProtectionOrders" json:"returnProtectionOrders,omitempty"` // If TRUE, then current protection orders are returned separately, otherwise you can use position.stopLoss and position.takeProfit fields.
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
 
-// Default values for ProtoOASymbolsListReq fields.
+// Default values for ProtoOAReconcileReq fields.
 const (
-	Default_ProtoOASymbolsListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_REQ
+	Default_ProtoOAReconcileReq_PayloadType = ProtoOAPayloadType_PROTO_OA_RECONCILE_REQ
 )
 
-func (x *ProtoOASymbolsListReq) Reset() {
-	*x = ProtoOASymbolsListReq{}
-	mi := &file_OpenApiMessages_proto_msgTypes[26]
+func (x *ProtoOAReconcileReq) Reset() {
+	*x = ProtoOAReconcileReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOASymbolsListReq) String() string {
+func (x *ProtoOAReconcileReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOASymbolsListReq) ProtoMessage() {}
+func (*ProtoOAReconcileReq) ProtoMessage() {}
 
-func (x *ProtoOASymbolsListReq) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[26]
+func (x *ProtoOAReconcileReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1883,63 +2398,63 @@ func (x *ProtoOASymbolsListReq) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOASymbolsListReq.ProtoReflect.Descriptor instead.
-func (*ProtoOASymbolsListReq) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{26}
+// Deprecated: Use ProtoOAReconcileReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAReconcileReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *ProtoOASymbolsListReq) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAReconcileReq) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOASymbolsListReq_PayloadType
+	return Default_ProtoOAReconcileReq_PayloadType
 }
 
-func (x *ProtoOASymbolsListReq) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAReconcileReq) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOASymbolsListReq) GetIncludeArchivedSymbols() bool {
-	if x != nil && x.IncludeArchivedSymbols != nil {
-		return *x.IncludeArchivedSymbols
+func (x *ProtoOAReconcileReq) GetReturnProtectionOrders() bool {
+	if x != nil && x.ReturnProtectionOrders != nil {
+		return *x.ReturnProtectionOrders
 	}
 	return false
 }
 
-// * Response to the ProtoOASymbolsListReq request.
-type ProtoOASymbolsListRes struct {
-	state               protoimpl.MessageState   `protogen:"open.v1"`
-	PayloadType         *ProtoOAPayloadType      `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2115" json:"payloadType,omitempty"`
-	CtidTraderAccountId *int64                   `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
-	Symbol              []*ProtoOALightSymbol    `protobuf:"bytes,3,rep,name=symbol" json:"symbol,omitempty"`                            // The list of symbols.
-	ArchivedSymbol      []*ProtoOAArchivedSymbol `protobuf:"bytes,4,rep,name=archivedSymbol" json:"archivedSymbol,omitempty"`            // The list of archived symbols.
+// * The response to the ProtoOAReconcileReq request.
+type ProtoOAReconcileRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2125" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Position            []*ProtoOAPosition     `protobuf:"bytes,3,rep,name=position" json:"position,omitempty"`                        // The list of trader's account open positions.
+	Order               []*ProtoOAOrder        `protobuf:"bytes,4,rep,name=order" json:"order,omitempty"`                              // The list of trader's account pending orders.
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-// Default values for ProtoOASymbolsListRes fields.
+// Default values for ProtoOAReconcileRes fields.
 const (
-	Default_ProtoOASymbolsListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOLS_LIST_RES
+	Default_ProtoOAReconcileRes_PayloadType = ProtoOAPayloadType_PROTO_OA_RECONCILE_RES
 )
 
-func (x *ProtoOASymbolsListRes) Reset() {
-	*x = ProtoOASymbolsListRes{}
-	mi := &file_OpenApiMessages_proto_msgTypes[27]
+func (x *ProtoOAReconcileRes) Reset() {
+	*x = ProtoOAReconcileRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProtoOASymbolsListRes) String() string {
+func (x *ProtoOAReconcileRes) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProtoOASymbolsListRes) ProtoMessage() {}
+func (*ProtoOAReconcileRes) ProtoMessage() {}
 
-func (x *ProtoOASymbolsListRes) ProtoReflect() protoreflect.Message {
-	mi := &file_OpenApiMessages_proto_msgTypes[27]
+func (x *ProtoOAReconcileRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1950,37 +2465,4025 @@ func (x *ProtoOASymbolsListRes) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProtoOASymbolsListRes.ProtoReflect.Descriptor instead.
-func (*ProtoOASymbolsListRes) Descriptor() ([]byte, []int) {
-	return file_OpenApiMessages_proto_rawDescGZIP(), []int{27}
+// Deprecated: Use ProtoOAReconcileRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAReconcileRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *ProtoOASymbolsListRes) GetPayloadType() ProtoOAPayloadType {
+func (x *ProtoOAReconcileRes) GetPayloadType() ProtoOAPayloadType {
 	if x != nil && x.PayloadType != nil {
 		return *x.PayloadType
 	}
-	return Default_ProtoOASymbolsListRes_PayloadType
+	return Default_ProtoOAReconcileRes_PayloadType
 }
 
-func (x *ProtoOASymbolsListRes) GetCtidTraderAccountId() int64 {
+func (x *ProtoOAReconcileRes) GetCtidTraderAccountId() int64 {
 	if x != nil && x.CtidTraderAccountId != nil {
 		return *x.CtidTraderAccountId
 	}
 	return 0
 }
 
-func (x *ProtoOASymbolsListRes) GetSymbol() []*ProtoOALightSymbol {
+func (x *ProtoOAReconcileRes) GetPosition() []*ProtoOAPosition {
 	if x != nil {
-		return x.Symbol
+		return x.Position
 	}
 	return nil
 }
 
-func (x *ProtoOASymbolsListRes) GetArchivedSymbol() []*ProtoOAArchivedSymbol {
+func (x *ProtoOAReconcileRes) GetOrder() []*ProtoOAOrder {
 	if x != nil {
-		return x.ArchivedSymbol
+		return x.Order
 	}
 	return nil
+}
+
+// * Event that is sent when errors occur during the order requests.
+type ProtoOAOrderErrorEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2132" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,5,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` //Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	ErrorCode           *string                `protobuf:"bytes,2,req,name=errorCode" json:"errorCode,omitempty"`                      // The name of the ProtoErrorCode or the other custom ErrorCodes (e.g. ProtoCHErrorCode).
+	OrderId             *int64                 `protobuf:"varint,3,opt,name=orderId" json:"orderId,omitempty"`                         // The unique ID of the order.
+	PositionId          *int64                 `protobuf:"varint,6,opt,name=positionId" json:"positionId,omitempty"`                   // The unique ID of the position.
+	Description         *string                `protobuf:"bytes,7,opt,name=description" json:"description,omitempty"`                  // The error description.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderErrorEvent fields.
+const (
+	Default_ProtoOAOrderErrorEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_ERROR_EVENT
+)
+
+func (x *ProtoOAOrderErrorEvent) Reset() {
+	*x = ProtoOAOrderErrorEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderErrorEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderErrorEvent) ProtoMessage() {}
+
+func (x *ProtoOAOrderErrorEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderErrorEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderErrorEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ProtoOAOrderErrorEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderErrorEvent_PayloadType
+}
+
+func (x *ProtoOAOrderErrorEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderErrorEvent) GetErrorCode() string {
+	if x != nil && x.ErrorCode != nil {
+		return *x.ErrorCode
+	}
+	return ""
+}
+
+func (x *ProtoOAOrderErrorEvent) GetOrderId() int64 {
+	if x != nil && x.OrderId != nil {
+		return *x.OrderId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderErrorEvent) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderErrorEvent) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+// * Request for getting Trader's deals historical data (execution details).
+type ProtoOADealListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2133" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	FromTimestamp       *int64                 `protobuf:"varint,3,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The Unix time from which the search starts >=0 (1st Jan 1970).
+	ToTimestamp         *int64                 `protobuf:"varint,4,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The Unix time where to stop searching <= 2147483646000 (19th Jan 2038).
+	MaxRows             *int32                 `protobuf:"varint,5,opt,name=maxRows" json:"maxRows,omitempty"`                         // The maximum number of the deals to return.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealListReq fields.
+const (
+	Default_ProtoOADealListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_REQ
+)
+
+func (x *ProtoOADealListReq) Reset() {
+	*x = ProtoOADealListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealListReq) ProtoMessage() {}
+
+func (x *ProtoOADealListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOADealListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ProtoOADealListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealListReq_PayloadType
+}
+
+func (x *ProtoOADealListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealListReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOADealListReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOADealListReq) GetMaxRows() int32 {
+	if x != nil && x.MaxRows != nil {
+		return *x.MaxRows
+	}
+	return 0
+}
+
+// * The response to the ProtoOADealListRes request.
+type ProtoOADealListRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2134" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Deal                []*ProtoOADeal         `protobuf:"bytes,3,rep,name=deal" json:"deal,omitempty"`                                // The list of the deals.
+	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealListRes fields.
+const (
+	Default_ProtoOADealListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_RES
+)
+
+func (x *ProtoOADealListRes) Reset() {
+	*x = ProtoOADealListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealListRes) ProtoMessage() {}
+
+func (x *ProtoOADealListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOADealListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ProtoOADealListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealListRes_PayloadType
+}
+
+func (x *ProtoOADealListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealListRes) GetDeal() []*ProtoOADeal {
+	if x != nil {
+		return x.Deal
+	}
+	return nil
+}
+
+func (x *ProtoOADealListRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting Trader's orders filtered by timestamp
+type ProtoOAOrderListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2175" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	FromTimestamp       *int64                 `protobuf:"varint,3,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The Unix time from which the search starts >=0 (1st Jan 1970).
+	ToTimestamp         *int64                 `protobuf:"varint,4,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The Unix time where to stop searching <= 2147483646000 (19th Jan 2038).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderListReq fields.
+const (
+	Default_ProtoOAOrderListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_LIST_REQ
+)
+
+func (x *ProtoOAOrderListReq) Reset() {
+	*x = ProtoOAOrderListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderListReq) ProtoMessage() {}
+
+func (x *ProtoOAOrderListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ProtoOAOrderListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderListReq_PayloadType
+}
+
+func (x *ProtoOAOrderListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+// * The response to the ProtoOAOrderListReq request.
+type ProtoOAOrderListRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2176" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Order               []*ProtoOAOrder        `protobuf:"bytes,3,rep,name=order" json:"order,omitempty"`                              // The list of the orders.
+	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderListRes fields.
+const (
+	Default_ProtoOAOrderListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_LIST_RES
+)
+
+func (x *ProtoOAOrderListRes) Reset() {
+	*x = ProtoOAOrderListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderListRes) ProtoMessage() {}
+
+func (x *ProtoOAOrderListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ProtoOAOrderListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderListRes_PayloadType
+}
+
+func (x *ProtoOAOrderListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListRes) GetOrder() []*ProtoOAOrder {
+	if x != nil {
+		return x.Order
+	}
+	return nil
+}
+
+func (x *ProtoOAOrderListRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting the margin estimate according to leverage profiles. Can be used before sending a new order request. This doesn't consider ACCORDING_TO_GSL margin calculation type, as this calculation is trivial: usedMargin = (VWAP price of the position - GSL price) * volume * Quote2Deposit.
+type ProtoOAExpectedMarginReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2139" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            *int64                 `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	Volume              []int64                `protobuf:"varint,4,rep,name=volume" json:"volume,omitempty"`                           // Volume represented in 0.01 of a unit (e.g. 1000 in protocol means 10.00 units).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAExpectedMarginReq fields.
+const (
+	Default_ProtoOAExpectedMarginReq_PayloadType = ProtoOAPayloadType_PROTO_OA_EXPECTED_MARGIN_REQ
+)
+
+func (x *ProtoOAExpectedMarginReq) Reset() {
+	*x = ProtoOAExpectedMarginReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAExpectedMarginReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAExpectedMarginReq) ProtoMessage() {}
+
+func (x *ProtoOAExpectedMarginReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAExpectedMarginReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAExpectedMarginReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ProtoOAExpectedMarginReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAExpectedMarginReq_PayloadType
+}
+
+func (x *ProtoOAExpectedMarginReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAExpectedMarginReq) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOAExpectedMarginReq) GetVolume() []int64 {
+	if x != nil {
+		return x.Volume
+	}
+	return nil
+}
+
+// * The response to the ProtoOAExpectedMarginReq request.
+type ProtoOAExpectedMarginRes struct {
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType      `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2140" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                   `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Margin              []*ProtoOAExpectedMargin `protobuf:"bytes,3,rep,name=margin" json:"margin,omitempty"`                            // The buy and sell margin estimate.
+	MoneyDigits         *uint32                  `protobuf:"varint,4,opt,name=moneyDigits" json:"moneyDigits,omitempty"`                 // Specifies the exponent of the monetary values. E.g. moneyDigits = 8 must be interpret as business value multiplied by 10^8, then real balance would be 10053099944 / 10^8 = 100.53099944. Affects margin.buyMargin, margin.sellMargin.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAExpectedMarginRes fields.
+const (
+	Default_ProtoOAExpectedMarginRes_PayloadType = ProtoOAPayloadType_PROTO_OA_EXPECTED_MARGIN_RES
+)
+
+func (x *ProtoOAExpectedMarginRes) Reset() {
+	*x = ProtoOAExpectedMarginRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAExpectedMarginRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAExpectedMarginRes) ProtoMessage() {}
+
+func (x *ProtoOAExpectedMarginRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAExpectedMarginRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAExpectedMarginRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ProtoOAExpectedMarginRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAExpectedMarginRes_PayloadType
+}
+
+func (x *ProtoOAExpectedMarginRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAExpectedMarginRes) GetMargin() []*ProtoOAExpectedMargin {
+	if x != nil {
+		return x.Margin
+	}
+	return nil
+}
+
+func (x *ProtoOAExpectedMarginRes) GetMoneyDigits() uint32 {
+	if x != nil && x.MoneyDigits != nil {
+		return *x.MoneyDigits
+	}
+	return 0
+}
+
+// * Event that is sent when the margin allocated to a specific position is changed.
+type ProtoOAMarginChangedEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2141" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId          *uint64                `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                   // The unique ID of the position.
+	UsedMargin          *uint64                `protobuf:"varint,4,req,name=usedMargin" json:"usedMargin,omitempty"`                   // The new value of the margin used.
+	MoneyDigits         *uint32                `protobuf:"varint,5,opt,name=moneyDigits" json:"moneyDigits,omitempty"`                 // Specifies the exponent of the monetary values. E.g. moneyDigits = 8 must be interpret as business value multiplied by 10^8, then real balance would be 10053099944 / 10^8 = 100.53099944. Affects usedMargin.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginChangedEvent fields.
+const (
+	Default_ProtoOAMarginChangedEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CHANGED_EVENT
+)
+
+func (x *ProtoOAMarginChangedEvent) Reset() {
+	*x = ProtoOAMarginChangedEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginChangedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginChangedEvent) ProtoMessage() {}
+
+func (x *ProtoOAMarginChangedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginChangedEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginChangedEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ProtoOAMarginChangedEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginChangedEvent_PayloadType
+}
+
+func (x *ProtoOAMarginChangedEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginChangedEvent) GetPositionId() uint64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginChangedEvent) GetUsedMargin() uint64 {
+	if x != nil && x.UsedMargin != nil {
+		return *x.UsedMargin
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginChangedEvent) GetMoneyDigits() uint32 {
+	if x != nil && x.MoneyDigits != nil {
+		return *x.MoneyDigits
+	}
+	return 0
+}
+
+// * Request for getting Trader's historical data of deposits and withdrawals.
+type ProtoOACashFlowHistoryListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2143" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	FromTimestamp       *int64                 `protobuf:"varint,3,req,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The Unix time from which the search starts >=0 (1st Jan 1970). Validation: toTimestamp - fromTimestamp <= 604800000 (1 week).
+	ToTimestamp         *int64                 `protobuf:"varint,4,req,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The Unix time where to stop searching <= 2147483646000 (19th Jan 2038).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOACashFlowHistoryListReq fields.
+const (
+	Default_ProtoOACashFlowHistoryListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ
+)
+
+func (x *ProtoOACashFlowHistoryListReq) Reset() {
+	*x = ProtoOACashFlowHistoryListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOACashFlowHistoryListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOACashFlowHistoryListReq) ProtoMessage() {}
+
+func (x *ProtoOACashFlowHistoryListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOACashFlowHistoryListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOACashFlowHistoryListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ProtoOACashFlowHistoryListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOACashFlowHistoryListReq_PayloadType
+}
+
+func (x *ProtoOACashFlowHistoryListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOACashFlowHistoryListReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOACashFlowHistoryListReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+// * Response to the ProtoOACashFlowHistoryListReq request.
+type ProtoOACashFlowHistoryListRes struct {
+	state               protoimpl.MessageState    `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType       `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2144" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                    `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	DepositWithdraw     []*ProtoOADepositWithdraw `protobuf:"bytes,3,rep,name=depositWithdraw" json:"depositWithdraw,omitempty"`          // The list of deposit and withdrawal operations.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOACashFlowHistoryListRes fields.
+const (
+	Default_ProtoOACashFlowHistoryListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_CASH_FLOW_HISTORY_LIST_RES
+)
+
+func (x *ProtoOACashFlowHistoryListRes) Reset() {
+	*x = ProtoOACashFlowHistoryListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOACashFlowHistoryListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOACashFlowHistoryListRes) ProtoMessage() {}
+
+func (x *ProtoOACashFlowHistoryListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOACashFlowHistoryListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOACashFlowHistoryListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *ProtoOACashFlowHistoryListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOACashFlowHistoryListRes_PayloadType
+}
+
+func (x *ProtoOACashFlowHistoryListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOACashFlowHistoryListRes) GetDepositWithdraw() []*ProtoOADepositWithdraw {
+	if x != nil {
+		return x.DepositWithdraw
+	}
+	return nil
+}
+
+// * Request for getting the list of granted trader's account for the access token.
+type ProtoOAGetAccountListByAccessTokenReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2149" json:"payloadType,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"` // The Access Token issued for providing access to the Trader's Account.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetAccountListByAccessTokenReq fields.
+const (
+	Default_ProtoOAGetAccountListByAccessTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ
+)
+
+func (x *ProtoOAGetAccountListByAccessTokenReq) Reset() {
+	*x = ProtoOAGetAccountListByAccessTokenReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetAccountListByAccessTokenReq) ProtoMessage() {}
+
+func (x *ProtoOAGetAccountListByAccessTokenReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetAccountListByAccessTokenReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetAccountListByAccessTokenReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetAccountListByAccessTokenReq_PayloadType
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenReq) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+// * Response to the ProtoOAGetAccountListByAccessTokenReq request.
+type ProtoOAGetAccountListByAccessTokenRes struct {
+	state             protoimpl.MessageState        `protogen:"open.v1"`
+	PayloadType       *ProtoOAPayloadType           `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2150" json:"payloadType,omitempty"`
+	AccessToken       *string                       `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"`                                                     // The Access Token issued for providing access to the Trader's Account.
+	PermissionScope   *ProtoOAClientPermissionScope `protobuf:"varint,3,opt,name=permissionScope,enum=messages.ProtoOAClientPermissionScope" json:"permissionScope,omitempty"` // SCOPE_VIEW, SCOPE_TRADE.
+	CtidTraderAccount []*ProtoOACtidTraderAccount   `protobuf:"bytes,4,rep,name=ctidTraderAccount" json:"ctidTraderAccount,omitempty"`                                         // The list of the accounts.
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetAccountListByAccessTokenRes fields.
+const (
+	Default_ProtoOAGetAccountListByAccessTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES
+)
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) Reset() {
+	*x = ProtoOAGetAccountListByAccessTokenRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetAccountListByAccessTokenRes) ProtoMessage() {}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetAccountListByAccessTokenRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetAccountListByAccessTokenRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetAccountListByAccessTokenRes_PayloadType
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) GetPermissionScope() ProtoOAClientPermissionScope {
+	if x != nil && x.PermissionScope != nil {
+		return *x.PermissionScope
+	}
+	return ProtoOAClientPermissionScope_SCOPE_VIEW
+}
+
+func (x *ProtoOAGetAccountListByAccessTokenRes) GetCtidTraderAccount() []*ProtoOACtidTraderAccount {
+	if x != nil {
+		return x.CtidTraderAccount
+	}
+	return nil
+}
+
+// * Request to refresh the access token using refresh token of granted trader's account.
+type ProtoOARefreshTokenReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2173" json:"payloadType,omitempty"`
+	RefreshToken  *string                `protobuf:"bytes,2,req,name=refreshToken" json:"refreshToken,omitempty"` // The Refresh Token issued for updating Access Token.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOARefreshTokenReq fields.
+const (
+	Default_ProtoOARefreshTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_REQ
+)
+
+func (x *ProtoOARefreshTokenReq) Reset() {
+	*x = ProtoOARefreshTokenReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOARefreshTokenReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOARefreshTokenReq) ProtoMessage() {}
+
+func (x *ProtoOARefreshTokenReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOARefreshTokenReq.ProtoReflect.Descriptor instead.
+func (*ProtoOARefreshTokenReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ProtoOARefreshTokenReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOARefreshTokenReq_PayloadType
+}
+
+func (x *ProtoOARefreshTokenReq) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
+	}
+	return ""
+}
+
+// * Response to the ProtoOARefreshTokenReq request.
+type ProtoOARefreshTokenRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2174" json:"payloadType,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"`   // The Access Token issued for providing access to the Trader's Account.
+	TokenType     *string                `protobuf:"bytes,3,req,name=tokenType" json:"tokenType,omitempty"`       // bearer
+	ExpiresIn     *int64                 `protobuf:"varint,4,req,name=expiresIn" json:"expiresIn,omitempty"`      // Access Token expiration in seconds.
+	RefreshToken  *string                `protobuf:"bytes,5,req,name=refreshToken" json:"refreshToken,omitempty"` // Your new Refresh Token.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOARefreshTokenRes fields.
+const (
+	Default_ProtoOARefreshTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_REFRESH_TOKEN_RES
+)
+
+func (x *ProtoOARefreshTokenRes) Reset() {
+	*x = ProtoOARefreshTokenRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOARefreshTokenRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOARefreshTokenRes) ProtoMessage() {}
+
+func (x *ProtoOARefreshTokenRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOARefreshTokenRes.ProtoReflect.Descriptor instead.
+func (*ProtoOARefreshTokenRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ProtoOARefreshTokenRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOARefreshTokenRes_PayloadType
+}
+
+func (x *ProtoOARefreshTokenRes) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *ProtoOARefreshTokenRes) GetTokenType() string {
+	if x != nil && x.TokenType != nil {
+		return *x.TokenType
+	}
+	return ""
+}
+
+func (x *ProtoOARefreshTokenRes) GetExpiresIn() int64 {
+	if x != nil && x.ExpiresIn != nil {
+		return *x.ExpiresIn
+	}
+	return 0
+}
+
+func (x *ProtoOARefreshTokenRes) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
+	}
+	return ""
+}
+
+// * Request for subscribing on spot events of the specified symbol. After successful subscription you'll receive technical ProtoOASpotEvent with latest price, after which you'll start receiving updates on prices via consequent ProtoOASpotEvents.
+type ProtoOASubscribeSpotsReq struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType              *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2127" json:"payloadType,omitempty"`
+	CtidTraderAccountId      *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId                 []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                                 // Unique identifier of the Symbol in cTrader platform.
+	SubscribeToSpotTimestamp *bool                  `protobuf:"varint,4,opt,name=subscribeToSpotTimestamp" json:"subscribeToSpotTimestamp,omitempty"` // If TRUE you will also receive the timestamp in ProtoOASpotEvent.
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeSpotsReq fields.
+const (
+	Default_ProtoOASubscribeSpotsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_REQ
+)
+
+func (x *ProtoOASubscribeSpotsReq) Reset() {
+	*x = ProtoOASubscribeSpotsReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeSpotsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeSpotsReq) ProtoMessage() {}
+
+func (x *ProtoOASubscribeSpotsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeSpotsReq.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeSpotsReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ProtoOASubscribeSpotsReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeSpotsReq_PayloadType
+}
+
+func (x *ProtoOASubscribeSpotsReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASubscribeSpotsReq) GetSymbolId() []int64 {
+	if x != nil {
+		return x.SymbolId
+	}
+	return nil
+}
+
+func (x *ProtoOASubscribeSpotsReq) GetSubscribeToSpotTimestamp() bool {
+	if x != nil && x.SubscribeToSpotTimestamp != nil {
+		return *x.SubscribeToSpotTimestamp
+	}
+	return false
+}
+
+// * Response to the ProtoOASubscribeSpotsReq request. Reflects that your request to subscribe for symbol has been added to queue. You'll receive technical ProtoOASpotEvent with current price shortly after this response.
+type ProtoOASubscribeSpotsRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2128" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeSpotsRes fields.
+const (
+	Default_ProtoOASubscribeSpotsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_SPOTS_RES
+)
+
+func (x *ProtoOASubscribeSpotsRes) Reset() {
+	*x = ProtoOASubscribeSpotsRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeSpotsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeSpotsRes) ProtoMessage() {}
+
+func (x *ProtoOASubscribeSpotsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeSpotsRes.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeSpotsRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ProtoOASubscribeSpotsRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeSpotsRes_PayloadType
+}
+
+func (x *ProtoOASubscribeSpotsRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for unsubscribing from the spot events of the specified symbol. Request to stop receiving ProtoOASpotEvents related to particular symbols. Unsubscription is useful to minimize traffic, especially during high volatility events.
+type ProtoOAUnsubscribeSpotsReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2129" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeSpotsReq fields.
+const (
+	Default_ProtoOAUnsubscribeSpotsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_SPOTS_REQ
+)
+
+func (x *ProtoOAUnsubscribeSpotsReq) Reset() {
+	*x = ProtoOAUnsubscribeSpotsReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeSpotsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeSpotsReq) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeSpotsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeSpotsReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeSpotsReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ProtoOAUnsubscribeSpotsReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeSpotsReq_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeSpotsReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAUnsubscribeSpotsReq) GetSymbolId() []int64 {
+	if x != nil {
+		return x.SymbolId
+	}
+	return nil
+}
+
+// * Response to the ProtoOASubscribeSpotsRes request. Reflects that your request to unsubscribe will has been added to queue and will be completed shortly. You may still occasionally receive ProtoOASpotEvents until request processing is complete.
+type ProtoOAUnsubscribeSpotsRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2130" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeSpotsRes fields.
+const (
+	Default_ProtoOAUnsubscribeSpotsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_SPOTS_RES
+)
+
+func (x *ProtoOAUnsubscribeSpotsRes) Reset() {
+	*x = ProtoOAUnsubscribeSpotsRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeSpotsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeSpotsRes) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeSpotsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeSpotsRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeSpotsRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ProtoOAUnsubscribeSpotsRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeSpotsRes_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeSpotsRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Event that is sent when a new spot event is generated on the server side. Requires subscription on the spot events, see ProtoOASubscribeSpotsReq. First event, received after subscription will contain latest spot prices even if market is closed.
+type ProtoOASpotEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2131" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            *int64                 `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	Bid                 *uint64                `protobuf:"varint,4,opt,name=bid" json:"bid,omitempty"`                                 // Bid price. Specified in 1/100000 of unit of a price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782)
+	Ask                 *uint64                `protobuf:"varint,5,opt,name=ask" json:"ask,omitempty"`                                 // Ask price. Specified in 1/100000 of unit of a price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782)
+	Trendbar            []*ProtoOATrendbar     `protobuf:"bytes,6,rep,name=trendbar" json:"trendbar,omitempty"`                        // Returns live trend bar. Requires subscription on the trend bars.
+	SessionClose        *uint64                `protobuf:"varint,7,opt,name=sessionClose" json:"sessionClose,omitempty"`               // Last session close. Specified in 1/100000 of unit of a price. (e.g. 123000 in protocol means 1.23, 53423782 means 534.23782)
+	Timestamp           *int64                 `protobuf:"varint,8,opt,name=timestamp" json:"timestamp,omitempty"`                     // The Unix time for spot.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASpotEvent fields.
+const (
+	Default_ProtoOASpotEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_SPOT_EVENT
+)
+
+func (x *ProtoOASpotEvent) Reset() {
+	*x = ProtoOASpotEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASpotEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASpotEvent) ProtoMessage() {}
+
+func (x *ProtoOASpotEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASpotEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOASpotEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ProtoOASpotEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASpotEvent_PayloadType
+}
+
+func (x *ProtoOASpotEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASpotEvent) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOASpotEvent) GetBid() uint64 {
+	if x != nil && x.Bid != nil {
+		return *x.Bid
+	}
+	return 0
+}
+
+func (x *ProtoOASpotEvent) GetAsk() uint64 {
+	if x != nil && x.Ask != nil {
+		return *x.Ask
+	}
+	return 0
+}
+
+func (x *ProtoOASpotEvent) GetTrendbar() []*ProtoOATrendbar {
+	if x != nil {
+		return x.Trendbar
+	}
+	return nil
+}
+
+func (x *ProtoOASpotEvent) GetSessionClose() uint64 {
+	if x != nil && x.SessionClose != nil {
+		return *x.SessionClose
+	}
+	return 0
+}
+
+func (x *ProtoOASpotEvent) GetTimestamp() int64 {
+	if x != nil && x.Timestamp != nil {
+		return *x.Timestamp
+	}
+	return 0
+}
+
+// * Request for subscribing for live trend bars. Requires subscription on the spot events, see ProtoOASubscribeSpotsReq.
+type ProtoOASubscribeLiveTrendbarReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2135" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Period              *ProtoOATrendbarPeriod `protobuf:"varint,3,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
+	SymbolId            *int64                 `protobuf:"varint,4,req,name=symbolId" json:"symbolId,omitempty"`                                 // Unique identifier of the Symbol in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeLiveTrendbarReq fields.
+const (
+	Default_ProtoOASubscribeLiveTrendbarReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ
+)
+
+func (x *ProtoOASubscribeLiveTrendbarReq) Reset() {
+	*x = ProtoOASubscribeLiveTrendbarReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeLiveTrendbarReq) ProtoMessage() {}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeLiveTrendbarReq.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeLiveTrendbarReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeLiveTrendbarReq_PayloadType
+}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) GetPeriod() ProtoOATrendbarPeriod {
+	if x != nil && x.Period != nil {
+		return *x.Period
+	}
+	return ProtoOATrendbarPeriod_M1
+}
+
+func (x *ProtoOASubscribeLiveTrendbarReq) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+// * Response to the ProtoOASubscribeLiveTrendbarReq request.
+type ProtoOASubscribeLiveTrendbarRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2165" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeLiveTrendbarRes fields.
+const (
+	Default_ProtoOASubscribeLiveTrendbarRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_RES
+)
+
+func (x *ProtoOASubscribeLiveTrendbarRes) Reset() {
+	*x = ProtoOASubscribeLiveTrendbarRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeLiveTrendbarRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeLiveTrendbarRes) ProtoMessage() {}
+
+func (x *ProtoOASubscribeLiveTrendbarRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeLiveTrendbarRes.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeLiveTrendbarRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *ProtoOASubscribeLiveTrendbarRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeLiveTrendbarRes_PayloadType
+}
+
+func (x *ProtoOASubscribeLiveTrendbarRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for unsubscribing from the live trend bars.
+type ProtoOAUnsubscribeLiveTrendbarReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2136" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Period              *ProtoOATrendbarPeriod `protobuf:"varint,3,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
+	SymbolId            *int64                 `protobuf:"varint,4,req,name=symbolId" json:"symbolId,omitempty"`                                 // Unique identifier of the Symbol in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeLiveTrendbarReq fields.
+const (
+	Default_ProtoOAUnsubscribeLiveTrendbarReq_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ
+)
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) Reset() {
+	*x = ProtoOAUnsubscribeLiveTrendbarReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeLiveTrendbarReq) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeLiveTrendbarReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeLiveTrendbarReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeLiveTrendbarReq_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) GetPeriod() ProtoOATrendbarPeriod {
+	if x != nil && x.Period != nil {
+		return *x.Period
+	}
+	return ProtoOATrendbarPeriod_M1
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarReq) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+// * Response to the ProtoOASubscribeLiveTrendbarReq request.
+type ProtoOAUnsubscribeLiveTrendbarRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2166" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeLiveTrendbarRes fields.
+const (
+	Default_ProtoOAUnsubscribeLiveTrendbarRes_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_RES
+)
+
+func (x *ProtoOAUnsubscribeLiveTrendbarRes) Reset() {
+	*x = ProtoOAUnsubscribeLiveTrendbarRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeLiveTrendbarRes) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeLiveTrendbarRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeLiveTrendbarRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeLiveTrendbarRes_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeLiveTrendbarRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for getting historical trend bars for the symbol.
+type ProtoOAGetTrendbarsReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2137" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	FromTimestamp       *int64                 `protobuf:"varint,3,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`                       // The Unix time in milliseconds from which the search starts. Must be bigger or equal to zero (1st Jan 1970).
+	ToTimestamp         *int64                 `protobuf:"varint,4,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                           // The Unix time in milliseconds of finishing the search. Smaller or equal to 2147483646000 (19th Jan 2038).
+	Period              *ProtoOATrendbarPeriod `protobuf:"varint,5,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
+	SymbolId            *int64                 `protobuf:"varint,6,req,name=symbolId" json:"symbolId,omitempty"`                                 // Unique identifier of the Symbol in cTrader platform.
+	Count               *uint32                `protobuf:"varint,7,opt,name=count" json:"count,omitempty"`                                       // Limit number of trend bars in response back from toTimestamp.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetTrendbarsReq fields.
+const (
+	Default_ProtoOAGetTrendbarsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_REQ
+)
+
+func (x *ProtoOAGetTrendbarsReq) Reset() {
+	*x = ProtoOAGetTrendbarsReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetTrendbarsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetTrendbarsReq) ProtoMessage() {}
+
+func (x *ProtoOAGetTrendbarsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetTrendbarsReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetTrendbarsReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetTrendbarsReq_PayloadType
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetPeriod() ProtoOATrendbarPeriod {
+	if x != nil && x.Period != nil {
+		return *x.Period
+	}
+	return ProtoOATrendbarPeriod_M1
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsReq) GetCount() uint32 {
+	if x != nil && x.Count != nil {
+		return *x.Count
+	}
+	return 0
+}
+
+// * Response to the ProtoOAGetTrendbarsReq request.
+type ProtoOAGetTrendbarsRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2138" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`           // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Period              *ProtoOATrendbarPeriod `protobuf:"varint,3,req,name=period,enum=messages.ProtoOATrendbarPeriod" json:"period,omitempty"` // Specifies period of trend bar series (e.g. M1, M10, etc.).
+	// Deprecated: Marked as deprecated in OpenApiMessages.proto.
+	Timestamp     *int64             `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"` // Simply don't use this field, as your original request already contains toTimestamp.
+	Trendbar      []*ProtoOATrendbar `protobuf:"bytes,5,rep,name=trendbar" json:"trendbar,omitempty"`    // The list of trend bars.
+	SymbolId      *int64             `protobuf:"varint,6,opt,name=symbolId" json:"symbolId,omitempty"`   // Unique identifier of the Symbol in cTrader platform.
+	HasMore       *bool              `protobuf:"varint,7,opt,name=hasMore" json:"hasMore,omitempty"`     // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetTrendbarsRes fields.
+const (
+	Default_ProtoOAGetTrendbarsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TRENDBARS_RES
+)
+
+func (x *ProtoOAGetTrendbarsRes) Reset() {
+	*x = ProtoOAGetTrendbarsRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetTrendbarsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetTrendbarsRes) ProtoMessage() {}
+
+func (x *ProtoOAGetTrendbarsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetTrendbarsRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetTrendbarsRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetTrendbarsRes_PayloadType
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetPeriod() ProtoOATrendbarPeriod {
+	if x != nil && x.Period != nil {
+		return *x.Period
+	}
+	return ProtoOATrendbarPeriod_M1
+}
+
+// Deprecated: Marked as deprecated in OpenApiMessages.proto.
+func (x *ProtoOAGetTrendbarsRes) GetTimestamp() int64 {
+	if x != nil && x.Timestamp != nil {
+		return *x.Timestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetTrendbar() []*ProtoOATrendbar {
+	if x != nil {
+		return x.Trendbar
+	}
+	return nil
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTrendbarsRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting historical tick data for the symbol.
+type ProtoOAGetTickDataReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2145" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`  // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            *int64                 `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                        // Unique identifier of the Symbol in cTrader platform.
+	Type                *ProtoOAQuoteType      `protobuf:"varint,4,req,name=type,enum=messages.ProtoOAQuoteType" json:"type,omitempty"` // Bid/Ask (1/2).
+	FromTimestamp       *int64                 `protobuf:"varint,5,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`              // The Unix time in milliseconds of starting the search. Must be bigger or equal to zero (1st Jan 1970).
+	ToTimestamp         *int64                 `protobuf:"varint,6,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                  // The Unix time in milliseconds of finishing the search. <= 2147483646000 (19th Jan 2038).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetTickDataReq fields.
+const (
+	Default_ProtoOAGetTickDataReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TICKDATA_REQ
+)
+
+func (x *ProtoOAGetTickDataReq) Reset() {
+	*x = ProtoOAGetTickDataReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetTickDataReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetTickDataReq) ProtoMessage() {}
+
+func (x *ProtoOAGetTickDataReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetTickDataReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetTickDataReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ProtoOAGetTickDataReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetTickDataReq_PayloadType
+}
+
+func (x *ProtoOAGetTickDataReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTickDataReq) GetSymbolId() int64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTickDataReq) GetType() ProtoOAQuoteType {
+	if x != nil && x.Type != nil {
+		return *x.Type
+	}
+	return ProtoOAQuoteType_BID
+}
+
+func (x *ProtoOAGetTickDataReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTickDataReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+// * Response to the ProtoOAGetTickDataReq request.
+type ProtoOAGetTickDataRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2146" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	TickData            []*ProtoOATickData     `protobuf:"bytes,3,rep,name=tickData" json:"tickData,omitempty"`                        // The list of ticks is in chronological order (newest first). The first tick contains Unix time in milliseconds while all subsequent ticks have the time difference in milliseconds between the previous and the current one.
+	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetTickDataRes fields.
+const (
+	Default_ProtoOAGetTickDataRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_TICKDATA_RES
+)
+
+func (x *ProtoOAGetTickDataRes) Reset() {
+	*x = ProtoOAGetTickDataRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetTickDataRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetTickDataRes) ProtoMessage() {}
+
+func (x *ProtoOAGetTickDataRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetTickDataRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetTickDataRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *ProtoOAGetTickDataRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetTickDataRes_PayloadType
+}
+
+func (x *ProtoOAGetTickDataRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetTickDataRes) GetTickData() []*ProtoOATickData {
+	if x != nil {
+		return x.TickData
+	}
+	return nil
+}
+
+func (x *ProtoOAGetTickDataRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting details of Trader's profile. Limited due to GDRP requirements.
+type ProtoOAGetCtidProfileByTokenReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2151" json:"payloadType,omitempty"`
+	AccessToken   *string                `protobuf:"bytes,2,req,name=accessToken" json:"accessToken,omitempty"` // The Access Token issued for providing access to the Trader's Account.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetCtidProfileByTokenReq fields.
+const (
+	Default_ProtoOAGetCtidProfileByTokenReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_REQ
+)
+
+func (x *ProtoOAGetCtidProfileByTokenReq) Reset() {
+	*x = ProtoOAGetCtidProfileByTokenReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetCtidProfileByTokenReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetCtidProfileByTokenReq) ProtoMessage() {}
+
+func (x *ProtoOAGetCtidProfileByTokenReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetCtidProfileByTokenReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetCtidProfileByTokenReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *ProtoOAGetCtidProfileByTokenReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetCtidProfileByTokenReq_PayloadType
+}
+
+func (x *ProtoOAGetCtidProfileByTokenReq) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+// * Response to the ProtoOAGetCtidProfileByTokenReq request.
+type ProtoOAGetCtidProfileByTokenRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2152" json:"payloadType,omitempty"`
+	Profile       *ProtoOACtidProfile    `protobuf:"bytes,2,req,name=profile" json:"profile,omitempty"` // Trader's profile.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetCtidProfileByTokenRes fields.
+const (
+	Default_ProtoOAGetCtidProfileByTokenRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES
+)
+
+func (x *ProtoOAGetCtidProfileByTokenRes) Reset() {
+	*x = ProtoOAGetCtidProfileByTokenRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetCtidProfileByTokenRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetCtidProfileByTokenRes) ProtoMessage() {}
+
+func (x *ProtoOAGetCtidProfileByTokenRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetCtidProfileByTokenRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetCtidProfileByTokenRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *ProtoOAGetCtidProfileByTokenRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetCtidProfileByTokenRes_PayloadType
+}
+
+func (x *ProtoOAGetCtidProfileByTokenRes) GetProfile() *ProtoOACtidProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+// * Event that is sent when the structure of depth of market is changed. Requires subscription on the depth of markets for the symbol, see ProtoOASubscribeDepthQuotesReq.
+type ProtoOADepthEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2155" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            *uint64                `protobuf:"varint,3,req,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	NewQuotes           []*ProtoOADepthQuote   `protobuf:"bytes,4,rep,name=newQuotes" json:"newQuotes,omitempty"`                      // The list of changes in the depth of market quotes.
+	DeletedQuotes       []uint64               `protobuf:"varint,5,rep,packed,name=deletedQuotes" json:"deletedQuotes,omitempty"`      // The list of quotes to delete.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADepthEvent fields.
+const (
+	Default_ProtoOADepthEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_DEPTH_EVENT
+)
+
+func (x *ProtoOADepthEvent) Reset() {
+	*x = ProtoOADepthEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADepthEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADepthEvent) ProtoMessage() {}
+
+func (x *ProtoOADepthEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADepthEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOADepthEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *ProtoOADepthEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADepthEvent_PayloadType
+}
+
+func (x *ProtoOADepthEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADepthEvent) GetSymbolId() uint64 {
+	if x != nil && x.SymbolId != nil {
+		return *x.SymbolId
+	}
+	return 0
+}
+
+func (x *ProtoOADepthEvent) GetNewQuotes() []*ProtoOADepthQuote {
+	if x != nil {
+		return x.NewQuotes
+	}
+	return nil
+}
+
+func (x *ProtoOADepthEvent) GetDeletedQuotes() []uint64 {
+	if x != nil {
+		return x.DeletedQuotes
+	}
+	return nil
+}
+
+// * Request for subscribing on depth of market of the specified symbol.
+type ProtoOASubscribeDepthQuotesReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2156" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeDepthQuotesReq fields.
+const (
+	Default_ProtoOASubscribeDepthQuotesReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ
+)
+
+func (x *ProtoOASubscribeDepthQuotesReq) Reset() {
+	*x = ProtoOASubscribeDepthQuotesReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeDepthQuotesReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeDepthQuotesReq) ProtoMessage() {}
+
+func (x *ProtoOASubscribeDepthQuotesReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeDepthQuotesReq.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeDepthQuotesReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *ProtoOASubscribeDepthQuotesReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeDepthQuotesReq_PayloadType
+}
+
+func (x *ProtoOASubscribeDepthQuotesReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASubscribeDepthQuotesReq) GetSymbolId() []int64 {
+	if x != nil {
+		return x.SymbolId
+	}
+	return nil
+}
+
+// * Response to the ProtoOASubscribeDepthQuotesReq request.
+type ProtoOASubscribeDepthQuotesRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2157" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASubscribeDepthQuotesRes fields.
+const (
+	Default_ProtoOASubscribeDepthQuotesRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_RES
+)
+
+func (x *ProtoOASubscribeDepthQuotesRes) Reset() {
+	*x = ProtoOASubscribeDepthQuotesRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASubscribeDepthQuotesRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASubscribeDepthQuotesRes) ProtoMessage() {}
+
+func (x *ProtoOASubscribeDepthQuotesRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASubscribeDepthQuotesRes.ProtoReflect.Descriptor instead.
+func (*ProtoOASubscribeDepthQuotesRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *ProtoOASubscribeDepthQuotesRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASubscribeDepthQuotesRes_PayloadType
+}
+
+func (x *ProtoOASubscribeDepthQuotesRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for unsubscribing from the depth of market of the specified symbol.
+type ProtoOAUnsubscribeDepthQuotesReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2158" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolId            []int64                `protobuf:"varint,3,rep,name=symbolId" json:"symbolId,omitempty"`                       // Unique identifier of the Symbol in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeDepthQuotesReq fields.
+const (
+	Default_ProtoOAUnsubscribeDepthQuotesReq_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_REQ
+)
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) Reset() {
+	*x = ProtoOAUnsubscribeDepthQuotesReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeDepthQuotesReq) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeDepthQuotesReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeDepthQuotesReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeDepthQuotesReq_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesReq) GetSymbolId() []int64 {
+	if x != nil {
+		return x.SymbolId
+	}
+	return nil
+}
+
+// * Response to the ProtoOAUnsubscribeDepthQuotesReq request.
+type ProtoOAUnsubscribeDepthQuotesRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2159" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAUnsubscribeDepthQuotesRes fields.
+const (
+	Default_ProtoOAUnsubscribeDepthQuotesRes_PayloadType = ProtoOAPayloadType_PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_RES
+)
+
+func (x *ProtoOAUnsubscribeDepthQuotesRes) Reset() {
+	*x = ProtoOAUnsubscribeDepthQuotesRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAUnsubscribeDepthQuotesRes) ProtoMessage() {}
+
+func (x *ProtoOAUnsubscribeDepthQuotesRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAUnsubscribeDepthQuotesRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAUnsubscribeDepthQuotesRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAUnsubscribeDepthQuotesRes_PayloadType
+}
+
+func (x *ProtoOAUnsubscribeDepthQuotesRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for a list of symbol categories available for a trading account.
+type ProtoOASymbolCategoryListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2160" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASymbolCategoryListReq fields.
+const (
+	Default_ProtoOASymbolCategoryListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOL_CATEGORY_REQ
+)
+
+func (x *ProtoOASymbolCategoryListReq) Reset() {
+	*x = ProtoOASymbolCategoryListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASymbolCategoryListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASymbolCategoryListReq) ProtoMessage() {}
+
+func (x *ProtoOASymbolCategoryListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASymbolCategoryListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOASymbolCategoryListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *ProtoOASymbolCategoryListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASymbolCategoryListReq_PayloadType
+}
+
+func (x *ProtoOASymbolCategoryListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response to the ProtoSymbolCategoryListReq request.
+type ProtoOASymbolCategoryListRes struct {
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType      `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2161" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                   `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	SymbolCategory      []*ProtoOASymbolCategory `protobuf:"bytes,3,rep,name=symbolCategory" json:"symbolCategory,omitempty"`            // The list of symbol categories.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOASymbolCategoryListRes fields.
+const (
+	Default_ProtoOASymbolCategoryListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_SYMBOL_CATEGORY_RES
+)
+
+func (x *ProtoOASymbolCategoryListRes) Reset() {
+	*x = ProtoOASymbolCategoryListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOASymbolCategoryListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOASymbolCategoryListRes) ProtoMessage() {}
+
+func (x *ProtoOASymbolCategoryListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOASymbolCategoryListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOASymbolCategoryListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *ProtoOASymbolCategoryListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOASymbolCategoryListRes_PayloadType
+}
+
+func (x *ProtoOASymbolCategoryListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOASymbolCategoryListRes) GetSymbolCategory() []*ProtoOASymbolCategory {
+	if x != nil {
+		return x.SymbolCategory
+	}
+	return nil
+}
+
+// * Request for logout of trading account session.
+type ProtoOAAccountLogoutReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2162" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAccountLogoutReq fields.
+const (
+	Default_ProtoOAAccountLogoutReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_LOGOUT_REQ
+)
+
+func (x *ProtoOAAccountLogoutReq) Reset() {
+	*x = ProtoOAAccountLogoutReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAccountLogoutReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAccountLogoutReq) ProtoMessage() {}
+
+func (x *ProtoOAAccountLogoutReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAccountLogoutReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountLogoutReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *ProtoOAAccountLogoutReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAccountLogoutReq_PayloadType
+}
+
+func (x *ProtoOAAccountLogoutReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response to the ProtoOAAccountLogoutReq request. Actual logout of trading account will be completed on ProtoOAAccountDisconnectEvent.
+type ProtoOAAccountLogoutRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2163" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAccountLogoutRes fields.
+const (
+	Default_ProtoOAAccountLogoutRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_LOGOUT_RES
+)
+
+func (x *ProtoOAAccountLogoutRes) Reset() {
+	*x = ProtoOAAccountLogoutRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAccountLogoutRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAccountLogoutRes) ProtoMessage() {}
+
+func (x *ProtoOAAccountLogoutRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAccountLogoutRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountLogoutRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *ProtoOAAccountLogoutRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAccountLogoutRes_PayloadType
+}
+
+func (x *ProtoOAAccountLogoutRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Event that is sent when the established session for an account is dropped on the server side. A new session must be authorized for the account.
+type ProtoOAAccountDisconnectEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2164" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAAccountDisconnectEvent fields.
+const (
+	Default_ProtoOAAccountDisconnectEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_ACCOUNT_DISCONNECT_EVENT
+)
+
+func (x *ProtoOAAccountDisconnectEvent) Reset() {
+	*x = ProtoOAAccountDisconnectEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAAccountDisconnectEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAAccountDisconnectEvent) ProtoMessage() {}
+
+func (x *ProtoOAAccountDisconnectEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAAccountDisconnectEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAAccountDisconnectEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *ProtoOAAccountDisconnectEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAAccountDisconnectEvent_PayloadType
+}
+
+func (x *ProtoOAAccountDisconnectEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Request for a list of existing margin call thresholds configured for a user.
+type ProtoOAMarginCallListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2167" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallListReq fields.
+const (
+	Default_ProtoOAMarginCallListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_LIST_REQ
+)
+
+func (x *ProtoOAMarginCallListReq) Reset() {
+	*x = ProtoOAMarginCallListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallListReq) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *ProtoOAMarginCallListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallListReq_PayloadType
+}
+
+func (x *ProtoOAMarginCallListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response with a list of existing user Margin Calls, usually contains 3 items.
+type ProtoOAMarginCallListRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2168" json:"payloadType,omitempty"`
+	MarginCall    []*ProtoOAMarginCall   `protobuf:"bytes,2,rep,name=marginCall" json:"marginCall,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallListRes fields.
+const (
+	Default_ProtoOAMarginCallListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_LIST_RES
+)
+
+func (x *ProtoOAMarginCallListRes) Reset() {
+	*x = ProtoOAMarginCallListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallListRes) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *ProtoOAMarginCallListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallListRes_PayloadType
+}
+
+func (x *ProtoOAMarginCallListRes) GetMarginCall() []*ProtoOAMarginCall {
+	if x != nil {
+		return x.MarginCall
+	}
+	return nil
+}
+
+// * Request to modify marginLevelThreshold of specified marginCallType for ctidTraderAccountId.
+type ProtoOAMarginCallUpdateReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2169" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`
+	MarginCall          *ProtoOAMarginCall     `protobuf:"bytes,3,req,name=marginCall" json:"marginCall,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallUpdateReq fields.
+const (
+	Default_ProtoOAMarginCallUpdateReq_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_UPDATE_REQ
+)
+
+func (x *ProtoOAMarginCallUpdateReq) Reset() {
+	*x = ProtoOAMarginCallUpdateReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallUpdateReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallUpdateReq) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallUpdateReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallUpdateReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallUpdateReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *ProtoOAMarginCallUpdateReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallUpdateReq_PayloadType
+}
+
+func (x *ProtoOAMarginCallUpdateReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginCallUpdateReq) GetMarginCall() *ProtoOAMarginCall {
+	if x != nil {
+		return x.MarginCall
+	}
+	return nil
+}
+
+// * If this response received, it means that margin call was successfully updated.
+type ProtoOAMarginCallUpdateRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType   *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2170" json:"payloadType,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallUpdateRes fields.
+const (
+	Default_ProtoOAMarginCallUpdateRes_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_UPDATE_RES
+)
+
+func (x *ProtoOAMarginCallUpdateRes) Reset() {
+	*x = ProtoOAMarginCallUpdateRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallUpdateRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallUpdateRes) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallUpdateRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallUpdateRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallUpdateRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *ProtoOAMarginCallUpdateRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallUpdateRes_PayloadType
+}
+
+// * Event that is sent when a Margin Call threshold configuration is updated.
+type ProtoOAMarginCallUpdateEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2171" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`
+	MarginCall          *ProtoOAMarginCall     `protobuf:"bytes,3,req,name=marginCall" json:"marginCall,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallUpdateEvent fields.
+const (
+	Default_ProtoOAMarginCallUpdateEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_UPDATE_EVENT
+)
+
+func (x *ProtoOAMarginCallUpdateEvent) Reset() {
+	*x = ProtoOAMarginCallUpdateEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallUpdateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallUpdateEvent) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallUpdateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallUpdateEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallUpdateEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *ProtoOAMarginCallUpdateEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallUpdateEvent_PayloadType
+}
+
+func (x *ProtoOAMarginCallUpdateEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginCallUpdateEvent) GetMarginCall() *ProtoOAMarginCall {
+	if x != nil {
+		return x.MarginCall
+	}
+	return nil
+}
+
+// * Event that is sent when account margin level reaches target marginLevelThreshold. Event is sent no more than once every 10 minutes to avoid spamming.
+type ProtoOAMarginCallTriggerEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2172" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`
+	MarginCall          *ProtoOAMarginCall     `protobuf:"bytes,3,req,name=marginCall" json:"marginCall,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAMarginCallTriggerEvent fields.
+const (
+	Default_ProtoOAMarginCallTriggerEvent_PayloadType = ProtoOAPayloadType_PROTO_OA_MARGIN_CALL_TRIGGER_EVENT
+)
+
+func (x *ProtoOAMarginCallTriggerEvent) Reset() {
+	*x = ProtoOAMarginCallTriggerEvent{}
+	mi := &file_OpenApiMessages_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAMarginCallTriggerEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAMarginCallTriggerEvent) ProtoMessage() {}
+
+func (x *ProtoOAMarginCallTriggerEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAMarginCallTriggerEvent.ProtoReflect.Descriptor instead.
+func (*ProtoOAMarginCallTriggerEvent) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *ProtoOAMarginCallTriggerEvent) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAMarginCallTriggerEvent_PayloadType
+}
+
+func (x *ProtoOAMarginCallTriggerEvent) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAMarginCallTriggerEvent) GetMarginCall() *ProtoOAMarginCall {
+	if x != nil {
+		return x.MarginCall
+	}
+	return nil
+}
+
+// * Request for getting a dynamic leverage entity referenced in ProtoOASymbol.leverageId.
+type ProtoOAGetDynamicLeverageByIDReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2177" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	LeverageId          *int64                 `protobuf:"varint,3,req,name=leverageId" json:"leverageId,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetDynamicLeverageByIDReq fields.
+const (
+	Default_ProtoOAGetDynamicLeverageByIDReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_DYNAMIC_LEVERAGE_REQ
+)
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) Reset() {
+	*x = ProtoOAGetDynamicLeverageByIDReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetDynamicLeverageByIDReq) ProtoMessage() {}
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetDynamicLeverageByIDReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetDynamicLeverageByIDReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetDynamicLeverageByIDReq_PayloadType
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDReq) GetLeverageId() int64 {
+	if x != nil && x.LeverageId != nil {
+		return *x.LeverageId
+	}
+	return 0
+}
+
+// * Response to the ProtoOAGetDynamicLeverageByIDReq request.
+type ProtoOAGetDynamicLeverageByIDRes struct {
+	state               protoimpl.MessageState  `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType     `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2178" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                  `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Leverage            *ProtoOADynamicLeverage `protobuf:"bytes,3,req,name=leverage" json:"leverage,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetDynamicLeverageByIDRes fields.
+const (
+	Default_ProtoOAGetDynamicLeverageByIDRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_DYNAMIC_LEVERAGE_RES
+)
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) Reset() {
+	*x = ProtoOAGetDynamicLeverageByIDRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetDynamicLeverageByIDRes) ProtoMessage() {}
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetDynamicLeverageByIDRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetDynamicLeverageByIDRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetDynamicLeverageByIDRes_PayloadType
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetDynamicLeverageByIDRes) GetLeverage() *ProtoOADynamicLeverage {
+	if x != nil {
+		return x.Leverage
+	}
+	return nil
+}
+
+// * Request for retrieving the deals related to a position.
+type ProtoOADealListByPositionIdReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2179" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId          *int64                 `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                   // The unique ID of the position.
+	FromTimestamp       *int64                 `protobuf:"varint,4,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The Unix time in milliseconds of starting the search. Must be bigger or equal to zero (1st Jan 1970).
+	ToTimestamp         *int64                 `protobuf:"varint,5,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The Unix time in milliseconds of finishing the search. <= 2147483646000 (19th Jan 2038).
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealListByPositionIdReq fields.
+const (
+	Default_ProtoOADealListByPositionIdReq_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_BY_POSITION_ID_REQ
+)
+
+func (x *ProtoOADealListByPositionIdReq) Reset() {
+	*x = ProtoOADealListByPositionIdReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealListByPositionIdReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealListByPositionIdReq) ProtoMessage() {}
+
+func (x *ProtoOADealListByPositionIdReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealListByPositionIdReq.ProtoReflect.Descriptor instead.
+func (*ProtoOADealListByPositionIdReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *ProtoOADealListByPositionIdReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealListByPositionIdReq_PayloadType
+}
+
+func (x *ProtoOADealListByPositionIdReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealListByPositionIdReq) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOADealListByPositionIdReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOADealListByPositionIdReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+// * Response to the ProtoOADealListByPositionIdReq request.
+type ProtoOADealListByPositionIdRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2180" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Deal                []*ProtoOADeal         `protobuf:"bytes,3,rep,name=deal" json:"deal,omitempty"`                                // The list of deals.
+	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealListByPositionIdRes fields.
+const (
+	Default_ProtoOADealListByPositionIdRes_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_LIST_BY_POSITION_ID_RES
+)
+
+func (x *ProtoOADealListByPositionIdRes) Reset() {
+	*x = ProtoOADealListByPositionIdRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealListByPositionIdRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealListByPositionIdRes) ProtoMessage() {}
+
+func (x *ProtoOADealListByPositionIdRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealListByPositionIdRes.ProtoReflect.Descriptor instead.
+func (*ProtoOADealListByPositionIdRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *ProtoOADealListByPositionIdRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealListByPositionIdRes_PayloadType
+}
+
+func (x *ProtoOADealListByPositionIdRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealListByPositionIdRes) GetDeal() []*ProtoOADeal {
+	if x != nil {
+		return x.Deal
+	}
+	return nil
+}
+
+func (x *ProtoOADealListByPositionIdRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting Order and its related Deals.
+type ProtoOAOrderDetailsReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2181" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	OrderId             *int64                 `protobuf:"varint,3,req,name=orderId" json:"orderId,omitempty"`                         // The unique ID of the Order.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderDetailsReq fields.
+const (
+	Default_ProtoOAOrderDetailsReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_DETAILS_REQ
+)
+
+func (x *ProtoOAOrderDetailsReq) Reset() {
+	*x = ProtoOAOrderDetailsReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderDetailsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderDetailsReq) ProtoMessage() {}
+
+func (x *ProtoOAOrderDetailsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderDetailsReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderDetailsReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *ProtoOAOrderDetailsReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderDetailsReq_PayloadType
+}
+
+func (x *ProtoOAOrderDetailsReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderDetailsReq) GetOrderId() int64 {
+	if x != nil && x.OrderId != nil {
+		return *x.OrderId
+	}
+	return 0
+}
+
+// * Response to the ProtoOAOrderDetailsReq request.
+type ProtoOAOrderDetailsRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2182" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Order               *ProtoOAOrder          `protobuf:"bytes,3,req,name=order" json:"order,omitempty"`                              // Order details.
+	Deal                []*ProtoOADeal         `protobuf:"bytes,4,rep,name=deal" json:"deal,omitempty"`                                // All Deals created by filling the specified Order.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderDetailsRes fields.
+const (
+	Default_ProtoOAOrderDetailsRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_DETAILS_RES
+)
+
+func (x *ProtoOAOrderDetailsRes) Reset() {
+	*x = ProtoOAOrderDetailsRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderDetailsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderDetailsRes) ProtoMessage() {}
+
+func (x *ProtoOAOrderDetailsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderDetailsRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderDetailsRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *ProtoOAOrderDetailsRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderDetailsRes_PayloadType
+}
+
+func (x *ProtoOAOrderDetailsRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderDetailsRes) GetOrder() *ProtoOAOrder {
+	if x != nil {
+		return x.Order
+	}
+	return nil
+}
+
+func (x *ProtoOAOrderDetailsRes) GetDeal() []*ProtoOADeal {
+	if x != nil {
+		return x.Deal
+	}
+	return nil
+}
+
+// * Request for retrieving Orders related to a Position by using Position ID. Filtered by utcLastUpdateTimestamp.
+type ProtoOAOrderListByPositionIdReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2183" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	PositionId          *int64                 `protobuf:"varint,3,req,name=positionId" json:"positionId,omitempty"`                   // The unique ID of the Position.
+	FromTimestamp       *int64                 `protobuf:"varint,4,opt,name=fromTimestamp" json:"fromTimestamp,omitempty"`             // The Unix time from which the search starts >=0 (1st Jan 1970). Search by utcLastUpdateTimestamp of the Order.
+	ToTimestamp         *int64                 `protobuf:"varint,5,opt,name=toTimestamp" json:"toTimestamp,omitempty"`                 // The Unix time where to stop searching <= 2147483646000 (19th Jan 2038). Search by utcLastUpdateTimestamp of the Order.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderListByPositionIdReq fields.
+const (
+	Default_ProtoOAOrderListByPositionIdReq_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_LIST_BY_POSITION_ID_REQ
+)
+
+func (x *ProtoOAOrderListByPositionIdReq) Reset() {
+	*x = ProtoOAOrderListByPositionIdReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderListByPositionIdReq) ProtoMessage() {}
+
+func (x *ProtoOAOrderListByPositionIdReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderListByPositionIdReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderListByPositionIdReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderListByPositionIdReq_PayloadType
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) GetPositionId() int64 {
+	if x != nil && x.PositionId != nil {
+		return *x.PositionId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) GetFromTimestamp() int64 {
+	if x != nil && x.FromTimestamp != nil {
+		return *x.FromTimestamp
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListByPositionIdReq) GetToTimestamp() int64 {
+	if x != nil && x.ToTimestamp != nil {
+		return *x.ToTimestamp
+	}
+	return 0
+}
+
+// * Response to ProtoOAOrderListByPositionIdReq request.
+type ProtoOAOrderListByPositionIdRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2184" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	Order               []*ProtoOAOrder        `protobuf:"bytes,3,rep,name=order" json:"order,omitempty"`                              // Orders related to the specified Position, sorted by utcLastUpdateTimestamp in descending order (newest first).
+	HasMore             *bool                  `protobuf:"varint,4,req,name=hasMore" json:"hasMore,omitempty"`                         // If TRUE then the number of records by filter is larger than chunkSize, the response contains the number of records that is equal to chunkSize.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAOrderListByPositionIdRes fields.
+const (
+	Default_ProtoOAOrderListByPositionIdRes_PayloadType = ProtoOAPayloadType_PROTO_OA_ORDER_LIST_BY_POSITION_ID_RES
+)
+
+func (x *ProtoOAOrderListByPositionIdRes) Reset() {
+	*x = ProtoOAOrderListByPositionIdRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAOrderListByPositionIdRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAOrderListByPositionIdRes) ProtoMessage() {}
+
+func (x *ProtoOAOrderListByPositionIdRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAOrderListByPositionIdRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAOrderListByPositionIdRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *ProtoOAOrderListByPositionIdRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAOrderListByPositionIdRes_PayloadType
+}
+
+func (x *ProtoOAOrderListByPositionIdRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAOrderListByPositionIdRes) GetOrder() []*ProtoOAOrder {
+	if x != nil {
+		return x.Order
+	}
+	return nil
+}
+
+func (x *ProtoOAOrderListByPositionIdRes) GetHasMore() bool {
+	if x != nil && x.HasMore != nil {
+		return *x.HasMore
+	}
+	return false
+}
+
+// * Request for getting sets of Deals that were offset by a specific Deal and that are offsetting the Deal.
+type ProtoOADealOffsetListReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2185" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	DealId              *int64                 `protobuf:"varint,3,req,name=dealId" json:"dealId,omitempty"`                           // The unique ID of the Deal.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealOffsetListReq fields.
+const (
+	Default_ProtoOADealOffsetListReq_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_OFFSET_LIST_REQ
+)
+
+func (x *ProtoOADealOffsetListReq) Reset() {
+	*x = ProtoOADealOffsetListReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealOffsetListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealOffsetListReq) ProtoMessage() {}
+
+func (x *ProtoOADealOffsetListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealOffsetListReq.ProtoReflect.Descriptor instead.
+func (*ProtoOADealOffsetListReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *ProtoOADealOffsetListReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealOffsetListReq_PayloadType
+}
+
+func (x *ProtoOADealOffsetListReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealOffsetListReq) GetDealId() int64 {
+	if x != nil && x.DealId != nil {
+		return *x.DealId
+	}
+	return 0
+}
+
+// * Response for ProtoOADealOffsetListReq.
+type ProtoOADealOffsetListRes struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2186" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // Unique identifier of the trader's account. Used to match responses to trader's accounts.
+	OffsetBy            []*ProtoOADealOffset   `protobuf:"bytes,3,rep,name=offsetBy" json:"offsetBy,omitempty"`                        // Deals which closed the specified deal.
+	Offsetting          []*ProtoOADealOffset   `protobuf:"bytes,4,rep,name=offsetting" json:"offsetting,omitempty"`                    // Deals which were closed by the specified deal.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOADealOffsetListRes fields.
+const (
+	Default_ProtoOADealOffsetListRes_PayloadType = ProtoOAPayloadType_PROTO_OA_DEAL_OFFSET_LIST_RES
+)
+
+func (x *ProtoOADealOffsetListRes) Reset() {
+	*x = ProtoOADealOffsetListRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[86]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOADealOffsetListRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOADealOffsetListRes) ProtoMessage() {}
+
+func (x *ProtoOADealOffsetListRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[86]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOADealOffsetListRes.ProtoReflect.Descriptor instead.
+func (*ProtoOADealOffsetListRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{86}
+}
+
+func (x *ProtoOADealOffsetListRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOADealOffsetListRes_PayloadType
+}
+
+func (x *ProtoOADealOffsetListRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOADealOffsetListRes) GetOffsetBy() []*ProtoOADealOffset {
+	if x != nil {
+		return x.OffsetBy
+	}
+	return nil
+}
+
+func (x *ProtoOADealOffsetListRes) GetOffsetting() []*ProtoOADealOffset {
+	if x != nil {
+		return x.Offsetting
+	}
+	return nil
+}
+
+// * Request for getting trader's positions' unrealized PnLs.
+type ProtoOAGetPositionUnrealizedPnLReq struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PayloadType         *ProtoOAPayloadType    `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2187" json:"payloadType,omitempty"`
+	CtidTraderAccountId *int64                 `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"` // The unique identifier of the trader's account in cTrader platform.
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetPositionUnrealizedPnLReq fields.
+const (
+	Default_ProtoOAGetPositionUnrealizedPnLReq_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQ
+)
+
+func (x *ProtoOAGetPositionUnrealizedPnLReq) Reset() {
+	*x = ProtoOAGetPositionUnrealizedPnLReq{}
+	mi := &file_OpenApiMessages_proto_msgTypes[87]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetPositionUnrealizedPnLReq) ProtoMessage() {}
+
+func (x *ProtoOAGetPositionUnrealizedPnLReq) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[87]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetPositionUnrealizedPnLReq.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetPositionUnrealizedPnLReq) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{87}
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLReq) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetPositionUnrealizedPnLReq_PayloadType
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLReq) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+// * Response to ProtoOAGetPositionUnrealizedPnLReq request.
+type ProtoOAGetPositionUnrealizedPnLRes struct {
+	state                 protoimpl.MessageState          `protogen:"open.v1"`
+	PayloadType           *ProtoOAPayloadType             `protobuf:"varint,1,opt,name=payloadType,enum=messages.ProtoOAPayloadType,def=2188" json:"payloadType,omitempty"`
+	CtidTraderAccountId   *int64                          `protobuf:"varint,2,req,name=ctidTraderAccountId" json:"ctidTraderAccountId,omitempty"`    // The unique identifier of the trader's account in cTrader platform.
+	PositionUnrealizedPnL []*ProtoOAPositionUnrealizedPnL `protobuf:"bytes,3,rep,name=positionUnrealizedPnL" json:"positionUnrealizedPnL,omitempty"` // Information about trader's positions' unrealized PnLs.
+	MoneyDigits           *uint32                         `protobuf:"varint,4,req,name=moneyDigits" json:"moneyDigits,omitempty"`                    // Specifies the exponent of various monetary values. E.g., moneyDigits = 8 should be interpreted as the value multiplied by 10^8 with the 'real' value equal to 10053099944 / 10^8 = 100.53099944. Affects positionUnrealizedPnL.grossUnrealizedPnL, positionUnrealizedPnL.netUnrealizedPnL.
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+// Default values for ProtoOAGetPositionUnrealizedPnLRes fields.
+const (
+	Default_ProtoOAGetPositionUnrealizedPnLRes_PayloadType = ProtoOAPayloadType_PROTO_OA_GET_POSITION_UNREALIZED_PNL_RES
+)
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) Reset() {
+	*x = ProtoOAGetPositionUnrealizedPnLRes{}
+	mi := &file_OpenApiMessages_proto_msgTypes[88]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoOAGetPositionUnrealizedPnLRes) ProtoMessage() {}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) ProtoReflect() protoreflect.Message {
+	mi := &file_OpenApiMessages_proto_msgTypes[88]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoOAGetPositionUnrealizedPnLRes.ProtoReflect.Descriptor instead.
+func (*ProtoOAGetPositionUnrealizedPnLRes) Descriptor() ([]byte, []int) {
+	return file_OpenApiMessages_proto_rawDescGZIP(), []int{88}
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) GetPayloadType() ProtoOAPayloadType {
+	if x != nil && x.PayloadType != nil {
+		return *x.PayloadType
+	}
+	return Default_ProtoOAGetPositionUnrealizedPnLRes_PayloadType
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) GetCtidTraderAccountId() int64 {
+	if x != nil && x.CtidTraderAccountId != nil {
+		return *x.CtidTraderAccountId
+	}
+	return 0
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) GetPositionUnrealizedPnL() []*ProtoOAPositionUnrealizedPnL {
+	if x != nil {
+		return x.PositionUnrealizedPnL
+	}
+	return nil
+}
+
+func (x *ProtoOAGetPositionUnrealizedPnLRes) GetMoneyDigits() uint32 {
+	if x != nil && x.MoneyDigits != nil {
+		return *x.MoneyDigits
+	}
+	return 0
 }
 
 var File_OpenApiMessages_proto protoreflect.FileDescriptor
@@ -1993,31 +6496,258 @@ const file_OpenApiMessages_proto_rawDesc = "" +
 	"\bclientId\x18\x02 \x02(\tR\bclientId\x12\"\n" +
 	"\fclientSecret\x18\x03 \x02(\tR\fclientSecret\"z\n" +
 	"\x19ProtoOAApplicationAuthRes\x12]\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_APPLICATION_AUTH_RESR\vpayloadType\"\x80\x02\n" +
-	"\x12ProtoOADealListReq\x12V\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_DEAL_LIST_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12$\n" +
-	"\rfromTimestamp\x18\x03 \x02(\x03R\rfromTimestamp\x12 \n" +
-	"\vtoTimestamp\x18\x04 \x02(\x03R\vtoTimestamp\x12\x18\n" +
-	"\amaxRows\x18\x05 \x01(\x05R\amaxRows\"\xe3\x01\n" +
-	"\x12ProtoOADealListRes\x12V\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_DEAL_LIST_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12)\n" +
-	"\x04deal\x18\x03 \x03(\v2\x15.messages.ProtoOADealR\x04deal\x12\x18\n" +
-	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\x91\x02\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_APPLICATION_AUTH_RESR\vpayloadType\"\xc6\x01\n" +
+	"\x15ProtoOAAccountAuthReq\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_ACCOUNT_AUTH_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12 \n" +
+	"\vaccessToken\x18\x03 \x02(\tR\vaccessToken\"\xa4\x01\n" +
+	"\x15ProtoOAAccountAuthRes\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_ACCOUNT_AUTH_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xb1\x02\n" +
 	"\x0fProtoOAErrorRes\x12R\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x12PROTO_OA_ERROR_RESR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x01(\x03R\x13ctidTraderAccountId\x12\x1c\n" +
 	"\terrorCode\x18\x03 \x02(\tR\terrorCode\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x128\n" +
-	"\x17maintenanceEndTimestamp\x18\x05 \x01(\x03R\x17maintenanceEndTimestamp\"\x99\x01\n" +
+	"\x17maintenanceEndTimestamp\x18\x05 \x01(\x03R\x17maintenanceEndTimestamp\x12\x1e\n" +
+	"\n" +
+	"retryAfter\x18\x06 \x01(\x04R\n" +
+	"retryAfter\"\x98\x01\n" +
+	"\x1cProtoOAClientDisconnectEvent\x12`\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType: PROTO_OA_CLIENT_DISCONNECT_EVENTR\vpayloadType\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xdd\x01\n" +
+	"$ProtoOAAccountsTokenInvalidatedEvent\x12i\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:)PROTO_OA_ACCOUNTS_TOKEN_INVALIDATED_EVENTR\vpayloadType\x122\n" +
+	"\x14ctidTraderAccountIds\x18\x02 \x03(\x03R\x14ctidTraderAccountIds\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"i\n" +
+	"\x11ProtoOAVersionReq\x12T\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x14PROTO_OA_VERSION_REQR\vpayloadType\"\x83\x01\n" +
+	"\x11ProtoOAVersionRes\x12T\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x14PROTO_OA_VERSION_RESR\vpayloadType\x12\x18\n" +
+	"\aversion\x18\x02 \x02(\tR\aversion\"\xa6\b\n" +
+	"\x12ProtoOANewOrderReq\x12V\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_NEW_ORDER_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x02(\x03R\bsymbolId\x128\n" +
+	"\torderType\x18\x04 \x02(\x0e2\x1a.messages.ProtoOAOrderTypeR\torderType\x128\n" +
+	"\ttradeSide\x18\x05 \x02(\x0e2\x1a.messages.ProtoOATradeSideR\ttradeSide\x12\x16\n" +
+	"\x06volume\x18\x06 \x02(\x03R\x06volume\x12\x1e\n" +
+	"\n" +
+	"limitPrice\x18\a \x01(\x01R\n" +
+	"limitPrice\x12\x1c\n" +
+	"\tstopPrice\x18\b \x01(\x01R\tstopPrice\x12P\n" +
+	"\vtimeInForce\x18\t \x01(\x0e2\x1c.messages.ProtoOATimeInForce:\x10GOOD_TILL_CANCELR\vtimeInForce\x120\n" +
+	"\x13expirationTimestamp\x18\n" +
+	" \x01(\x03R\x13expirationTimestamp\x12\x1a\n" +
+	"\bstopLoss\x18\v \x01(\x01R\bstopLoss\x12\x1e\n" +
+	"\n" +
+	"takeProfit\x18\f \x01(\x01R\n" +
+	"takeProfit\x12\x18\n" +
+	"\acomment\x18\r \x01(\tR\acomment\x12,\n" +
+	"\x11baseSlippagePrice\x18\x0e \x01(\x01R\x11baseSlippagePrice\x12*\n" +
+	"\x10slippageInPoints\x18\x0f \x01(\x05R\x10slippageInPoints\x12\x14\n" +
+	"\x05label\x18\x10 \x01(\tR\x05label\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x11 \x01(\x03R\n" +
+	"positionId\x12$\n" +
+	"\rclientOrderId\x18\x12 \x01(\tR\rclientOrderId\x12*\n" +
+	"\x10relativeStopLoss\x18\x13 \x01(\x03R\x10relativeStopLoss\x12.\n" +
+	"\x12relativeTakeProfit\x18\x14 \x01(\x03R\x12relativeTakeProfit\x12.\n" +
+	"\x12guaranteedStopLoss\x18\x15 \x01(\bR\x12guaranteedStopLoss\x12*\n" +
+	"\x10trailingStopLoss\x18\x16 \x01(\bR\x10trailingStopLoss\x12X\n" +
+	"\x11stopTriggerMethod\x18\x17 \x01(\x0e2#.messages.ProtoOAOrderTriggerMethod:\x05TRADER\x11stopTriggerMethod\"\xe4\x04\n" +
+	"\x15ProtoOAExecutionEvent\x12X\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x18PROTO_OA_EXECUTION_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12D\n" +
+	"\rexecutionType\x18\x03 \x02(\x0e2\x1e.messages.ProtoOAExecutionTypeR\rexecutionType\x125\n" +
+	"\bposition\x18\x04 \x01(\v2\x19.messages.ProtoOAPositionR\bposition\x12,\n" +
+	"\x05order\x18\x05 \x01(\v2\x16.messages.ProtoOAOrderR\x05order\x12)\n" +
+	"\x04deal\x18\x06 \x01(\v2\x15.messages.ProtoOADealR\x04deal\x12Y\n" +
+	"\x14bonusDepositWithdraw\x18\a \x01(\v2%.messages.ProtoOABonusDepositWithdrawR\x14bonusDepositWithdraw\x12J\n" +
+	"\x0fdepositWithdraw\x18\b \x01(\v2 .messages.ProtoOADepositWithdrawR\x0fdepositWithdraw\x12\x1c\n" +
+	"\terrorCode\x18\t \x01(\tR\terrorCode\x12$\n" +
+	"\risServerEvent\x18\n" +
+	" \x01(\bR\risServerEvent\"\xbe\x01\n" +
+	"\x15ProtoOACancelOrderReq\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_CANCEL_ORDER_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x18\n" +
+	"\aorderId\x18\x03 \x02(\x03R\aorderId\"\xbe\x05\n" +
+	"\x14ProtoOAAmendOrderReq\x12X\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x18PROTO_OA_AMEND_ORDER_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x18\n" +
+	"\aorderId\x18\x03 \x02(\x03R\aorderId\x12\x16\n" +
+	"\x06volume\x18\x04 \x01(\x03R\x06volume\x12\x1e\n" +
+	"\n" +
+	"limitPrice\x18\x05 \x01(\x01R\n" +
+	"limitPrice\x12\x1c\n" +
+	"\tstopPrice\x18\x06 \x01(\x01R\tstopPrice\x120\n" +
+	"\x13expirationTimestamp\x18\a \x01(\x03R\x13expirationTimestamp\x12\x1a\n" +
+	"\bstopLoss\x18\b \x01(\x01R\bstopLoss\x12\x1e\n" +
+	"\n" +
+	"takeProfit\x18\t \x01(\x01R\n" +
+	"takeProfit\x12*\n" +
+	"\x10slippageInPoints\x18\n" +
+	" \x01(\x05R\x10slippageInPoints\x12*\n" +
+	"\x10relativeStopLoss\x18\v \x01(\x03R\x10relativeStopLoss\x12.\n" +
+	"\x12relativeTakeProfit\x18\f \x01(\x03R\x12relativeTakeProfit\x12.\n" +
+	"\x12guaranteedStopLoss\x18\r \x01(\bR\x12guaranteedStopLoss\x12*\n" +
+	"\x10trailingStopLoss\x18\x0e \x01(\bR\x10trailingStopLoss\x12X\n" +
+	"\x11stopTriggerMethod\x18\x0f \x01(\x0e2#.messages.ProtoOAOrderTriggerMethod:\x05TRADER\x11stopTriggerMethod\"\xcb\x03\n" +
+	"\x1bProtoOAAmendPositionSLTPReq\x12`\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType: PROTO_OA_AMEND_POSITION_SLTP_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x03R\n" +
+	"positionId\x12\x1a\n" +
+	"\bstopLoss\x18\x04 \x01(\x01R\bstopLoss\x12\x1e\n" +
+	"\n" +
+	"takeProfit\x18\x05 \x01(\x01R\n" +
+	"takeProfit\x12.\n" +
+	"\x12guaranteedStopLoss\x18\a \x01(\bR\x12guaranteedStopLoss\x12*\n" +
+	"\x10trailingStopLoss\x18\b \x01(\bR\x10trailingStopLoss\x12`\n" +
+	"\x15stopLossTriggerMethod\x18\t \x01(\x0e2#.messages.ProtoOAOrderTriggerMethod:\x05TRADER\x15stopLossTriggerMethod\"\xe0\x01\n" +
+	"\x17ProtoOAClosePositionReq\x12[\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1bPROTO_OA_CLOSE_POSITION_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x03R\n" +
+	"positionId\x12\x16\n" +
+	"\x06volume\x18\x04 \x02(\x03R\x06volume\"\xc5\x02\n" +
+	"\x1dProtoOATrailingSLChangedEvent\x12b\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\"PROTO_OA_TRAILING_SL_CHANGED_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x03R\n" +
+	"positionId\x12\x18\n" +
+	"\aorderId\x18\x04 \x02(\x03R\aorderId\x12\x1c\n" +
+	"\tstopPrice\x18\x05 \x02(\x01R\tstopPrice\x126\n" +
+	"\x16utcLastUpdateTimestamp\x18\x06 \x02(\x03R\x16utcLastUpdateTimestamp\"\xa0\x01\n" +
+	"\x13ProtoOAAssetListReq\x12W\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ASSET_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xce\x01\n" +
+	"\x13ProtoOAAssetListRes\x12W\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ASSET_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12,\n" +
+	"\x05asset\x18\x03 \x03(\v2\x16.messages.ProtoOAAssetR\x05asset\"\xe3\x01\n" +
+	"\x15ProtoOASymbolsListReq\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOLS_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12=\n" +
+	"\x16includeArchivedSymbols\x18\x03 \x01(\b:\x05falseR\x16includeArchivedSymbols\"\xa3\x02\n" +
+	"\x15ProtoOASymbolsListRes\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOLS_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x124\n" +
+	"\x06symbol\x18\x03 \x03(\v2\x1c.messages.ProtoOALightSymbolR\x06symbol\x12G\n" +
+	"\x0earchivedSymbol\x18\x04 \x03(\v2\x1f.messages.ProtoOAArchivedSymbolR\x0earchivedSymbol\"\xbf\x01\n" +
+	"\x14ProtoOASymbolByIdReq\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOL_BY_ID_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\x9d\x02\n" +
+	"\x14ProtoOASymbolByIdRes\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOL_BY_ID_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12/\n" +
+	"\x06symbol\x18\x03 \x03(\v2\x17.messages.ProtoOASymbolR\x06symbol\x12G\n" +
+	"\x0earchivedSymbol\x18\x04 \x03(\v2\x1f.messages.ProtoOAArchivedSymbolR\x0earchivedSymbol\"\xfd\x01\n" +
+	"\x1eProtoOASymbolsForConversionReq\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SYMBOLS_FOR_CONVERSION_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\"\n" +
+	"\ffirstAssetId\x18\x03 \x02(\x03R\ffirstAssetId\x12 \n" +
+	"\vlastAssetId\x18\x04 \x02(\x03R\vlastAssetId\"\xed\x01\n" +
+	"\x1eProtoOASymbolsForConversionRes\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SYMBOLS_FOR_CONVERSION_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x124\n" +
+	"\x06symbol\x18\x03 \x03(\v2\x1c.messages.ProtoOALightSymbolR\x06symbol\"\xc8\x01\n" +
+	"\x19ProtoOASymbolChangedEvent\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_SYMBOL_CHANGED_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xab\x01\n" +
+	"\x18ProtoOAAssetClassListReq\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_ASSET_CLASS_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xe8\x01\n" +
+	"\x18ProtoOAAssetClassListRes\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_ASSET_CLASS_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12;\n" +
+	"\n" +
+	"assetClass\x18\x03 \x03(\v2\x1b.messages.ProtoOAAssetClassR\n" +
+	"assetClass\"\x99\x01\n" +
 	"\x10ProtoOATraderReq\x12S\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x13PROTO_OA_TRADER_REQR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xca\x01\n" +
 	"\x10ProtoOATraderRes\x12S\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x13PROTO_OA_TRADER_RESR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12/\n" +
-	"\x06trader\x18\x03 \x02(\v2\x17.messages.ProtoOATraderR\x06trader\"\xb4\x01\n" +
+	"\x06trader\x18\x03 \x02(\v2\x17.messages.ProtoOATraderR\x06trader\"\xdc\x01\n" +
+	"\x19ProtoOATraderUpdatedEvent\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_TRADER_UPDATE_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12/\n" +
+	"\x06trader\x18\x03 \x02(\v2\x17.messages.ProtoOATraderR\x06trader\"\xd7\x01\n" +
+	"\x13ProtoOAReconcileReq\x12V\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_RECONCILE_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x126\n" +
+	"\x16returnProtectionOrders\x18\x03 \x01(\bR\x16returnProtectionOrders\"\x84\x02\n" +
+	"\x13ProtoOAReconcileRes\x12V\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_RECONCILE_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x125\n" +
+	"\bposition\x18\x03 \x03(\v2\x19.messages.ProtoOAPositionR\bposition\x12,\n" +
+	"\x05order\x18\x04 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\"\xa0\x02\n" +
+	"\x16ProtoOAOrderErrorEvent\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_ORDER_ERROR_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x05 \x02(\x03R\x13ctidTraderAccountId\x12\x1c\n" +
+	"\terrorCode\x18\x02 \x02(\tR\terrorCode\x12\x18\n" +
+	"\aorderId\x18\x03 \x01(\x03R\aorderId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x06 \x01(\x03R\n" +
+	"positionId\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\"\x80\x02\n" +
+	"\x12ProtoOADealListReq\x12V\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_DEAL_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12$\n" +
+	"\rfromTimestamp\x18\x03 \x01(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x04 \x01(\x03R\vtoTimestamp\x12\x18\n" +
+	"\amaxRows\x18\x05 \x01(\x05R\amaxRows\"\xe3\x01\n" +
+	"\x12ProtoOADealListRes\x12V\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_DEAL_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12)\n" +
+	"\x04deal\x18\x03 \x03(\v2\x15.messages.ProtoOADealR\x04deal\x12\x18\n" +
+	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\xe8\x01\n" +
+	"\x13ProtoOAOrderListReq\x12W\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ORDER_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12$\n" +
+	"\rfromTimestamp\x18\x03 \x01(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x04 \x01(\x03R\vtoTimestamp\"\xe8\x01\n" +
+	"\x13ProtoOAOrderListRes\x12W\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ORDER_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12,\n" +
+	"\x05order\x18\x03 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\x12\x18\n" +
+	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\xde\x01\n" +
+	"\x18ProtoOAExpectedMarginReq\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_EXPECTED_MARGIN_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x02(\x03R\bsymbolId\x12\x16\n" +
+	"\x06volume\x18\x04 \x03(\x03R\x06volume\"\x85\x02\n" +
+	"\x18ProtoOAExpectedMarginRes\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_EXPECTED_MARGIN_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x127\n" +
+	"\x06margin\x18\x03 \x03(\v2\x1f.messages.ProtoOAExpectedMarginR\x06margin\x12 \n" +
+	"\vmoneyDigits\x18\x04 \x01(\rR\vmoneyDigits\"\x8e\x02\n" +
+	"\x19ProtoOAMarginChangedEvent\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_MARGIN_CHANGED_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x04R\n" +
+	"positionId\x12\x1e\n" +
+	"\n" +
+	"usedMargin\x18\x04 \x02(\x04R\n" +
+	"usedMargin\x12 \n" +
+	"\vmoneyDigits\x18\x05 \x01(\rR\vmoneyDigits\"\xfe\x01\n" +
+	"\x1dProtoOACashFlowHistoryListReq\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_CASH_FLOW_HISTORY_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12$\n" +
+	"\rfromTimestamp\x18\x03 \x02(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x04 \x02(\x03R\vtoTimestamp\"\x82\x02\n" +
+	"\x1dProtoOACashFlowHistoryListRes\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_CASH_FLOW_HISTORY_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12J\n" +
+	"\x0fdepositWithdraw\x18\x03 \x03(\v2 .messages.ProtoOADepositWithdrawR\x0fdepositWithdraw\"\xb4\x01\n" +
 	"%ProtoOAGetAccountListByAccessTokenReq\x12i\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:)PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQR\vpayloadType\x12 \n" +
 	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\"\xd8\x02\n" +
@@ -2025,7 +6755,56 @@ const file_OpenApiMessages_proto_rawDesc = "" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:)PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RESR\vpayloadType\x12 \n" +
 	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\x12P\n" +
 	"\x0fpermissionScope\x18\x03 \x01(\x0e2&.messages.ProtoOAClientPermissionScopeR\x0fpermissionScope\x12P\n" +
-	"\x11ctidTraderAccount\x18\x04 \x03(\v2\".messages.ProtoOACtidTraderAccountR\x11ctidTraderAccount\"\xd9\x02\n" +
+	"\x11ctidTraderAccount\x18\x04 \x03(\v2\".messages.ProtoOACtidTraderAccountR\x11ctidTraderAccount\"\x98\x01\n" +
+	"\x16ProtoOARefreshTokenReq\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_REQR\vpayloadType\x12\"\n" +
+	"\frefreshToken\x18\x02 \x02(\tR\frefreshToken\"\xf6\x01\n" +
+	"\x16ProtoOARefreshTokenRes\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_RESR\vpayloadType\x12 \n" +
+	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\x12\x1c\n" +
+	"\ttokenType\x18\x03 \x02(\tR\ttokenType\x12\x1c\n" +
+	"\texpiresIn\x18\x04 \x02(\x03R\texpiresIn\x12\"\n" +
+	"\frefreshToken\x18\x05 \x02(\tR\frefreshToken\"\x82\x02\n" +
+	"\x18ProtoOASubscribeSpotsReq\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SUBSCRIBE_SPOTS_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\x12:\n" +
+	"\x18subscribeToSpotTimestamp\x18\x04 \x01(\bR\x18subscribeToSpotTimestamp\"\xaa\x01\n" +
+	"\x18ProtoOASubscribeSpotsRes\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SUBSCRIBE_SPOTS_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xca\x01\n" +
+	"\x1aProtoOAUnsubscribeSpotsReq\x12^\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1ePROTO_OA_UNSUBSCRIBE_SPOTS_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xae\x01\n" +
+	"\x1aProtoOAUnsubscribeSpotsRes\x12^\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1ePROTO_OA_UNSUBSCRIBE_SPOTS_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xd2\x02\n" +
+	"\x10ProtoOASpotEvent\x12S\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x13PROTO_OA_SPOT_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x02(\x03R\bsymbolId\x12\x10\n" +
+	"\x03bid\x18\x04 \x01(\x04R\x03bid\x12\x10\n" +
+	"\x03ask\x18\x05 \x01(\x04R\x03ask\x125\n" +
+	"\btrendbar\x18\x06 \x03(\v2\x19.messages.ProtoOATrendbarR\btrendbar\x12\"\n" +
+	"\fsessionClose\x18\a \x01(\x04R\fsessionClose\x12\x1c\n" +
+	"\ttimestamp\x18\b \x01(\x03R\ttimestamp\"\x8e\x02\n" +
+	"\x1fProtoOASubscribeLiveTrendbarReq\x12d\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:$PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x127\n" +
+	"\x06period\x18\x03 \x02(\x0e2\x1f.messages.ProtoOATrendbarPeriodR\x06period\x12\x1a\n" +
+	"\bsymbolId\x18\x04 \x02(\x03R\bsymbolId\"\xb9\x01\n" +
+	"\x1fProtoOASubscribeLiveTrendbarRes\x12d\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:$PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\x92\x02\n" +
+	"!ProtoOAUnsubscribeLiveTrendbarReq\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x127\n" +
+	"\x06period\x18\x03 \x02(\x0e2\x1f.messages.ProtoOATrendbarPeriodR\x06period\x12\x1a\n" +
+	"\bsymbolId\x18\x04 \x02(\x03R\bsymbolId\"\xbd\x01\n" +
+	"!ProtoOAUnsubscribeLiveTrendbarRes\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xd9\x02\n" +
 	"\x16ProtoOAGetTrendbarsReq\x12Z\n" +
 	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_GET_TRENDBARS_REQR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12$\n" +
@@ -2041,79 +6820,153 @@ const file_OpenApiMessages_proto_rawDesc = "" +
 	"\ttimestamp\x18\x04 \x01(\x03B\x02\x18\x01R\ttimestamp\x125\n" +
 	"\btrendbar\x18\x05 \x03(\v2\x19.messages.ProtoOATrendbarR\btrendbar\x12\x1a\n" +
 	"\bsymbolId\x18\x06 \x01(\x03R\bsymbolId\x12\x18\n" +
-	"\ahasMore\x18\a \x01(\bR\ahasMore\"\xc6\x01\n" +
-	"\x15ProtoOAAccountAuthReq\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_ACCOUNT_AUTH_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12 \n" +
-	"\vaccessToken\x18\x03 \x02(\tR\vaccessToken\"\xa4\x01\n" +
-	"\x15ProtoOAAccountAuthRes\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_ACCOUNT_AUTH_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\x9f\x01\n" +
-	"\x13ProtoOAReconcileReq\x12V\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_RECONCILE_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\x84\x02\n" +
-	"\x13ProtoOAReconcileRes\x12V\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x16PROTO_OA_RECONCILE_RESR\vpayloadType\x120\n" +
+	"\ahasMore\x18\a \x01(\bR\ahasMore\"\xb8\x02\n" +
+	"\x15ProtoOAGetTickDataReq\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_GET_TICKDATA_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
+	"\bsymbolId\x18\x03 \x02(\x03R\bsymbolId\x12.\n" +
+	"\x04type\x18\x04 \x02(\x0e2\x1a.messages.ProtoOAQuoteTypeR\x04type\x12$\n" +
+	"\rfromTimestamp\x18\x05 \x01(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x06 \x01(\x03R\vtoTimestamp\"\xf5\x01\n" +
+	"\x15ProtoOAGetTickDataRes\x12Y\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_GET_TICKDATA_RESR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x125\n" +
-	"\bposition\x18\x03 \x03(\v2\x19.messages.ProtoOAPositionR\bposition\x12,\n" +
-	"\x05order\x18\x04 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\"\x98\x01\n" +
-	"\x16ProtoOARefreshTokenReq\x12Z\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_REQR\vpayloadType\x12\"\n" +
-	"\frefreshToken\x18\x02 \x02(\tR\frefreshToken\"\xf6\x01\n" +
-	"\x16ProtoOARefreshTokenRes\x12Z\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_REFRESH_TOKEN_RESR\vpayloadType\x12 \n" +
-	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\x12\x1c\n" +
-	"\ttokenType\x18\x03 \x02(\tR\ttokenType\x12\x1c\n" +
-	"\texpiresIn\x18\x04 \x02(\x03R\texpiresIn\x12\"\n" +
-	"\frefreshToken\x18\x05 \x02(\tR\frefreshToken\"\xbf\x01\n" +
-	"\x14ProtoOASymbolByIdReq\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOL_BY_ID_REQR\vpayloadType\x120\n" +
+	"\btickData\x18\x03 \x03(\v2\x19.messages.ProtoOATickDataR\btickData\x12\x18\n" +
+	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\xab\x01\n" +
+	"\x1fProtoOAGetCtidProfileByTokenReq\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_REQR\vpayloadType\x12 \n" +
+	"\vaccessToken\x18\x02 \x02(\tR\vaccessToken\"\xc1\x01\n" +
+	"\x1fProtoOAGetCtidProfileByTokenRes\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RESR\vpayloadType\x126\n" +
+	"\aprofile\x18\x02 \x02(\v2\x1c.messages.ProtoOACtidProfileR\aprofile\"\x9c\x02\n" +
+	"\x11ProtoOADepthEvent\x12T\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x14PROTO_OA_DEPTH_EVENTR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
-	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xd4\x01\n" +
-	"\x14ProtoOASymbolByIdRes\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOL_BY_ID_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12/\n" +
-	"\x06symbol\x18\x03 \x03(\v2\x17.messages.ProtoOASymbolR\x06symbol\"\xc6\x01\n" +
-	"\x18ProtoOASubscribeSpotsReq\x12\\\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SUBSCRIBE_SPOTS_REQR\vpayloadType\x120\n" +
+	"\bsymbolId\x18\x03 \x02(\x04R\bsymbolId\x129\n" +
+	"\tnewQuotes\x18\x04 \x03(\v2\x1b.messages.ProtoOADepthQuoteR\tnewQuotes\x12(\n" +
+	"\rdeletedQuotes\x18\x05 \x03(\x04B\x02\x10\x01R\rdeletedQuotes\"\xd3\x01\n" +
+	"\x1eProtoOASubscribeDepthQuotesReq\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
-	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xaa\x01\n" +
-	"\x18ProtoOASubscribeSpotsRes\x12\\\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SUBSCRIBE_SPOTS_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xb4\x02\n" +
-	"\x10ProtoOASpotEvent\x12S\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x13PROTO_OA_SPOT_EVENTR\vpayloadType\x120\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xb7\x01\n" +
+	"\x1eProtoOASubscribeDepthQuotesRes\x12c\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xd7\x01\n" +
+	" ProtoOAUnsubscribeDepthQuotesReq\x12e\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:%PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_REQR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1a\n" +
-	"\bsymbolId\x18\x03 \x02(\x03R\bsymbolId\x12\x10\n" +
-	"\x03bid\x18\x04 \x01(\x04R\x03bid\x12\x10\n" +
-	"\x03ask\x18\x05 \x01(\x04R\x03ask\x125\n" +
-	"\btrendbar\x18\x06 \x03(\v2\x19.messages.ProtoOATrendbarR\btrendbar\x12\"\n" +
-	"\fsessionClose\x18\a \x01(\x04R\fsessionClose\"\xfd\x01\n" +
-	"\x1eProtoOASymbolsForConversionReq\x12c\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SYMBOLS_FOR_CONVERSION_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\"\n" +
-	"\ffirstAssetId\x18\x03 \x02(\x03R\ffirstAssetId\x12 \n" +
-	"\vlastAssetId\x18\x04 \x02(\x03R\vlastAssetId\"\xed\x01\n" +
-	"\x1eProtoOASymbolsForConversionRes\x12c\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:#PROTO_OA_SYMBOLS_FOR_CONVERSION_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x124\n" +
-	"\x06symbol\x18\x03 \x03(\v2\x1c.messages.ProtoOALightSymbolR\x06symbol\"\xa0\x01\n" +
-	"\x13ProtoOAAssetListReq\x12W\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ASSET_LIST_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xce\x01\n" +
-	"\x13ProtoOAAssetListRes\x12W\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x17PROTO_OA_ASSET_LIST_RESR\vpayloadType\x120\n" +
+	"\bsymbolId\x18\x03 \x03(\x03R\bsymbolId\"\xbb\x01\n" +
+	" ProtoOAUnsubscribeDepthQuotesRes\x12e\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:%PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xae\x01\n" +
+	"\x1cProtoOASymbolCategoryListReq\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SYMBOL_CATEGORY_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xf7\x01\n" +
+	"\x1cProtoOASymbolCategoryListRes\x12\\\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1cPROTO_OA_SYMBOL_CATEGORY_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12G\n" +
+	"\x0esymbolCategory\x18\x03 \x03(\v2\x1f.messages.ProtoOASymbolCategoryR\x0esymbolCategory\"\xa8\x01\n" +
+	"\x17ProtoOAAccountLogoutReq\x12[\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1bPROTO_OA_ACCOUNT_LOGOUT_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xa8\x01\n" +
+	"\x17ProtoOAAccountLogoutRes\x12[\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1bPROTO_OA_ACCOUNT_LOGOUT_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xb4\x01\n" +
+	"\x1dProtoOAAccountDisconnectEvent\x12a\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:!PROTO_OA_ACCOUNT_DISCONNECT_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xab\x01\n" +
+	"\x18ProtoOAMarginCallListReq\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_MARGIN_CALL_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xb6\x01\n" +
+	"\x18ProtoOAMarginCallListRes\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_MARGIN_CALL_LIST_RESR\vpayloadType\x12;\n" +
+	"\n" +
+	"marginCall\x18\x02 \x03(\v2\x1b.messages.ProtoOAMarginCallR\n" +
+	"marginCall\"\xec\x01\n" +
+	"\x1aProtoOAMarginCallUpdateReq\x12_\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1fPROTO_OA_MARGIN_CALL_UPDATE_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12;\n" +
+	"\n" +
+	"marginCall\x18\x03 \x02(\v2\x1b.messages.ProtoOAMarginCallR\n" +
+	"marginCall\"}\n" +
+	"\x1aProtoOAMarginCallUpdateRes\x12_\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1fPROTO_OA_MARGIN_CALL_UPDATE_RESR\vpayloadType\"\xf0\x01\n" +
+	"\x1cProtoOAMarginCallUpdateEvent\x12a\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:!PROTO_OA_MARGIN_CALL_UPDATE_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12;\n" +
+	"\n" +
+	"marginCall\x18\x03 \x02(\v2\x1b.messages.ProtoOAMarginCallR\n" +
+	"marginCall\"\xf2\x01\n" +
+	"\x1dProtoOAMarginCallTriggerEvent\x12b\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\"PROTO_OA_MARGIN_CALL_TRIGGER_EVENTR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12;\n" +
+	"\n" +
+	"marginCall\x18\x03 \x02(\v2\x1b.messages.ProtoOAMarginCallR\n" +
+	"marginCall\"\xd7\x01\n" +
+	" ProtoOAGetDynamicLeverageByIDReq\x12a\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:!PROTO_OA_GET_DYNAMIC_LEVERAGE_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"leverageId\x18\x03 \x02(\x03R\n" +
+	"leverageId\"\xf5\x01\n" +
+	" ProtoOAGetDynamicLeverageByIDRes\x12a\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:!PROTO_OA_GET_DYNAMIC_LEVERAGE_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12<\n" +
+	"\bleverage\x18\x03 \x02(\v2 .messages.ProtoOADynamicLeverageR\bleverage\"\xa1\x02\n" +
+	"\x1eProtoOADealListByPositionIdReq\x12e\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:%PROTO_OA_DEAL_LIST_BY_POSITION_ID_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x03R\n" +
+	"positionId\x12$\n" +
+	"\rfromTimestamp\x18\x04 \x01(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x05 \x01(\x03R\vtoTimestamp\"\xfe\x01\n" +
+	"\x1eProtoOADealListByPositionIdRes\x12e\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:%PROTO_OA_DEAL_LIST_BY_POSITION_ID_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12)\n" +
+	"\x04deal\x18\x03 \x03(\v2\x15.messages.ProtoOADealR\x04deal\x12\x18\n" +
+	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\xc0\x01\n" +
+	"\x16ProtoOAOrderDetailsReq\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_ORDER_DETAILS_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x18\n" +
+	"\aorderId\x18\x03 \x02(\x03R\aorderId\"\xff\x01\n" +
+	"\x16ProtoOAOrderDetailsRes\x12Z\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1aPROTO_OA_ORDER_DETAILS_RESR\vpayloadType\x120\n" +
 	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12,\n" +
-	"\x05asset\x18\x03 \x03(\v2\x16.messages.ProtoOAAssetR\x05asset\"\xdc\x01\n" +
-	"\x15ProtoOASymbolsListReq\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOLS_LIST_REQR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x126\n" +
-	"\x16includeArchivedSymbols\x18\x03 \x01(\bR\x16includeArchivedSymbols\"\xa3\x02\n" +
-	"\x15ProtoOASymbolsListRes\x12Y\n" +
-	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x19PROTO_OA_SYMBOLS_LIST_RESR\vpayloadType\x120\n" +
-	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x124\n" +
-	"\x06symbol\x18\x03 \x03(\v2\x1c.messages.ProtoOALightSymbolR\x06symbol\x12G\n" +
-	"\x0earchivedSymbol\x18\x04 \x03(\v2\x1f.messages.ProtoOAArchivedSymbolR\x0earchivedSymbolB!Z\x1fgithub.com/Carlosokumu/messages"
+	"\x05order\x18\x03 \x02(\v2\x16.messages.ProtoOAOrderR\x05order\x12)\n" +
+	"\x04deal\x18\x04 \x03(\v2\x15.messages.ProtoOADealR\x04deal\"\xa3\x02\n" +
+	"\x1fProtoOAOrderListByPositionIdReq\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_ORDER_LIST_BY_POSITION_ID_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x1e\n" +
+	"\n" +
+	"positionId\x18\x03 \x02(\x03R\n" +
+	"positionId\x12$\n" +
+	"\rfromTimestamp\x18\x04 \x01(\x03R\rfromTimestamp\x12 \n" +
+	"\vtoTimestamp\x18\x05 \x01(\x03R\vtoTimestamp\"\x83\x02\n" +
+	"\x1fProtoOAOrderListByPositionIdRes\x12f\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:&PROTO_OA_ORDER_LIST_BY_POSITION_ID_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12,\n" +
+	"\x05order\x18\x03 \x03(\v2\x16.messages.ProtoOAOrderR\x05order\x12\x18\n" +
+	"\ahasMore\x18\x04 \x02(\bR\ahasMore\"\xc3\x01\n" +
+	"\x18ProtoOADealOffsetListReq\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_DEAL_OFFSET_LIST_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\x16\n" +
+	"\x06dealId\x18\x03 \x02(\x03R\x06dealId\"\xa1\x02\n" +
+	"\x18ProtoOADealOffsetListRes\x12]\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:\x1dPROTO_OA_DEAL_OFFSET_LIST_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x127\n" +
+	"\boffsetBy\x18\x03 \x03(\v2\x1b.messages.ProtoOADealOffsetR\boffsetBy\x12;\n" +
+	"\n" +
+	"offsetting\x18\x04 \x03(\v2\x1b.messages.ProtoOADealOffsetR\n" +
+	"offsetting\"\xc0\x01\n" +
+	"\"ProtoOAGetPositionUnrealizedPnLReq\x12h\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:(PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\"\xc0\x02\n" +
+	"\"ProtoOAGetPositionUnrealizedPnLRes\x12h\n" +
+	"\vpayloadType\x18\x01 \x01(\x0e2\x1c.messages.ProtoOAPayloadType:(PROTO_OA_GET_POSITION_UNREALIZED_PNL_RESR\vpayloadType\x120\n" +
+	"\x13ctidTraderAccountId\x18\x02 \x02(\x03R\x13ctidTraderAccountId\x12\\\n" +
+	"\x15positionUnrealizedPnL\x18\x03 \x03(\v2&.messages.ProtoOAPositionUnrealizedPnLR\x15positionUnrealizedPnL\x12 \n" +
+	"\vmoneyDigits\x18\x04 \x02(\rR\vmoneyDigitsB!Z\x1fgithub.com/Carlosokumu/messages"
 
 var (
 	file_OpenApiMessages_proto_rawDescOnce sync.Once
@@ -2127,99 +6980,276 @@ func file_OpenApiMessages_proto_rawDescGZIP() []byte {
 	return file_OpenApiMessages_proto_rawDescData
 }
 
-var file_OpenApiMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_OpenApiMessages_proto_msgTypes = make([]protoimpl.MessageInfo, 89)
 var file_OpenApiMessages_proto_goTypes = []any{
 	(*ProtoOAApplicationAuthReq)(nil),             // 0: messages.ProtoOAApplicationAuthReq
 	(*ProtoOAApplicationAuthRes)(nil),             // 1: messages.ProtoOAApplicationAuthRes
-	(*ProtoOADealListReq)(nil),                    // 2: messages.ProtoOADealListReq
-	(*ProtoOADealListRes)(nil),                    // 3: messages.ProtoOADealListRes
+	(*ProtoOAAccountAuthReq)(nil),                 // 2: messages.ProtoOAAccountAuthReq
+	(*ProtoOAAccountAuthRes)(nil),                 // 3: messages.ProtoOAAccountAuthRes
 	(*ProtoOAErrorRes)(nil),                       // 4: messages.ProtoOAErrorRes
-	(*ProtoOATraderReq)(nil),                      // 5: messages.ProtoOATraderReq
-	(*ProtoOATraderRes)(nil),                      // 6: messages.ProtoOATraderRes
-	(*ProtoOAGetAccountListByAccessTokenReq)(nil), // 7: messages.ProtoOAGetAccountListByAccessTokenReq
-	(*ProtoOAGetAccountListByAccessTokenRes)(nil), // 8: messages.ProtoOAGetAccountListByAccessTokenRes
-	(*ProtoOAGetTrendbarsReq)(nil),                // 9: messages.ProtoOAGetTrendbarsReq
-	(*ProtoOAGetTrendbarsRes)(nil),                // 10: messages.ProtoOAGetTrendbarsRes
-	(*ProtoOAAccountAuthReq)(nil),                 // 11: messages.ProtoOAAccountAuthReq
-	(*ProtoOAAccountAuthRes)(nil),                 // 12: messages.ProtoOAAccountAuthRes
-	(*ProtoOAReconcileReq)(nil),                   // 13: messages.ProtoOAReconcileReq
-	(*ProtoOAReconcileRes)(nil),                   // 14: messages.ProtoOAReconcileRes
-	(*ProtoOARefreshTokenReq)(nil),                // 15: messages.ProtoOARefreshTokenReq
-	(*ProtoOARefreshTokenRes)(nil),                // 16: messages.ProtoOARefreshTokenRes
-	(*ProtoOASymbolByIdReq)(nil),                  // 17: messages.ProtoOASymbolByIdReq
-	(*ProtoOASymbolByIdRes)(nil),                  // 18: messages.ProtoOASymbolByIdRes
-	(*ProtoOASubscribeSpotsReq)(nil),              // 19: messages.ProtoOASubscribeSpotsReq
-	(*ProtoOASubscribeSpotsRes)(nil),              // 20: messages.ProtoOASubscribeSpotsRes
-	(*ProtoOASpotEvent)(nil),                      // 21: messages.ProtoOASpotEvent
+	(*ProtoOAClientDisconnectEvent)(nil),          // 5: messages.ProtoOAClientDisconnectEvent
+	(*ProtoOAAccountsTokenInvalidatedEvent)(nil),  // 6: messages.ProtoOAAccountsTokenInvalidatedEvent
+	(*ProtoOAVersionReq)(nil),                     // 7: messages.ProtoOAVersionReq
+	(*ProtoOAVersionRes)(nil),                     // 8: messages.ProtoOAVersionRes
+	(*ProtoOANewOrderReq)(nil),                    // 9: messages.ProtoOANewOrderReq
+	(*ProtoOAExecutionEvent)(nil),                 // 10: messages.ProtoOAExecutionEvent
+	(*ProtoOACancelOrderReq)(nil),                 // 11: messages.ProtoOACancelOrderReq
+	(*ProtoOAAmendOrderReq)(nil),                  // 12: messages.ProtoOAAmendOrderReq
+	(*ProtoOAAmendPositionSLTPReq)(nil),           // 13: messages.ProtoOAAmendPositionSLTPReq
+	(*ProtoOAClosePositionReq)(nil),               // 14: messages.ProtoOAClosePositionReq
+	(*ProtoOATrailingSLChangedEvent)(nil),         // 15: messages.ProtoOATrailingSLChangedEvent
+	(*ProtoOAAssetListReq)(nil),                   // 16: messages.ProtoOAAssetListReq
+	(*ProtoOAAssetListRes)(nil),                   // 17: messages.ProtoOAAssetListRes
+	(*ProtoOASymbolsListReq)(nil),                 // 18: messages.ProtoOASymbolsListReq
+	(*ProtoOASymbolsListRes)(nil),                 // 19: messages.ProtoOASymbolsListRes
+	(*ProtoOASymbolByIdReq)(nil),                  // 20: messages.ProtoOASymbolByIdReq
+	(*ProtoOASymbolByIdRes)(nil),                  // 21: messages.ProtoOASymbolByIdRes
 	(*ProtoOASymbolsForConversionReq)(nil),        // 22: messages.ProtoOASymbolsForConversionReq
 	(*ProtoOASymbolsForConversionRes)(nil),        // 23: messages.ProtoOASymbolsForConversionRes
-	(*ProtoOAAssetListReq)(nil),                   // 24: messages.ProtoOAAssetListReq
-	(*ProtoOAAssetListRes)(nil),                   // 25: messages.ProtoOAAssetListRes
-	(*ProtoOASymbolsListReq)(nil),                 // 26: messages.ProtoOASymbolsListReq
-	(*ProtoOASymbolsListRes)(nil),                 // 27: messages.ProtoOASymbolsListRes
-	(ProtoOAPayloadType)(0),                       // 28: messages.ProtoOAPayloadType
-	(*ProtoOADeal)(nil),                           // 29: messages.ProtoOADeal
-	(*ProtoOATrader)(nil),                         // 30: messages.ProtoOATrader
-	(ProtoOAClientPermissionScope)(0),             // 31: messages.ProtoOAClientPermissionScope
-	(*ProtoOACtidTraderAccount)(nil),              // 32: messages.ProtoOACtidTraderAccount
-	(ProtoOATrendbarPeriod)(0),                    // 33: messages.ProtoOATrendbarPeriod
-	(*ProtoOATrendbar)(nil),                       // 34: messages.ProtoOATrendbar
-	(*ProtoOAPosition)(nil),                       // 35: messages.ProtoOAPosition
-	(*ProtoOAOrder)(nil),                          // 36: messages.ProtoOAOrder
-	(*ProtoOASymbol)(nil),                         // 37: messages.ProtoOASymbol
-	(*ProtoOALightSymbol)(nil),                    // 38: messages.ProtoOALightSymbol
-	(*ProtoOAAsset)(nil),                          // 39: messages.ProtoOAAsset
-	(*ProtoOAArchivedSymbol)(nil),                 // 40: messages.ProtoOAArchivedSymbol
+	(*ProtoOASymbolChangedEvent)(nil),             // 24: messages.ProtoOASymbolChangedEvent
+	(*ProtoOAAssetClassListReq)(nil),              // 25: messages.ProtoOAAssetClassListReq
+	(*ProtoOAAssetClassListRes)(nil),              // 26: messages.ProtoOAAssetClassListRes
+	(*ProtoOATraderReq)(nil),                      // 27: messages.ProtoOATraderReq
+	(*ProtoOATraderRes)(nil),                      // 28: messages.ProtoOATraderRes
+	(*ProtoOATraderUpdatedEvent)(nil),             // 29: messages.ProtoOATraderUpdatedEvent
+	(*ProtoOAReconcileReq)(nil),                   // 30: messages.ProtoOAReconcileReq
+	(*ProtoOAReconcileRes)(nil),                   // 31: messages.ProtoOAReconcileRes
+	(*ProtoOAOrderErrorEvent)(nil),                // 32: messages.ProtoOAOrderErrorEvent
+	(*ProtoOADealListReq)(nil),                    // 33: messages.ProtoOADealListReq
+	(*ProtoOADealListRes)(nil),                    // 34: messages.ProtoOADealListRes
+	(*ProtoOAOrderListReq)(nil),                   // 35: messages.ProtoOAOrderListReq
+	(*ProtoOAOrderListRes)(nil),                   // 36: messages.ProtoOAOrderListRes
+	(*ProtoOAExpectedMarginReq)(nil),              // 37: messages.ProtoOAExpectedMarginReq
+	(*ProtoOAExpectedMarginRes)(nil),              // 38: messages.ProtoOAExpectedMarginRes
+	(*ProtoOAMarginChangedEvent)(nil),             // 39: messages.ProtoOAMarginChangedEvent
+	(*ProtoOACashFlowHistoryListReq)(nil),         // 40: messages.ProtoOACashFlowHistoryListReq
+	(*ProtoOACashFlowHistoryListRes)(nil),         // 41: messages.ProtoOACashFlowHistoryListRes
+	(*ProtoOAGetAccountListByAccessTokenReq)(nil), // 42: messages.ProtoOAGetAccountListByAccessTokenReq
+	(*ProtoOAGetAccountListByAccessTokenRes)(nil), // 43: messages.ProtoOAGetAccountListByAccessTokenRes
+	(*ProtoOARefreshTokenReq)(nil),                // 44: messages.ProtoOARefreshTokenReq
+	(*ProtoOARefreshTokenRes)(nil),                // 45: messages.ProtoOARefreshTokenRes
+	(*ProtoOASubscribeSpotsReq)(nil),              // 46: messages.ProtoOASubscribeSpotsReq
+	(*ProtoOASubscribeSpotsRes)(nil),              // 47: messages.ProtoOASubscribeSpotsRes
+	(*ProtoOAUnsubscribeSpotsReq)(nil),            // 48: messages.ProtoOAUnsubscribeSpotsReq
+	(*ProtoOAUnsubscribeSpotsRes)(nil),            // 49: messages.ProtoOAUnsubscribeSpotsRes
+	(*ProtoOASpotEvent)(nil),                      // 50: messages.ProtoOASpotEvent
+	(*ProtoOASubscribeLiveTrendbarReq)(nil),       // 51: messages.ProtoOASubscribeLiveTrendbarReq
+	(*ProtoOASubscribeLiveTrendbarRes)(nil),       // 52: messages.ProtoOASubscribeLiveTrendbarRes
+	(*ProtoOAUnsubscribeLiveTrendbarReq)(nil),     // 53: messages.ProtoOAUnsubscribeLiveTrendbarReq
+	(*ProtoOAUnsubscribeLiveTrendbarRes)(nil),     // 54: messages.ProtoOAUnsubscribeLiveTrendbarRes
+	(*ProtoOAGetTrendbarsReq)(nil),                // 55: messages.ProtoOAGetTrendbarsReq
+	(*ProtoOAGetTrendbarsRes)(nil),                // 56: messages.ProtoOAGetTrendbarsRes
+	(*ProtoOAGetTickDataReq)(nil),                 // 57: messages.ProtoOAGetTickDataReq
+	(*ProtoOAGetTickDataRes)(nil),                 // 58: messages.ProtoOAGetTickDataRes
+	(*ProtoOAGetCtidProfileByTokenReq)(nil),       // 59: messages.ProtoOAGetCtidProfileByTokenReq
+	(*ProtoOAGetCtidProfileByTokenRes)(nil),       // 60: messages.ProtoOAGetCtidProfileByTokenRes
+	(*ProtoOADepthEvent)(nil),                     // 61: messages.ProtoOADepthEvent
+	(*ProtoOASubscribeDepthQuotesReq)(nil),        // 62: messages.ProtoOASubscribeDepthQuotesReq
+	(*ProtoOASubscribeDepthQuotesRes)(nil),        // 63: messages.ProtoOASubscribeDepthQuotesRes
+	(*ProtoOAUnsubscribeDepthQuotesReq)(nil),      // 64: messages.ProtoOAUnsubscribeDepthQuotesReq
+	(*ProtoOAUnsubscribeDepthQuotesRes)(nil),      // 65: messages.ProtoOAUnsubscribeDepthQuotesRes
+	(*ProtoOASymbolCategoryListReq)(nil),          // 66: messages.ProtoOASymbolCategoryListReq
+	(*ProtoOASymbolCategoryListRes)(nil),          // 67: messages.ProtoOASymbolCategoryListRes
+	(*ProtoOAAccountLogoutReq)(nil),               // 68: messages.ProtoOAAccountLogoutReq
+	(*ProtoOAAccountLogoutRes)(nil),               // 69: messages.ProtoOAAccountLogoutRes
+	(*ProtoOAAccountDisconnectEvent)(nil),         // 70: messages.ProtoOAAccountDisconnectEvent
+	(*ProtoOAMarginCallListReq)(nil),              // 71: messages.ProtoOAMarginCallListReq
+	(*ProtoOAMarginCallListRes)(nil),              // 72: messages.ProtoOAMarginCallListRes
+	(*ProtoOAMarginCallUpdateReq)(nil),            // 73: messages.ProtoOAMarginCallUpdateReq
+	(*ProtoOAMarginCallUpdateRes)(nil),            // 74: messages.ProtoOAMarginCallUpdateRes
+	(*ProtoOAMarginCallUpdateEvent)(nil),          // 75: messages.ProtoOAMarginCallUpdateEvent
+	(*ProtoOAMarginCallTriggerEvent)(nil),         // 76: messages.ProtoOAMarginCallTriggerEvent
+	(*ProtoOAGetDynamicLeverageByIDReq)(nil),      // 77: messages.ProtoOAGetDynamicLeverageByIDReq
+	(*ProtoOAGetDynamicLeverageByIDRes)(nil),      // 78: messages.ProtoOAGetDynamicLeverageByIDRes
+	(*ProtoOADealListByPositionIdReq)(nil),        // 79: messages.ProtoOADealListByPositionIdReq
+	(*ProtoOADealListByPositionIdRes)(nil),        // 80: messages.ProtoOADealListByPositionIdRes
+	(*ProtoOAOrderDetailsReq)(nil),                // 81: messages.ProtoOAOrderDetailsReq
+	(*ProtoOAOrderDetailsRes)(nil),                // 82: messages.ProtoOAOrderDetailsRes
+	(*ProtoOAOrderListByPositionIdReq)(nil),       // 83: messages.ProtoOAOrderListByPositionIdReq
+	(*ProtoOAOrderListByPositionIdRes)(nil),       // 84: messages.ProtoOAOrderListByPositionIdRes
+	(*ProtoOADealOffsetListReq)(nil),              // 85: messages.ProtoOADealOffsetListReq
+	(*ProtoOADealOffsetListRes)(nil),              // 86: messages.ProtoOADealOffsetListRes
+	(*ProtoOAGetPositionUnrealizedPnLReq)(nil),    // 87: messages.ProtoOAGetPositionUnrealizedPnLReq
+	(*ProtoOAGetPositionUnrealizedPnLRes)(nil),    // 88: messages.ProtoOAGetPositionUnrealizedPnLRes
+	(ProtoOAPayloadType)(0),                       // 89: messages.ProtoOAPayloadType
+	(ProtoOAOrderType)(0),                         // 90: messages.ProtoOAOrderType
+	(ProtoOATradeSide)(0),                         // 91: messages.ProtoOATradeSide
+	(ProtoOATimeInForce)(0),                       // 92: messages.ProtoOATimeInForce
+	(ProtoOAOrderTriggerMethod)(0),                // 93: messages.ProtoOAOrderTriggerMethod
+	(ProtoOAExecutionType)(0),                     // 94: messages.ProtoOAExecutionType
+	(*ProtoOAPosition)(nil),                       // 95: messages.ProtoOAPosition
+	(*ProtoOAOrder)(nil),                          // 96: messages.ProtoOAOrder
+	(*ProtoOADeal)(nil),                           // 97: messages.ProtoOADeal
+	(*ProtoOABonusDepositWithdraw)(nil),           // 98: messages.ProtoOABonusDepositWithdraw
+	(*ProtoOADepositWithdraw)(nil),                // 99: messages.ProtoOADepositWithdraw
+	(*ProtoOAAsset)(nil),                          // 100: messages.ProtoOAAsset
+	(*ProtoOALightSymbol)(nil),                    // 101: messages.ProtoOALightSymbol
+	(*ProtoOAArchivedSymbol)(nil),                 // 102: messages.ProtoOAArchivedSymbol
+	(*ProtoOASymbol)(nil),                         // 103: messages.ProtoOASymbol
+	(*ProtoOAAssetClass)(nil),                     // 104: messages.ProtoOAAssetClass
+	(*ProtoOATrader)(nil),                         // 105: messages.ProtoOATrader
+	(*ProtoOAExpectedMargin)(nil),                 // 106: messages.ProtoOAExpectedMargin
+	(ProtoOAClientPermissionScope)(0),             // 107: messages.ProtoOAClientPermissionScope
+	(*ProtoOACtidTraderAccount)(nil),              // 108: messages.ProtoOACtidTraderAccount
+	(*ProtoOATrendbar)(nil),                       // 109: messages.ProtoOATrendbar
+	(ProtoOATrendbarPeriod)(0),                    // 110: messages.ProtoOATrendbarPeriod
+	(ProtoOAQuoteType)(0),                         // 111: messages.ProtoOAQuoteType
+	(*ProtoOATickData)(nil),                       // 112: messages.ProtoOATickData
+	(*ProtoOACtidProfile)(nil),                    // 113: messages.ProtoOACtidProfile
+	(*ProtoOADepthQuote)(nil),                     // 114: messages.ProtoOADepthQuote
+	(*ProtoOASymbolCategory)(nil),                 // 115: messages.ProtoOASymbolCategory
+	(*ProtoOAMarginCall)(nil),                     // 116: messages.ProtoOAMarginCall
+	(*ProtoOADynamicLeverage)(nil),                // 117: messages.ProtoOADynamicLeverage
+	(*ProtoOADealOffset)(nil),                     // 118: messages.ProtoOADealOffset
+	(*ProtoOAPositionUnrealizedPnL)(nil),          // 119: messages.ProtoOAPositionUnrealizedPnL
 }
 var file_OpenApiMessages_proto_depIdxs = []int32{
-	28, // 0: messages.ProtoOAApplicationAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 1: messages.ProtoOAApplicationAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 2: messages.ProtoOADealListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 3: messages.ProtoOADealListRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	29, // 4: messages.ProtoOADealListRes.deal:type_name -> messages.ProtoOADeal
-	28, // 5: messages.ProtoOAErrorRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 6: messages.ProtoOATraderReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 7: messages.ProtoOATraderRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	30, // 8: messages.ProtoOATraderRes.trader:type_name -> messages.ProtoOATrader
-	28, // 9: messages.ProtoOAGetAccountListByAccessTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 10: messages.ProtoOAGetAccountListByAccessTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	31, // 11: messages.ProtoOAGetAccountListByAccessTokenRes.permissionScope:type_name -> messages.ProtoOAClientPermissionScope
-	32, // 12: messages.ProtoOAGetAccountListByAccessTokenRes.ctidTraderAccount:type_name -> messages.ProtoOACtidTraderAccount
-	28, // 13: messages.ProtoOAGetTrendbarsReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	33, // 14: messages.ProtoOAGetTrendbarsReq.period:type_name -> messages.ProtoOATrendbarPeriod
-	28, // 15: messages.ProtoOAGetTrendbarsRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	33, // 16: messages.ProtoOAGetTrendbarsRes.period:type_name -> messages.ProtoOATrendbarPeriod
-	34, // 17: messages.ProtoOAGetTrendbarsRes.trendbar:type_name -> messages.ProtoOATrendbar
-	28, // 18: messages.ProtoOAAccountAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 19: messages.ProtoOAAccountAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 20: messages.ProtoOAReconcileReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 21: messages.ProtoOAReconcileRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	35, // 22: messages.ProtoOAReconcileRes.position:type_name -> messages.ProtoOAPosition
-	36, // 23: messages.ProtoOAReconcileRes.order:type_name -> messages.ProtoOAOrder
-	28, // 24: messages.ProtoOARefreshTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 25: messages.ProtoOARefreshTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 26: messages.ProtoOASymbolByIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 27: messages.ProtoOASymbolByIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	37, // 28: messages.ProtoOASymbolByIdRes.symbol:type_name -> messages.ProtoOASymbol
-	28, // 29: messages.ProtoOASubscribeSpotsReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 30: messages.ProtoOASubscribeSpotsRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 31: messages.ProtoOASpotEvent.payloadType:type_name -> messages.ProtoOAPayloadType
-	34, // 32: messages.ProtoOASpotEvent.trendbar:type_name -> messages.ProtoOATrendbar
-	28, // 33: messages.ProtoOASymbolsForConversionReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 34: messages.ProtoOASymbolsForConversionRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	38, // 35: messages.ProtoOASymbolsForConversionRes.symbol:type_name -> messages.ProtoOALightSymbol
-	28, // 36: messages.ProtoOAAssetListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 37: messages.ProtoOAAssetListRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	39, // 38: messages.ProtoOAAssetListRes.asset:type_name -> messages.ProtoOAAsset
-	28, // 39: messages.ProtoOASymbolsListReq.payloadType:type_name -> messages.ProtoOAPayloadType
-	28, // 40: messages.ProtoOASymbolsListRes.payloadType:type_name -> messages.ProtoOAPayloadType
-	38, // 41: messages.ProtoOASymbolsListRes.symbol:type_name -> messages.ProtoOALightSymbol
-	40, // 42: messages.ProtoOASymbolsListRes.archivedSymbol:type_name -> messages.ProtoOAArchivedSymbol
-	43, // [43:43] is the sub-list for method output_type
-	43, // [43:43] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	89,  // 0: messages.ProtoOAApplicationAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 1: messages.ProtoOAApplicationAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 2: messages.ProtoOAAccountAuthReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 3: messages.ProtoOAAccountAuthRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 4: messages.ProtoOAErrorRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 5: messages.ProtoOAClientDisconnectEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 6: messages.ProtoOAAccountsTokenInvalidatedEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 7: messages.ProtoOAVersionReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 8: messages.ProtoOAVersionRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 9: messages.ProtoOANewOrderReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	90,  // 10: messages.ProtoOANewOrderReq.orderType:type_name -> messages.ProtoOAOrderType
+	91,  // 11: messages.ProtoOANewOrderReq.tradeSide:type_name -> messages.ProtoOATradeSide
+	92,  // 12: messages.ProtoOANewOrderReq.timeInForce:type_name -> messages.ProtoOATimeInForce
+	93,  // 13: messages.ProtoOANewOrderReq.stopTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
+	89,  // 14: messages.ProtoOAExecutionEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	94,  // 15: messages.ProtoOAExecutionEvent.executionType:type_name -> messages.ProtoOAExecutionType
+	95,  // 16: messages.ProtoOAExecutionEvent.position:type_name -> messages.ProtoOAPosition
+	96,  // 17: messages.ProtoOAExecutionEvent.order:type_name -> messages.ProtoOAOrder
+	97,  // 18: messages.ProtoOAExecutionEvent.deal:type_name -> messages.ProtoOADeal
+	98,  // 19: messages.ProtoOAExecutionEvent.bonusDepositWithdraw:type_name -> messages.ProtoOABonusDepositWithdraw
+	99,  // 20: messages.ProtoOAExecutionEvent.depositWithdraw:type_name -> messages.ProtoOADepositWithdraw
+	89,  // 21: messages.ProtoOACancelOrderReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 22: messages.ProtoOAAmendOrderReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	93,  // 23: messages.ProtoOAAmendOrderReq.stopTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
+	89,  // 24: messages.ProtoOAAmendPositionSLTPReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	93,  // 25: messages.ProtoOAAmendPositionSLTPReq.stopLossTriggerMethod:type_name -> messages.ProtoOAOrderTriggerMethod
+	89,  // 26: messages.ProtoOAClosePositionReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 27: messages.ProtoOATrailingSLChangedEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 28: messages.ProtoOAAssetListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 29: messages.ProtoOAAssetListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	100, // 30: messages.ProtoOAAssetListRes.asset:type_name -> messages.ProtoOAAsset
+	89,  // 31: messages.ProtoOASymbolsListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 32: messages.ProtoOASymbolsListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	101, // 33: messages.ProtoOASymbolsListRes.symbol:type_name -> messages.ProtoOALightSymbol
+	102, // 34: messages.ProtoOASymbolsListRes.archivedSymbol:type_name -> messages.ProtoOAArchivedSymbol
+	89,  // 35: messages.ProtoOASymbolByIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 36: messages.ProtoOASymbolByIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	103, // 37: messages.ProtoOASymbolByIdRes.symbol:type_name -> messages.ProtoOASymbol
+	102, // 38: messages.ProtoOASymbolByIdRes.archivedSymbol:type_name -> messages.ProtoOAArchivedSymbol
+	89,  // 39: messages.ProtoOASymbolsForConversionReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 40: messages.ProtoOASymbolsForConversionRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	101, // 41: messages.ProtoOASymbolsForConversionRes.symbol:type_name -> messages.ProtoOALightSymbol
+	89,  // 42: messages.ProtoOASymbolChangedEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 43: messages.ProtoOAAssetClassListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 44: messages.ProtoOAAssetClassListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	104, // 45: messages.ProtoOAAssetClassListRes.assetClass:type_name -> messages.ProtoOAAssetClass
+	89,  // 46: messages.ProtoOATraderReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 47: messages.ProtoOATraderRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	105, // 48: messages.ProtoOATraderRes.trader:type_name -> messages.ProtoOATrader
+	89,  // 49: messages.ProtoOATraderUpdatedEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	105, // 50: messages.ProtoOATraderUpdatedEvent.trader:type_name -> messages.ProtoOATrader
+	89,  // 51: messages.ProtoOAReconcileReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 52: messages.ProtoOAReconcileRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	95,  // 53: messages.ProtoOAReconcileRes.position:type_name -> messages.ProtoOAPosition
+	96,  // 54: messages.ProtoOAReconcileRes.order:type_name -> messages.ProtoOAOrder
+	89,  // 55: messages.ProtoOAOrderErrorEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 56: messages.ProtoOADealListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 57: messages.ProtoOADealListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	97,  // 58: messages.ProtoOADealListRes.deal:type_name -> messages.ProtoOADeal
+	89,  // 59: messages.ProtoOAOrderListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 60: messages.ProtoOAOrderListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	96,  // 61: messages.ProtoOAOrderListRes.order:type_name -> messages.ProtoOAOrder
+	89,  // 62: messages.ProtoOAExpectedMarginReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 63: messages.ProtoOAExpectedMarginRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	106, // 64: messages.ProtoOAExpectedMarginRes.margin:type_name -> messages.ProtoOAExpectedMargin
+	89,  // 65: messages.ProtoOAMarginChangedEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 66: messages.ProtoOACashFlowHistoryListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 67: messages.ProtoOACashFlowHistoryListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	99,  // 68: messages.ProtoOACashFlowHistoryListRes.depositWithdraw:type_name -> messages.ProtoOADepositWithdraw
+	89,  // 69: messages.ProtoOAGetAccountListByAccessTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 70: messages.ProtoOAGetAccountListByAccessTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	107, // 71: messages.ProtoOAGetAccountListByAccessTokenRes.permissionScope:type_name -> messages.ProtoOAClientPermissionScope
+	108, // 72: messages.ProtoOAGetAccountListByAccessTokenRes.ctidTraderAccount:type_name -> messages.ProtoOACtidTraderAccount
+	89,  // 73: messages.ProtoOARefreshTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 74: messages.ProtoOARefreshTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 75: messages.ProtoOASubscribeSpotsReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 76: messages.ProtoOASubscribeSpotsRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 77: messages.ProtoOAUnsubscribeSpotsReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 78: messages.ProtoOAUnsubscribeSpotsRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 79: messages.ProtoOASpotEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	109, // 80: messages.ProtoOASpotEvent.trendbar:type_name -> messages.ProtoOATrendbar
+	89,  // 81: messages.ProtoOASubscribeLiveTrendbarReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	110, // 82: messages.ProtoOASubscribeLiveTrendbarReq.period:type_name -> messages.ProtoOATrendbarPeriod
+	89,  // 83: messages.ProtoOASubscribeLiveTrendbarRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 84: messages.ProtoOAUnsubscribeLiveTrendbarReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	110, // 85: messages.ProtoOAUnsubscribeLiveTrendbarReq.period:type_name -> messages.ProtoOATrendbarPeriod
+	89,  // 86: messages.ProtoOAUnsubscribeLiveTrendbarRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 87: messages.ProtoOAGetTrendbarsReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	110, // 88: messages.ProtoOAGetTrendbarsReq.period:type_name -> messages.ProtoOATrendbarPeriod
+	89,  // 89: messages.ProtoOAGetTrendbarsRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	110, // 90: messages.ProtoOAGetTrendbarsRes.period:type_name -> messages.ProtoOATrendbarPeriod
+	109, // 91: messages.ProtoOAGetTrendbarsRes.trendbar:type_name -> messages.ProtoOATrendbar
+	89,  // 92: messages.ProtoOAGetTickDataReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	111, // 93: messages.ProtoOAGetTickDataReq.type:type_name -> messages.ProtoOAQuoteType
+	89,  // 94: messages.ProtoOAGetTickDataRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	112, // 95: messages.ProtoOAGetTickDataRes.tickData:type_name -> messages.ProtoOATickData
+	89,  // 96: messages.ProtoOAGetCtidProfileByTokenReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 97: messages.ProtoOAGetCtidProfileByTokenRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	113, // 98: messages.ProtoOAGetCtidProfileByTokenRes.profile:type_name -> messages.ProtoOACtidProfile
+	89,  // 99: messages.ProtoOADepthEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	114, // 100: messages.ProtoOADepthEvent.newQuotes:type_name -> messages.ProtoOADepthQuote
+	89,  // 101: messages.ProtoOASubscribeDepthQuotesReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 102: messages.ProtoOASubscribeDepthQuotesRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 103: messages.ProtoOAUnsubscribeDepthQuotesReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 104: messages.ProtoOAUnsubscribeDepthQuotesRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 105: messages.ProtoOASymbolCategoryListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 106: messages.ProtoOASymbolCategoryListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	115, // 107: messages.ProtoOASymbolCategoryListRes.symbolCategory:type_name -> messages.ProtoOASymbolCategory
+	89,  // 108: messages.ProtoOAAccountLogoutReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 109: messages.ProtoOAAccountLogoutRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 110: messages.ProtoOAAccountDisconnectEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 111: messages.ProtoOAMarginCallListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 112: messages.ProtoOAMarginCallListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	116, // 113: messages.ProtoOAMarginCallListRes.marginCall:type_name -> messages.ProtoOAMarginCall
+	89,  // 114: messages.ProtoOAMarginCallUpdateReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	116, // 115: messages.ProtoOAMarginCallUpdateReq.marginCall:type_name -> messages.ProtoOAMarginCall
+	89,  // 116: messages.ProtoOAMarginCallUpdateRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 117: messages.ProtoOAMarginCallUpdateEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	116, // 118: messages.ProtoOAMarginCallUpdateEvent.marginCall:type_name -> messages.ProtoOAMarginCall
+	89,  // 119: messages.ProtoOAMarginCallTriggerEvent.payloadType:type_name -> messages.ProtoOAPayloadType
+	116, // 120: messages.ProtoOAMarginCallTriggerEvent.marginCall:type_name -> messages.ProtoOAMarginCall
+	89,  // 121: messages.ProtoOAGetDynamicLeverageByIDReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 122: messages.ProtoOAGetDynamicLeverageByIDRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	117, // 123: messages.ProtoOAGetDynamicLeverageByIDRes.leverage:type_name -> messages.ProtoOADynamicLeverage
+	89,  // 124: messages.ProtoOADealListByPositionIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 125: messages.ProtoOADealListByPositionIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	97,  // 126: messages.ProtoOADealListByPositionIdRes.deal:type_name -> messages.ProtoOADeal
+	89,  // 127: messages.ProtoOAOrderDetailsReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 128: messages.ProtoOAOrderDetailsRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	96,  // 129: messages.ProtoOAOrderDetailsRes.order:type_name -> messages.ProtoOAOrder
+	97,  // 130: messages.ProtoOAOrderDetailsRes.deal:type_name -> messages.ProtoOADeal
+	89,  // 131: messages.ProtoOAOrderListByPositionIdReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 132: messages.ProtoOAOrderListByPositionIdRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	96,  // 133: messages.ProtoOAOrderListByPositionIdRes.order:type_name -> messages.ProtoOAOrder
+	89,  // 134: messages.ProtoOADealOffsetListReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 135: messages.ProtoOADealOffsetListRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	118, // 136: messages.ProtoOADealOffsetListRes.offsetBy:type_name -> messages.ProtoOADealOffset
+	118, // 137: messages.ProtoOADealOffsetListRes.offsetting:type_name -> messages.ProtoOADealOffset
+	89,  // 138: messages.ProtoOAGetPositionUnrealizedPnLReq.payloadType:type_name -> messages.ProtoOAPayloadType
+	89,  // 139: messages.ProtoOAGetPositionUnrealizedPnLRes.payloadType:type_name -> messages.ProtoOAPayloadType
+	119, // 140: messages.ProtoOAGetPositionUnrealizedPnLRes.positionUnrealizedPnL:type_name -> messages.ProtoOAPositionUnrealizedPnL
+	141, // [141:141] is the sub-list for method output_type
+	141, // [141:141] is the sub-list for method input_type
+	141, // [141:141] is the sub-list for extension type_name
+	141, // [141:141] is the sub-list for extension extendee
+	0,   // [0:141] is the sub-list for field type_name
 }
 
 func init() { file_OpenApiMessages_proto_init() }
@@ -2234,7 +7264,7 @@ func file_OpenApiMessages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_OpenApiMessages_proto_rawDesc), len(file_OpenApiMessages_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   89,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

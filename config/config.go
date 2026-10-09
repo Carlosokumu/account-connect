@@ -2,22 +2,27 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v2"
 )
 
 var (
-	AccountConnectPort int32
-	CtraderPort        int32
-	CtraderEndpoint    string
+	AccountConnectPort  int32
+	CtraderPort         int32
+	CtraderEndpoint     string
+	CtraderLivePort     int32
+	CtraderLiveEndpoint string
 )
 
 type Config struct {
 	Servers struct {
 		Ctrader struct {
-			Endpoint string `yaml:"endpoint"`
-			Port     int32  `yaml:"port"`
+			Endpoint     string `yaml:"endpoint"`
+			Port         int32  `yaml:"port"`
+			LiveEndpoint string `yaml:"live_endpoint"`
+			LivePort     int32  `yaml:"live_port"`
 		} `yaml:"ctrader"`
 		AccountConnectServer struct {
 			Port int32 `yaml:"port"`
@@ -52,6 +57,26 @@ func LoadConfigs() error {
 
 	CtraderPort = cfg.Servers.Ctrader.Port
 	CtraderEndpoint = cfg.Servers.Ctrader.Endpoint
-	return nil
 
+	CtraderLivePort = cfg.Servers.Ctrader.LivePort
+	CtraderLiveEndpoint = cfg.Servers.Ctrader.LiveEndpoint
+
+	return nil
+}
+
+func EndpointForEnvironment(env string) (string, int32, error) {
+	switch env {
+	case "demo":
+		if CtraderEndpoint == "" || CtraderPort == 0 {
+			return "", 0, errors.New("demo cTrader endpoint is not configured")
+		}
+		return CtraderEndpoint, CtraderPort, nil
+	case "live":
+		if CtraderLiveEndpoint == "" || CtraderLivePort == 0 {
+			return "", 0, errors.New("live cTrader endpoint is not configured")
+		}
+		return CtraderLiveEndpoint, CtraderLivePort, nil
+	default:
+		return "", 0, fmt.Errorf("unknown cTrader environment: %q", env)
+	}
 }

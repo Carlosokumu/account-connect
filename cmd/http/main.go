@@ -1,12 +1,13 @@
 package main
 
 import (
+	"account-connect/assetmeta"
 	"account-connect/config"
-	"account-connect/internal/adapters"
 	"account-connect/internal/clients"
 	"account-connect/internal/managers"
 	"account-connect/internal/messages"
 	"account-connect/internal/messagevalidator"
+	"account-connect/persistence"
 	db "account-connect/persistence"
 	"context"
 	"encoding/json"
@@ -27,149 +28,130 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	ClientSendBufferSize = 512
+	wsReadLimit       = 512 * 1024
+	wsPingInterval    = 30 * time.Second
+	wsPingWriteWait   = 15 * time.Second
+	wsReadDeadline    = 60 * time.Second
+	wsWriteDeadline   = 30 * time.Second
+	wsShutdownTimeout = 5 * time.Second
 )
 
+// writerLoop is the single goroutine that owns all writes to the websocket
+// connection, eliminating concurrent write races.
+func writerLoop(ws *websocket.Conn, send <-chan []byte, done <-chan struct{}) {
+	ticker := time.NewTicker(wsPingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case msg, ok := <-send:
+			if !ok {
+				// send channel closed — write a close frame and exit
+				ws.WriteControl(
+					websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+					time.Now().Add(wsWriteDeadline),
+				)
+				return
+			}
+			ws.SetWriteDeadline(time.Now().Add(wsWriteDeadline))
+			if err := ws.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Printf("Write error: %v", err)
+				return
+			}
+
+		case <-ticker.C:
+			err := ws.WriteControl(
+				websocket.PingMessage,
+				[]byte{},
+				time.Now().Add(wsPingWriteWait),
+			)
+			if err != nil {
+				log.Printf("Ping failed: %v", err)
+				return
+			}
+
+		case <-done:
+			return
+		}
+	}
+}
+
 func startWsService(ctx context.Context, clientManager *managers.AccountConnectClientManager) error {
+	mux := http.NewServeMux()
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", config.AccountConnectPort),
-		Handler: nil,
+		Handler: mux,
 	}
 
 	msgValidator := messagevalidator.New()
 	msgValidator.RegisterValidations()
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
 		ws, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
 			log.Printf("Failed to upgrade connection to ws: %v", err)
 			return
 		}
+		ws.SetReadLimit(wsReadLimit)
 
+		// Validate client ID before doing anything else.
 		clientID := req.URL.Query().Get("tradeshare_client_id")
 		if clientID == "" {
-			errMsg := map[string]string{
-				"error":   "client_id_required",
-				"message": "Connection rejected: tradeshare_client_id parameter is required",
-			}
-			ws.WriteJSON(errMsg)
-			ws.WriteControl(
-				websocket.CloseMessage,
-				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "client_id_required"),
-				time.Now().Add(time.Second),
-			)
-			ws.Close()
+			rejectConn(ws, "client_id_required", "tradeshare_client_id parameter is required")
 			return
 		}
 
-		client := &clients.AccountConnectClient{
-			ID:            clientID,
-			Conn:          ws,
-			Send:          make(chan []byte, ClientSendBufferSize),
-			Streams:       make(map[string]chan []byte, ClientSendBufferSize),
-			PlatformConns: make(map[messages.Platform]adapters.PlatformAdapter),
-		}
-
+		client := clients.NewAccountConnectClient(clientID, ws)
 		clientManager.Register <- client
-
-		ws.SetPongHandler(func(pongMsg string) error {
-			log.Printf("pong message received from client:%s", client.ID)
-			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
-			return nil
-		})
-
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ticker.C:
-					err := ws.WriteControl(
-						websocket.PingMessage,
-						[]byte{},
-						time.Now().Add(5*time.Second),
-					)
-					if err != nil {
-						log.Printf("Ping failed (client %s): %v", clientID, err)
-						ws.Close()
-						return
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
 		defer func() {
 			clientManager.Unregister <- client
-			ws.Close()
 			log.Printf("Client %s disconnected", clientID)
 		}()
 
+		// send is the only channel allowed to write to ws.
+		send := make(chan []byte, 64)
+		done := make(chan struct{})
+		defer close(done)
+
+		go writerLoop(ws, send, done)
+
+		ws.SetPongHandler(func(_ string) error {
+			log.Printf("Pong received from client: %s", clientID)
+			ws.SetReadDeadline(time.Now().Add(wsReadDeadline))
+			return nil
+		})
+
 		for {
-			ws.SetReadDeadline(time.Now().Add(45 * time.Second))
-			ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			ws.SetReadDeadline(time.Now().Add(wsReadDeadline))
 			_, rawMsg, err := ws.ReadMessage()
 			if err != nil {
-				log.Printf("Error received while reading: %v", err)
+				if websocket.IsUnexpectedCloseError(err,
+					websocket.CloseGoingAway,
+					websocket.CloseNormalClosure,
+					websocket.CloseNoStatusReceived,
+				) {
+					log.Printf("Unexpected close from client %s: %v", clientID, err)
+				}
 				break
 			}
 
 			var msg messages.AccountConnectMsg
 			if err := json.Unmarshal(rawMsg, &msg); err != nil {
-				errPayload := map[string]string{
-					"error":   "unmarshal_failed",
-					"message": err.Error(),
-				}
-
-				errPayloadB, err := json.Marshal(errPayload)
-				if err != nil {
-					log.Printf("Failed to marshal client error: %v", err)
-					continue
-				}
-				err = clientManager.HandleClientError(client, errPayloadB)
-				if err != nil {
-					log.Printf("Handle Client error fail: %v", err)
-				}
+				sendError(send, "unmarshal_failed", err.Error())
 				continue
 			}
 
 			if err := msgValidator.Validate(msg); err != nil {
-				errPayload := map[string]string{
-					"error":   "message_validation_failed",
-					"message": err.Error(),
-				}
-
-				errPayloadB, err := json.Marshal(errPayload)
-				if err != nil {
-					log.Printf("Failed to marshal client error: %v", err)
-					continue
-				}
-				err = clientManager.HandleClientError(client, errPayloadB)
-				if err != nil {
-					log.Printf("Handle Client error fail: %v", err)
-				}
+				sendError(send, "message_validation_failed", err.Error())
 				continue
 			}
 
 			if err := clientManager.ValidateClient(msg.TradeshareClientId); err != nil {
-				errPayload := map[string]string{
-					"error":   "client_validation_failed",
-					"message": err.Error(),
-				}
-
-				errPayloadB, err := json.Marshal(errPayload)
-				if err != nil {
-					log.Printf("Failed to marshal client error: %v", err)
-					continue
-				}
-				err = clientManager.HandleClientError(client, errPayloadB)
-				if err != nil {
-					log.Printf("Handle Client error fail: %v", err)
-				}
+				sendError(send, "client_validation_failed", err.Error())
 				continue
 			}
+
 			clientManager.IncomingClientMessages <- rawMsg
 		}
 	})
@@ -177,10 +159,8 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 	go func() {
 		<-ctx.Done()
 		log.Println("Shutting down WebSocket server...")
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), wsShutdownTimeout)
 		defer cancel()
-
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			log.Printf("WebSocket server shutdown error: %v", err)
 		}
@@ -195,6 +175,34 @@ func startWsService(ctx context.Context, clientManager *managers.AccountConnectC
 	return nil
 }
 
+// rejectConn sends an error message and a close frame, then closes the
+// connection. Used before a client is registered.
+func rejectConn(ws *websocket.Conn, code, msg string) {
+	ws.SetWriteDeadline(time.Now().Add(wsWriteDeadline))
+	ws.WriteJSON(map[string]string{"error": code, "message": msg})
+	ws.WriteControl(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.ClosePolicyViolation, code),
+		time.Now().Add(wsWriteDeadline),
+	)
+	ws.Close()
+}
+
+// sendError marshals an error payload and queues it on the send channel.
+// Non-blocking: drops the message and logs if the channel is full.
+func sendError(send chan<- []byte, code, msg string) {
+	payload, err := json.Marshal(map[string]string{"error": code, "message": msg})
+	if err != nil {
+		log.Printf("Failed to marshal error payload: %v", err)
+		return
+	}
+	select {
+	case send <- payload:
+	default:
+		log.Printf("Send buffer full, dropped error: %s", code)
+	}
+}
+
 func main() {
 	var wg sync.WaitGroup
 
@@ -203,6 +211,9 @@ func main() {
 		log.Printf("Failed to read config file correctly: %v", err)
 		os.Exit(1)
 	}
+
+	log.Printf("loaded ctrader config: endpoint=%q port=%d live_endpoint=%q live_port=%d",
+		config.CtraderEndpoint, config.CtraderPort, config.CtraderLiveEndpoint, config.CtraderLivePort)
 
 	accdb := db.AccountConnectDb{}
 	err = accdb.Create()
@@ -223,7 +234,18 @@ func main() {
 		cancel()
 	}()
 
-	clientManager := managers.NewClientManager(accdb)
+	accCache := persistence.NewBboltTradeCache(accdb.Db)
+	if err := accCache.RegisterBuckets(); err != nil {
+		log.Printf("Failed to register cache buckets: %v", err)
+		os.Exit(1)
+	}
+
+	assetProvider, err := assetmeta.NewMemoryProvider(context.Background(), accCache)
+	if err != nil {
+		log.Fatalf("failed to initialize asset metadata: %v", err)
+	}
+
+	clientManager := managers.NewClientManager(accCache, assetProvider)
 
 	wg.Add(1)
 	go func() {
@@ -241,8 +263,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	log.Println("Main: context canceled, waiting for goroutines to finish...")
-
+	log.Println("Main: context canceled, waiting for goroutines...")
 	wg.Wait()
 	log.Println("Graceful shutdown done")
 }
