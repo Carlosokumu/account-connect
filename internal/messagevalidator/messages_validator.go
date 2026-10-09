@@ -38,6 +38,11 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 			messages.TypeDisconnect,
 			messages.TypeStream,
 			messages.TypeCandlestickStream,
+			messages.TypeHistoricalTicks,
+			messages.TypeLiveTicks,
+			messages.TypeOrderBookDepth,
+			messages.TypeDepthStream,
+			messages.TypeBBOStream,
 			messages.TypeAccountOrders:
 			return true
 		default:
