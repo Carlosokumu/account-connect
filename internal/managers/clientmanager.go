@@ -1,6 +1,7 @@
 package managers
 
 import (
+	"account-connect/assetmeta"
 	messageutils "account-connect/internal/accountconnectmessageutils"
 	requestutils "account-connect/internal/accountconnectrequestutils"
 	"account-connect/internal/clients"
@@ -36,8 +37,8 @@ type AccountConnectClientManager struct {
 }
 
 // NewClientManager creates a new client manager instance
-func NewClientManager(accdb db.AccountConnectCache) *AccountConnectClientManager {
-	r := router.NewRouter(accdb)
+func NewClientManager(accdb db.AccountConnectCache, assetProvider assetmeta.Provider) *AccountConnectClientManager {
+	r := router.NewRouter(accdb, assetProvider)
 
 	return &AccountConnectClientManager{
 		clients:                make(map[string]*clients.AccountConnectClient),
@@ -96,23 +97,33 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 
 		case client := <-m.Unregister:
 			m.Lock()
-			if _, ok := m.clients[client.ID]; ok {
-				disconnectMsg := messages.AccountConnectMsg{
-					AccountConnectMessageType: messages.TypeDisconnect,
-					Payload:                   nil,
-					TradeshareClientId:        client.ID,
-				}
-				if clientCtx, ok := m.clientContexts[client.ID]; ok {
-					log.Printf("Canceling ctx for client id: %v via unregister", client.ID)
-					m.msgRouter.Route(clientCtx.ctx, client, disconnectMsg)
-					clientCtx.cancel()
-					delete(m.clientContexts, client.ID)
-				}
-
-				close(client.Send)
-				delete(m.clients, client.ID)
+			registeredClient, exists := m.clients[client.ID]
+			if !exists {
+				m.Unlock()
+				continue
 			}
+			if registeredClient != client {
+				log.Printf("Ignoring stale unregister for client %s", client.ID)
+				m.Unlock()
+				continue
+			}
+
+			disconnectMsg := messages.AccountConnectMsg{
+				AccountConnectMessageType: messages.TypeDisconnect,
+				Payload:                   nil,
+				TradeshareClientId:        client.ID,
+			}
+			if clientCtx, ok := m.clientContexts[client.ID]; ok {
+				m.msgRouter.Route(clientCtx.ctx, client, disconnectMsg)
+				clientCtx.cancel()
+				delete(m.clientContexts, client.ID)
+			}
+
+			close(client.Send)
+			delete(m.clients, client.ID)
 			m.Unlock()
+
+			client.Conn.Close()
 
 		case incomingMsg := <-m.IncomingClientMessages:
 			var msg messages.AccountConnectMsg
