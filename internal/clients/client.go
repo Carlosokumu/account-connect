@@ -19,7 +19,7 @@ const (
 type AccountConnectClient struct {
 	ID            string
 	Conn          *websocket.Conn
-	PlatformConns map[messages.Platform]adapters.ProvidersAdapter
+	ProviderConns map[messages.Provider]adapters.ProvidersAdapter
 	Send          chan []byte
 	Streams       map[string]chan []byte
 	StreamsMutex  sync.Mutex
@@ -32,7 +32,7 @@ func NewAccountConnectClient(id string, conn *websocket.Conn) *AccountConnectCli
 		Conn:          conn,
 		Send:          make(chan []byte, ClientSendBufferSize),
 		Streams:       make(map[string]chan []byte),
-		PlatformConns: make(map[messages.Platform]adapters.ProvidersAdapter),
+		ProviderConns: make(map[messages.Provider]adapters.ProvidersAdapter),
 	}
 }
 
