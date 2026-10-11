@@ -408,7 +408,7 @@ func (cta *CtraderAdapter) GetSymbolTrendBars(ctx context.Context, payload acoun
 	return cta.ctrader.GetChartTrendBars(ctx, payload)
 }
 
-func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload acount_connect_messages.AccountConnectCandlestickStreamPayload) error {
+func (cta *CtraderAdapter) SubscribeOHLC(ctx context.Context, payload acount_connect_messages.AccountConnectCandlestickStreamPayload) error {
 	if payload.AccountID == 0 {
 		return fmt.Errorf("account_id is required for ctrader candlestick stream")
 	}
@@ -431,7 +431,7 @@ func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload aco
 
 	go func() {
 		for barB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeCandlestickStream, acount_connect_messages.Ctrader, cta.ctrader.AccountConnClient.ID, barB)
+			msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeOHLCUpdate, acount_connect_messages.Ctrader, cta.ctrader.AccountConnClient.ID, barB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal candlestick stream message: %v", err)
@@ -444,7 +444,7 @@ func (cta *CtraderAdapter) GetCandlestickStream(ctx context.Context, payload aco
 	return cta.ctrader.StartCandlestickStream(ctx, payload, stream)
 }
 
-func (cta *CtraderAdapter) GetTickStream(ctx context.Context, payload acount_connect_messages.AccountConnectTickDataPayload) error {
+func (cta *CtraderAdapter) SubscribeTicks(ctx context.Context, payload acount_connect_messages.AccountConnectTickDataPayload) error {
 	if payload.Ctrader == nil {
 		return fmt.Errorf("ctrader payload is required for tick stream")
 	}
@@ -464,7 +464,7 @@ func (cta *CtraderAdapter) GetTickStream(ctx context.Context, payload acount_con
 
 	go func() {
 		for tickB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeLiveTicks, acount_connect_messages.Ctrader, cta.ctrader.AccountConnClient.ID, tickB)
+			msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeTicksUpdate, acount_connect_messages.Ctrader, cta.ctrader.AccountConnClient.ID, tickB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal tick stream message: %v", err)
@@ -480,11 +480,11 @@ func (cta *CtraderAdapter) GetTickStream(ctx context.Context, payload acount_con
 func (cta *CtraderAdapter) GetOrderBookDepth(ctx context.Context, payload acount_connect_messages.AccountConnectDepthPayload) error {
 	return fmt.Errorf("order book depth not yet supported for ctrader")
 }
-func (cta *CtraderAdapter) GetDepthStream(ctx context.Context, payload acount_connect_messages.AccountConnectDepthPayload) error {
+func (cta *CtraderAdapter) SubscribeDepth(ctx context.Context, payload acount_connect_messages.AccountConnectDepthPayload) error {
 	return fmt.Errorf("live depth stream not yet supported for ctrader")
 }
 
-func (cta *CtraderAdapter) GetBBOStream(ctx context.Context, payload acount_connect_messages.AccountConnectBBOPayload) error {
+func (cta *CtraderAdapter) SubscribeBBO(ctx context.Context, payload acount_connect_messages.AccountConnectBBOPayload) error {
 	return fmt.Errorf("bbo stream not yet supported for ctrader")
 }
 
@@ -1242,7 +1242,7 @@ func (t *CTrader) handleAccountAuthResponse(ctx context.Context, clientMsgId str
 	if err != nil {
 		return err
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAuthorizeAccount, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accauthresB)
+	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAccountAuthorize, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accauthresB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1296,7 +1296,7 @@ func (t *CTrader) handleTraderInfoResponse(ctx context.Context, clientMsgId stri
 		return fmt.Errorf("failed to find pending request for key: %s", clientMsgId)
 	}
 
-	msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeTraderInfo, acount_connect_messages.Ctrader, t.AccountConnClient.ID, resB)
+	msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeAccountInfo, acount_connect_messages.Ctrader, t.AccountConnClient.ID, resB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1354,7 +1354,7 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, clientMsgId strin
 			return
 		}
 
-		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeTrendBars, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsResB)
+		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeOHLCHistory, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsResB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			log.Printf("failed to marshal final message: %v", err)
@@ -1496,7 +1496,7 @@ func (t *CTrader) sendSymbolListResponse(ctx context.Context, syms []acount_conn
 	if err != nil {
 		return fmt.Errorf("failed to marshal symbol list data: %w", err)
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeAccountSymbols, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accconnectsymsB)
+	msg := messageutils.CreateSuccessResponse(ctx, acount_connect_messages.TypeSymbolsList, acount_connect_messages.Ctrader, t.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1519,7 +1519,7 @@ func (t *CTrader) handleAccountHistoricalDeals(ctx context.Context, clientMsgId 
 		if err != nil {
 			return fmt.Errorf("failed to marshal deal: %s", err)
 		}
-		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeHistoricalTrades, acount_connect_messages.Ctrader, t.AccountConnClient.ID, dealsB)
+		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeAccountTrades, acount_connect_messages.Ctrader, t.AccountConnClient.ID, dealsB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			return err
@@ -1621,7 +1621,7 @@ func (t *CTrader) handleTickDataResponse(ctx context.Context, clientMsgId string
 			return
 		}
 
-		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeHistoricalTicks, acount_connect_messages.Ctrader, t.AccountConnClient.ID, resB)
+		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeTicksHistory, acount_connect_messages.Ctrader, t.AccountConnClient.ID, resB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			log.Printf("failed to marshal final message: %v", err)

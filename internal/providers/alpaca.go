@@ -139,7 +139,7 @@ func (a *AlpacaAdapter) GetAccountInfo(ctx context.Context, payload messages.Acc
 	if err != nil {
 		return fmt.Errorf("failed to marshal alpaca account info: %w", err)
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTraderInfo, messages.Alpaca, a.AccountConnClient.ID, infoB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountInfo, messages.Alpaca, a.AccountConnClient.ID, infoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -231,7 +231,7 @@ func (a *AlpacaAdapter) GetSymbolTrendBars(ctx context.Context, payload messages
 		return fmt.Errorf("failed to marshal alpaca trend bars: %w", err)
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTrendBars, messages.Alpaca, a.AccountConnClient.ID, resB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOHLCHistory, messages.Alpaca, a.AccountConnClient.ID, resB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func (a *AlpacaAdapter) GetTradingSymbols(ctx context.Context, payload messages.
 		return fmt.Errorf("failed to marshal alpaca symbol list: %w", err)
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Alpaca, a.AccountConnClient.ID, accconnectsymsB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeSymbolsList, messages.Alpaca, a.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -323,7 +323,7 @@ func (a *AlpacaAdapter) GetTradingSymbols(ctx context.Context, payload messages.
 	return nil
 }
 
-func (a *AlpacaAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+func (a *AlpacaAdapter) SubscribeOHLC(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
 	if a.client == nil {
 		return fmt.Errorf("alpaca account not connected")
 	}
@@ -347,7 +347,7 @@ func (a *AlpacaAdapter) GetCandlestickStream(ctx context.Context, payload messag
 
 	go func() {
 		for barB := range strm {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeCandlestickStream, messages.Alpaca, a.AccountConnClient.ID, barB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOHLCUpdate, messages.Alpaca, a.AccountConnClient.ID, barB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal alpaca candlestick stream message: %v", err)
@@ -469,7 +469,7 @@ func (a *AlpacaAdapter) GetHistoricalTicks(ctx context.Context, payload messages
 	return fmt.Errorf("historical ticks not yet supported for alpaca")
 }
 
-func (a *AlpacaAdapter) GetTickStream(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
+func (a *AlpacaAdapter) SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
 	return fmt.Errorf("tick stream not yet supported for alpaca")
 }
 
@@ -477,11 +477,11 @@ func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.
 	return fmt.Errorf("order book depth not yet supported for alpaca")
 }
 
-func (a *AlpacaAdapter) GetDepthStream(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
+func (a *AlpacaAdapter) SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
 	return fmt.Errorf("depth stream not yet supported for alpaca")
 }
 
-func (a *AlpacaAdapter) GetBBOStream(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
+func (a *AlpacaAdapter) SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
 	return fmt.Errorf("bbo stream not yet supported for alpaca")
 }
 
