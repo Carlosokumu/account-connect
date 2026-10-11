@@ -29,20 +29,20 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 		switch mt {
 		case
 			messages.TypeConnect,
-			messages.TypeAuthorizeAccount,
-			messages.TypeTraderInfo,
-			messages.TypeHistoricalTrades,
-			messages.TypeAccountSymbols,
-			messages.TypeTrendBars,
+			messages.TypeAccountAuthorize,
+			messages.TypeAccountInfo,
+			messages.TypeSymbolsList,
+			messages.TypeAccountTrades,
+			messages.TypeOHLCHistory,
+			messages.TypeOHLCSubscribe,
 			messages.TypeError,
 			messages.TypeDisconnect,
-			messages.TypeStream,
-			messages.TypeCandlestickStream,
-			messages.TypeHistoricalTicks,
-			messages.TypeLiveTicks,
-			messages.TypeOrderBookDepth,
-			messages.TypeDepthStream,
-			messages.TypeBBOStream,
+			messages.TypeOHLCUpdate,
+			messages.TypeTicksHistory,
+			messages.TypeTicksUpdate,
+			messages.TypeDepthSnapshot,
+			messages.TypeDepthSubscribe,
+			messages.TypeBBOSubscribe,
 			messages.TypeAccountOrders:
 			return true
 		default:
@@ -51,7 +51,7 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 	})
 
 	msgvalidator.validator.RegisterValidation("platform_enum", func(fl validator.FieldLevel) bool {
-		mt, ok := fl.Field().Interface().(messages.Platform)
+		mt, ok := fl.Field().Interface().(messages.Provider)
 		if !ok {
 			return false
 		}
