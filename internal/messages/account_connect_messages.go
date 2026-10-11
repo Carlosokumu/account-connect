@@ -6,12 +6,12 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 )
 
-type Platform string
+type Provider string
 
 const (
-	Ctrader Platform = "ctrader"
-	Binance Platform = "binance"
-	Alpaca  Platform = "alpaca"
+	Ctrader Provider = "ctrader"
+	Binance Provider = "binance"
+	Alpaca  Provider = "alpaca"
 )
 
 type MessageStatus string
@@ -34,22 +34,36 @@ const (
 )
 
 const (
-	TypeConnect           MessageType = "connect"
-	TypeAuthorizeAccount  MessageType = "authorize_account"
-	TypeTraderInfo        MessageType = "trader_info"
-	TypeHistoricalTrades  MessageType = "historical_trades"
-	TypeAccountSymbols    MessageType = "account_symbols"
-	TypeTrendBars         MessageType = "trend_bars"
-	TypeError             MessageType = "error"
-	TypeDisconnect        MessageType = "disconnect"
-	TypeStream            MessageType = "stream_subscribe"
-	TypeCandlestickStream MessageType = "candlestick_stream"
-	TypeAccountOrders     MessageType = "account_orders"
-	TypeHistoricalTicks   MessageType = "historical_ticks"
-	TypeLiveTicks         MessageType = "live_ticks"
-	TypeDepthStream       MessageType = "live_depth"
-	TypeOrderBookDepth    MessageType = "order_book_depth"
-	TypeBBOStream         MessageType = "bbo_stream"
+	// session
+	TypeConnect    MessageType = "session.connect"
+	TypeDisconnect MessageType = "session.disconnect"
+	TypeError      MessageType = "error"
+
+	// account
+	TypeAccountAuthorize MessageType = "account.authorize"
+	TypeAccountInfo      MessageType = "account.info"
+	TypeAccountOrders    MessageType = "account.orders"
+	TypeAccountTrades    MessageType = "account.trades"
+
+	// market data: request/response
+	TypeSymbolsList   MessageType = "symbols.list"
+	TypeOHLCHistory   MessageType = "ohlc.history"
+	TypeTicksHistory  MessageType = "ticks.history"
+	TypeDepthSnapshot MessageType = "depth.snapshot"
+
+	// market data: subscriptions
+	TypeOHLCSubscribe    MessageType = "ohlc.subscribe"
+	TypeOHLCUpdate       MessageType = "ohlc.update"
+	TypeOHLCUnsubscribe  MessageType = "ohlc.unsubscribe"
+	TypeTicksSubscribe   MessageType = "ticks.subscribe"
+	TypeTicksUpdate      MessageType = "ticks.update"
+	TypeTicksUnsubscribe MessageType = "ticks.unsubscribe"
+	TypeDepthSubscribe   MessageType = "depth.subscribe"
+	TypeDepthUpdate      MessageType = "depth.update"
+	TypeDepthUnsubscribe MessageType = "depth.unsubscribe"
+	TypeBBOSubscribe     MessageType = "bbo.subscribe"
+	TypeBBOUpdate        MessageType = "bbo.update"
+	TypeBBOUnsubscribe   MessageType = "bbo.unsubscribe"
 )
 
 const (
@@ -65,7 +79,7 @@ var accountIDCounter int64
 type AccountConnectMsg struct {
 	AccountConnectMessageType MessageType     `json:"messagetype" validate:"required,messagetype_enum"`
 	TradeshareClientId        string          `json:"tradeshare_client_id" validate:"required"`
-	Platform                  Platform        `json:"platform" validate:"required"`
+	Provider                  Provider        `json:"provider" validate:"required"`
 	RequestId                 string          `json:"request_id" validate:"required"`
 	Payload                   json.RawMessage `json:"payload" validate:"required"`
 }
@@ -74,7 +88,7 @@ type AccountConnectMsg struct {
 type AccountConnectMsgRes struct {
 	AccountConnectMessageType MessageType     `json:"messagetype"`
 	Status                    MessageStatus   `json:"status"`
-	Platform                  Platform        `json:"platform"`
+	Provider                  Provider        `json:"provider"`
 	TradeShareClientId        string          `json:"tradeshare_client_id"`
 	RequestId                 string          `json:"request_id"`
 	Payload                   json.RawMessage `json:"payload"`
@@ -86,21 +100,6 @@ type CTraderConnectPayload struct {
 	ClientId     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	AccessToken  string `json:"access_token"`
-}
-
-type AccountConnectAccountInfoRes struct {
-	CtraderAccounts *AccountConnectTradingAccountRes  `json:"ctrader_accounts,omitempty"`
-	CtraderAccount  *AccountConnectCtraderAccountInfo `json:"ctrader_account,omitempty"`
-	Binance         *AccountConnectBinanceAccountInfo `json:"binance,omitempty"`
-	Alpaca          *AlpacaAccountInfo                `json:"account_info,omitempty"`
-}
-
-// CTraderConnectPayload  is payload structure defining fields  required to establish a ctrader connection.
-type AccountConnectTradingAccount struct {
-	BinanceTradingAccount BinanceTradingAccount
-}
-
-type BinanceTradingAccount struct {
 }
 
 // BinanceConnectPayload is payload structure defining fields  required to establish a binance connection.
@@ -117,13 +116,54 @@ type AlpacaConnectPayload struct {
 	Paper     bool   `json:"paper"`
 }
 
+type AccountConnectAccountInfoRes struct {
+	CtraderAccounts *AccountConnectTradingAccountRes  `json:"ctrader_accounts,omitempty"`
+	CtraderAccount  *AccountConnectCtraderAccountInfo `json:"ctrader_account,omitempty"`
+	Binance         *AccountConnectBinanceAccountInfo `json:"binance,omitempty"`
+	Alpaca          *AlpacaAccountInfo                `json:"account_info,omitempty"`
+}
+
+type AccountConnectCtraderAccountInfo struct {
+	CtidTraderAccountId   int64   `json:"ctid_trader_account_id"`
+	Balance               float64 `json:"balance"` // scaled by 10^MoneyDigits
+	ManagerBonus          float64 `json:"manager_bonus,omitempty"`
+	IbBonus               float64 `json:"ib_bonus,omitempty"`
+	NonWithdrawableBonus  float64 `json:"non_withdrawable_bonus,omitempty"`
+	MoneyDigits           uint32  `json:"money_digits"` // kept in output for transparency/debugging
+	DepositAssetId        int64   `json:"deposit_asset_id"`
+	LeverageInCents       uint32  `json:"leverage_in_cents,omitempty"` // e.g. 5000 = 1:50
+	MaxLeverage           uint32  `json:"max_leverage,omitempty"`
+	SwapFree              bool    `json:"swap_free"`
+	IsLimitedRisk         bool    `json:"is_limited_risk"`
+	AccountType           string  `json:"account_type,omitempty"` // HEDGED/NETTED — needs enum→string mapping
+	BrokerName            string  `json:"broker_name,omitempty"`
+	TraderLogin           int64   `json:"trader_login,omitempty"`
+	RegistrationTimestamp int64   `json:"registration_timestamp,omitempty"`
+	AccessRights          string  `json:"access_rights,omitempty"` // enum→string
+}
+
+type AccountConnectBinanceAccountInfo struct {
+	Accounts map[BinanceAccountType]AccountConnectBinanceAccount `json:"accounts"`
+	Errors   map[BinanceAccountType]string                       `json:"errors,omitempty"`
+}
+
+type AlpacaAccountInfo struct {
+	AccountID        int64  `json:"account_id"`
+	Status           string `json:"status"`
+	Currency         string `json:"currency"`
+	Cash             string `json:"cash"`
+	Equity           string `json:"equity"`
+	BuyingPower      string `json:"buying_power"`
+	PatternDayTrader bool   `json:"pattern_day_trader"`
+	TradingBlocked   bool   `json:"trading_blocked"`
+}
+
 type AccountConnectTrendBarsPayload struct {
-	AccountID  AccountID `json:"account_id"`
-	SymbolName string    `json:"symbol_name"`
-	// SymbolId      int64     `json:"symbol_id"`
-	Period        string `json:"period"`
-	FromTimestamp *int64 `json:"from_timestamp"`
-	ToTimestamp   *int64 `json:"to_timestamp"`
+	AccountID     AccountID `json:"account_id"`
+	SymbolName    string    `json:"symbol_name"`
+	Period        string    `json:"period"`
+	FromTimestamp *int64    `json:"from_timestamp"`
+	ToTimestamp   *int64    `json:"to_timestamp"`
 }
 
 // AccountConnectStreamPayload wrapper payload required to initialize a stream of messages.
@@ -231,25 +271,6 @@ type AccountConnectCtraderTradingAccount struct {
 	SwapFree                    bool   `json:"swapFree"`
 	MoneyDigits                 int    `json:"moneyDigits"`
 	Live                        bool   `json:"live"`
-}
-
-type AccountConnectCtraderAccountInfo struct {
-	CtidTraderAccountId   int64   `json:"ctid_trader_account_id"`
-	Balance               float64 `json:"balance"` // scaled by 10^MoneyDigits
-	ManagerBonus          float64 `json:"manager_bonus,omitempty"`
-	IbBonus               float64 `json:"ib_bonus,omitempty"`
-	NonWithdrawableBonus  float64 `json:"non_withdrawable_bonus,omitempty"`
-	MoneyDigits           uint32  `json:"money_digits"` // kept in output for transparency/debugging
-	DepositAssetId        int64   `json:"deposit_asset_id"`
-	LeverageInCents       uint32  `json:"leverage_in_cents,omitempty"` // e.g. 5000 = 1:50
-	MaxLeverage           uint32  `json:"max_leverage,omitempty"`
-	SwapFree              bool    `json:"swap_free"`
-	IsLimitedRisk         bool    `json:"is_limited_risk"`
-	AccountType           string  `json:"account_type,omitempty"` // HEDGED/NETTED — needs enum→string mapping
-	BrokerName            string  `json:"broker_name,omitempty"`
-	TraderLogin           int64   `json:"trader_login,omitempty"`
-	RegistrationTimestamp int64   `json:"registration_timestamp,omitempty"`
-	AccessRights          string  `json:"access_rights,omitempty"` // enum→string
 }
 
 type AccountConnectTradingAccountRes struct {
@@ -396,28 +417,12 @@ type AccountConnectBinanceTraderInfo struct {
 	Delivery    *AccountConnectBinanceDeliveryInfo `json:"delivery,omitempty"`
 }
 
-type AccountConnectBinanceAccountInfo struct {
-	Accounts map[BinanceAccountType]AccountConnectBinanceAccount `json:"accounts"`
-	Errors   map[BinanceAccountType]string                       `json:"errors,omitempty"`
-}
-
 type AccountConnectBinanceAccount struct {
 	AccountID int64                              `json:"account_id"`
 	Spot      *AccountConnectBinanceSpotInfo     `json:"spot,omitempty"`
 	Margin    *AccountConnectBinanceMarginInfo   `json:"margin,omitempty"`
 	Futures   *AccountConnectBinanceFuturesInfo  `json:"futures,omitempty"`
 	Delivery  *AccountConnectBinanceDeliveryInfo `json:"delivery,omitempty"`
-}
-
-type AlpacaAccountInfo struct {
-	AccountID        int64  `json:"account_id"`
-	Status           string `json:"status"`
-	Currency         string `json:"currency"`
-	Cash             string `json:"cash"`
-	Equity           string `json:"equity"`
-	BuyingPower      string `json:"buying_power"`
-	PatternDayTrader bool   `json:"pattern_day_trader"`
-	TradingBlocked   bool   `json:"trading_blocked"`
 }
 
 type AccountConnectBinanceSpotInfo struct {
