@@ -16,12 +16,14 @@ type ProvidersAdapter interface {
 	GetAccountInfo(ctx context.Context, payload messages.AccountConnectAccountInfoPayload) error
 	GetSymbolTrendBars(ctx context.Context, payload messages.AccountConnectTrendBarsPayload) error
 	GetTradingSymbols(ctx context.Context, payload messages.AccountConnectSymbolsPayload) error
-	Disconnect(ctx context.Context) error
-	GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error
 	GetAccountOrders(ctx context.Context, payload messages.AccountConnectOrderPayload) error
 	GetHistoricalTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error
-	GetTickStream(ctx context.Context, payload messages.AccountConnectTickDataPayload) error
 	GetOrderBookDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error
-	GetDepthStream(ctx context.Context, payload messages.AccountConnectDepthPayload) error
-	GetBBOStream(ctx context.Context, payload messages.AccountConnectBBOPayload) error
+
+	SubscribeOHLC(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error
+	SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error
+	SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error
+	SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error
+
+	Disconnect(ctx context.Context) error
 }
