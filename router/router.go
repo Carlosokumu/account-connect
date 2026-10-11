@@ -41,31 +41,31 @@ func (r *Router) Route(ctx context.Context, client *clients.AccountConnectClient
 	switch msg.AccountConnectMessageType {
 	case messages.TypeConnect:
 		return handler.handleConnect(ctx, client, r.db, msg)
-	case messages.TypeAuthorizeAccount:
+	case messages.TypeAccountAuthorize:
 		return handler.handleAccountAuthorize(ctx, msg)
-	case messages.TypeHistoricalTrades:
+	case messages.TypeAccountTrades:
 		return handler.handleHistoricalTrades(ctx, msg)
-	case messages.TypeTraderInfo:
+	case messages.TypeAccountInfo:
 		return handler.handleTraderInfo(ctx, msg)
-	case messages.TypeTrendBars:
+	case messages.TypeOHLCHistory:
 		return handler.handleTrendBars(ctx, msg)
-	case messages.TypeAccountSymbols:
+	case messages.TypeSymbolsList:
 		return handler.handleAccountSymbols(ctx, msg)
 	case messages.TypeDisconnect:
 		return handler.handleClientDisconnect(ctx)
-	case messages.TypeCandlestickStream:
+	case messages.TypeOHLCSubscribe:
 		return handler.handleCandlestickStream(ctx, msg)
 	case messages.TypeAccountOrders:
 		return handler.handleAccountOrders(ctx, msg)
-	case messages.TypeHistoricalTicks:
+	case messages.TypeTicksHistory:
 		return handler.handleHistoricalTicks(ctx, msg)
-	case messages.TypeLiveTicks:
+	case messages.TypeTicksSubscribe:
 		return handler.handleLiveTickStream(ctx, msg)
-	case messages.TypeDepthStream:
+	case messages.TypeDepthSubscribe:
 		return handler.handleBookDepthStream(ctx, msg)
-	case messages.TypeOrderBookDepth:
+	case messages.TypeDepthSnapshot:
 		return handler.handleOrderBookDepth(ctx, msg)
-	case messages.TypeBBOStream:
+	case messages.TypeBBOSubscribe:
 		return handler.handleBBOStream(ctx, msg)
 
 	default:
@@ -201,7 +201,7 @@ func (r *Router) RequestCandlestickStream(ctx context.Context, platformadapter a
 		return fmt.Errorf("failed to unmarshal candlestick stream request: %w", err)
 	}
 
-	err = platformadapter.GetCandlestickStream(ctx, req)
+	err = platformadapter.SubscribeOHLC(ctx, req)
 	if err != nil {
 		log.Printf("Failed to initialize candlestick stream: %v", err)
 		return err
@@ -218,7 +218,7 @@ func (r *Router) RequestLiveTradesStream(ctx context.Context, platformadapter ad
 		return fmt.Errorf("failed to unmarshal live tick stream request: %w", err)
 	}
 
-	err = platformadapter.GetTickStream(ctx, req)
+	err = platformadapter.SubscribeTicks(ctx, req)
 	if err != nil {
 		log.Printf("Failed to initialize live tick stream: %v", err)
 		return err
@@ -272,7 +272,7 @@ func (r *Router) RequestOrderBookDepthStream(ctx context.Context, platformadapte
 		return err
 	}
 
-	err = platformadapter.GetDepthStream(ctx, req)
+	err = platformadapter.SubscribeDepth(ctx, req)
 	if err != nil {
 		log.Printf("Failed to fetch account historical ticks: %v", err)
 		return err
@@ -290,7 +290,7 @@ func (r *Router) RequestBBOStream(ctx context.Context, platformadapter adapters.
 		return err
 	}
 
-	err = platformadapter.GetBBOStream(ctx, req)
+	err = platformadapter.SubscribeBBO(ctx, req)
 	if err != nil {
 		log.Printf("Failed to fetch account historical ticks: %v", err)
 		return err
@@ -309,7 +309,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *c
 	)
 	ctx = context.WithValue(ctx, requestutils.REQUEST_ID, msg.RequestId)
 
-	switch msg.Platform {
+	switch msg.Provider {
 	case messages.Binance:
 		_, err = h.handleBinanceConnect(ctx, accountConnClient, cache, msg.Payload)
 	case messages.Ctrader:
@@ -317,7 +317,7 @@ func (h *messageHandler) handleConnect(ctx context.Context, accountConnClient *c
 	case messages.Alpaca:
 		_, err = h.handleAlpacaConnect(ctx, accountConnClient, msg.Payload)
 	default:
-		return fmt.Errorf("unsupported platform: %s", msg.Platform)
+		return fmt.Errorf("unsupported platform: %s", msg.Provider)
 	}
 
 	if err != nil {
@@ -342,7 +342,7 @@ func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg message
 	}
 
 	if err := h.router.AuthorizeAccount(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTraderInfo, err)
+		return h.writeErrorResponse(messages.TypeAccountInfo, err)
 	}
 	return nil
 }
@@ -358,10 +358,6 @@ func (h *messageHandler) handleBinanceConnect(
 		return nil, fmt.Errorf("invalid Binance payload: %w", err)
 	}
 
-	// if binanceMsg.AccountType == "" {
-	// 	return nil, fmt.Errorf("account_type is required for binance connection")
-	// }
-
 	adapter := providers.NewBinanceAdapter(accountConnClient, cache, h.router.assetProvider)
 	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
 		Binance: config.BinanceConfig{
@@ -372,7 +368,7 @@ func (h *messageHandler) handleBinanceConnect(
 	}); err != nil {
 		return nil, err
 	}
-	accountConnClient.PlatformConns[messages.Binance] = adapter
+	accountConnClient.ProviderConns[messages.Binance] = adapter
 	return adapter, nil
 }
 
@@ -402,7 +398,7 @@ func (h *messageHandler) handleCtraderConnect(
 	}); err != nil {
 		return nil, err
 	}
-	accountConnClient.PlatformConns[messages.Ctrader] = adapter
+	accountConnClient.ProviderConns[messages.Ctrader] = adapter
 
 	return adapter, nil
 }
@@ -427,7 +423,7 @@ func (h *messageHandler) handleAlpacaConnect(
 	}); err != nil {
 		return nil, err
 	}
-	accountConnClient.PlatformConns[messages.Alpaca] = adapter
+	accountConnClient.ProviderConns[messages.Alpaca] = adapter
 	return adapter, nil
 }
 
@@ -435,7 +431,7 @@ func (h *messageHandler) handleClientDisconnect(ctx context.Context) error {
 	var disconnecterr error
 	client := h.client
 
-	for _, platformadapter := range client.PlatformConns {
+	for _, platformadapter := range client.ProviderConns {
 		err := h.router.DisconnectPlatformConnection(ctx, platformadapter)
 		if err != nil {
 			return err
@@ -502,7 +498,7 @@ func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.Acco
 	}
 
 	if err := h.router.RequestTraderInfo(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTraderInfo, err)
+		return h.writeErrorResponse(messages.TypeAccountInfo, err)
 	}
 
 	return nil
@@ -523,7 +519,7 @@ func (h *messageHandler) handleTrendBars(ctx context.Context, msg messages.Accou
 	}
 
 	if err := h.router.RequestTrendBars(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTrendBars, err)
+		return h.writeErrorResponse(messages.TypeOHLCHistory, err)
 	}
 	return nil
 }
@@ -543,7 +539,7 @@ func (h *messageHandler) handleAccountSymbols(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestAccountSymbols(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeAccountSymbols, err)
+		return h.writeErrorResponse(messages.TypeSymbolsList, err)
 	}
 	return nil
 }
@@ -562,7 +558,7 @@ func (h *messageHandler) handleCandlestickStream(ctx context.Context, msg messag
 	}
 
 	if err := h.router.RequestCandlestickStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeCandlestickStream, err)
+		return h.writeErrorResponse(messages.TypeOHLCUpdate, err)
 	}
 	return nil
 }
@@ -582,7 +578,7 @@ func (h *messageHandler) handleHistoricalTicks(ctx context.Context, msg messages
 	}
 
 	if err := h.router.RequestHistoricalTicks(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeHistoricalTicks, err)
+		return h.writeErrorResponse(messages.TypeTicksHistory, err)
 	}
 	return nil
 }
@@ -602,7 +598,7 @@ func (h *messageHandler) handleLiveTickStream(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestLiveTradesStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+		return h.writeErrorResponse(messages.TypeTicksSubscribe, err)
 	}
 	return nil
 }
@@ -622,7 +618,7 @@ func (h *messageHandler) handleOrderBookDepth(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestOrderBookDepth(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+		return h.writeErrorResponse(messages.TypeDepthSnapshot, err)
 	}
 	return nil
 }
@@ -642,7 +638,7 @@ func (h *messageHandler) handleBookDepthStream(ctx context.Context, msg messages
 	}
 
 	if err := h.router.RequestOrderBookDepthStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+		return h.writeErrorResponse(messages.TypeDepthSubscribe, err)
 	}
 	return nil
 }
@@ -662,7 +658,7 @@ func (h *messageHandler) handleBBOStream(ctx context.Context, msg messages.Accou
 	}
 
 	if err := h.router.RequestBBOStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeLiveTicks, err)
+		return h.writeErrorResponse(messages.TypeBBOSubscribe, err)
 	}
 	return nil
 }
@@ -706,9 +702,9 @@ func (h *messageHandler) getClient(msg messages.AccountConnectMsg) error {
 }
 
 func (h *messageHandler) getAdapter(msg messages.AccountConnectMsg) (adapters.ProvidersAdapter, error) {
-	adapter, ok := h.client.PlatformConns[msg.Platform]
+	adapter, ok := h.client.ProviderConns[msg.Provider]
 	if !ok {
-		return nil, fmt.Errorf("no adapter for platform %s on client %s", msg.Platform, h.client.ID)
+		return nil, fmt.Errorf("no adapter for platform %s on client %s", msg.Provider, h.client.ID)
 	}
 	return adapter, nil
 }

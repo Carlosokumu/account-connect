@@ -1058,7 +1058,7 @@ func (b *BinanceAdapter) GetTradingSymbols(ctx context.Context, payload messages
 		return err
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountSymbols, messages.Binance, b.AccountConnClient.ID, accconnectsymsB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeSymbolsList, messages.Binance, b.AccountConnClient.ID, accconnectsymsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1152,7 +1152,7 @@ func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload message
 			return
 		}
 
-		msg := messageutils.CreateSuccessResponse(ctx, messages.TypeHistoricalTicks, messages.Binance, b.AccountConnClient.ID, resB)
+		msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksHistory, messages.Binance, b.AccountConnClient.ID, resB)
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			log.Printf("failed to marshal final message: %v", err)
@@ -1181,7 +1181,7 @@ func (b *BinanceAdapter) GetAccountInfo(ctx context.Context, payload messages.Ac
 	if err != nil {
 		return fmt.Errorf("failed to marshal binance account info: %w", err)
 	}
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTraderInfo, messages.Binance, b.AccountConnClient.ID, infoB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeAccountInfo, messages.Binance, b.AccountConnClient.ID, infoB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1321,7 +1321,7 @@ func (b *BinanceAdapter) GetSymbolTrendBars(ctx context.Context, trendbarsArgs m
 		return fmt.Errorf("failed to marshal trend bars: %w", err)
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTrendBars, messages.Binance, b.AccountConnClient.ID, acctrendbarsB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOHLCHistory, messages.Binance, b.AccountConnClient.ID, acctrendbarsB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1501,7 +1501,7 @@ func (b *BinanceAdapter) StartCandlestickStream(ctx context.Context, payload mes
 	return nil
 }
 
-func (b *BinanceAdapter) GetTickStream(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
+func (b *BinanceAdapter) SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
 	if payload.Binance == nil {
 		return fmt.Errorf("binance payload is required for tick stream")
 	}
@@ -1517,7 +1517,7 @@ func (b *BinanceAdapter) GetTickStream(ctx context.Context, payload messages.Acc
 
 	go func() {
 		for tickB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeLiveTicks, messages.Binance, b.binanceConn.AccountConnClient.ID, tickB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksUpdate, messages.Binance, b.binanceConn.AccountConnClient.ID, tickB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal tick stream message: %v", err)
@@ -1534,7 +1534,7 @@ func (b *BinanceAdapter) GetAccountOrders(ctx context.Context, payload messages.
 	return nil
 }
 
-func (b *BinanceAdapter) GetCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
+func (b *BinanceAdapter) SubscribeOHLC(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload) error {
 	if payload.AccountID == 0 {
 		return fmt.Errorf("account_id is required for binance candlestick stream")
 	}
@@ -1561,7 +1561,7 @@ func (b *BinanceAdapter) GetCandlestickStream(ctx context.Context, payload messa
 
 	go func() {
 		for barB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeCandlestickStream, messages.Binance, b.AccountConnClient.ID, barB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOHLCUpdate, messages.Binance, b.AccountConnClient.ID, barB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal candlestick stream message: %v", err)
@@ -1626,10 +1626,9 @@ func (b *BinanceAdapter) GetOrderBookDepth(ctx context.Context, payload messages
 	res.SymbolName = bp.SymbolName
 	resB, err := json.Marshal(res)
 	if err != nil {
-		return fmt.Errorf("failed to marshal depth response: %w", err)
 	}
 
-	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeOrderBookDepth, messages.Binance, b.AccountConnClient.ID, resB)
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSnapshot, messages.Binance, b.AccountConnClient.ID, resB)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -1638,7 +1637,7 @@ func (b *BinanceAdapter) GetOrderBookDepth(ctx context.Context, payload messages
 	return nil
 }
 
-func (b *BinanceAdapter) GetDepthStream(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
+func (b *BinanceAdapter) SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
 	if payload.Binance == nil {
 		return fmt.Errorf("binance payload is required for depth stream")
 	}
@@ -1667,7 +1666,7 @@ func (b *BinanceAdapter) GetDepthStream(ctx context.Context, payload messages.Ac
 
 	go func() {
 		for depthB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthStream, messages.Binance, b.AccountConnClient.ID, depthB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSubscribe, messages.Binance, b.AccountConnClient.ID, depthB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal depth stream message: %v", err)
@@ -1680,7 +1679,7 @@ func (b *BinanceAdapter) GetDepthStream(ctx context.Context, payload messages.Ac
 	return b.binanceConn.StartDepthStream(ctx, acct.accountType, bp.SymbolName, limit, stream)
 }
 
-func (b *BinanceAdapter) GetBBOStream(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
+func (b *BinanceAdapter) SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
 	if payload.Binance == nil {
 		return fmt.Errorf("binance payload is required for BBO stream")
 	}
@@ -1707,7 +1706,7 @@ func (b *BinanceAdapter) GetBBOStream(ctx context.Context, payload messages.Acco
 
 	go func() {
 		for bboB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeBBOStream, messages.Binance, b.AccountConnClient.ID, bboB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeBBOUpdate, messages.Binance, b.AccountConnClient.ID, bboB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal BBO stream message: %v", err)
