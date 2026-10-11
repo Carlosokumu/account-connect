@@ -191,7 +191,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 			}
 			if accountConnectMsgRes.AccountConnectMessageType == messages.TypeConnect && accountConnectMsgRes.Status == messages.StatusSuccess {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, messages.TypeConnect, accountConnectMsgRes.Payload); err != nil {
+				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Provider, messages.TypeConnect, accountConnectMsgRes.Payload); err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 				}
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
@@ -200,7 +200,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 				}
 			} else {
 				ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload); err != nil {
+				if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Provider, accountConnectMsgRes.AccountConnectMessageType, accountConnectMsgRes.Payload); err != nil {
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 				}
 			}
@@ -211,7 +211,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 			}
 			// TODO: unmarshal into typed envelope once stream payloads are wrapped in AccountConnectMsgRes
 			ctx = context.WithValue(ctx, requestutils.REQUEST_ID, accountConnectMsgRes.RequestId)
-			if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Platform, accountConnectMsgRes.AccountConnectMessageType, msg); err != nil {
+			if err := m.writeClientConnMessage(ctx, client, accountConnectMsgRes.Provider, accountConnectMsgRes.AccountConnectMessageType, msg); err != nil {
 				log.Printf("Client: %s stream write fail: %v", client.ID, err)
 			}
 		}
@@ -219,7 +219,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 }
 
 // writeClientConnMessage will write an AccountConnectMsgRes to the client's conn using writeJSONWithTimeout
-func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *clients.AccountConnectClient, platform messages.Platform, msgType messages.MessageType, payload []byte) error {
+func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context, client *clients.AccountConnectClient, platform messages.Provider, msgType messages.MessageType, payload []byte) error {
 	msg := messageutils.CreateSuccessResponse(
 		ctx,
 		msgType,
