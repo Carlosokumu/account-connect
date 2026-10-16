@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,9 +29,10 @@ import (
 )
 
 const (
-	alpacaPaperBaseURL = "https://paper-api.alpaca.markets"
-	alpacaLiveBaseURL  = "https://api.alpaca.markets"
-	alpacaDataBaseURL  = "https://data.alpaca.markets"
+	alpacaPaperBaseURL      = "https://paper-api.alpaca.markets"
+	alpacaLiveBaseURL       = "https://api.alpaca.markets"
+	alpacaDataBaseURL       = "https://data.alpaca.markets"
+	alpacaDefaultDepthLimit = 20
 )
 
 var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
@@ -44,6 +46,69 @@ type alpacaOrderbook struct {
 	Timestamp time.Time         `json:"t"`
 	Bids      []alpacaBookLevel `json:"b"`
 	Asks      []alpacaBookLevel `json:"a"`
+}
+
+type alpacaLocalBook struct {
+	bids map[float64]float64
+	asks map[float64]float64
+}
+
+func newAlpacaLocalBook() *alpacaLocalBook {
+	return &alpacaLocalBook{
+		bids: make(map[float64]float64),
+		asks: make(map[float64]float64),
+	}
+}
+
+// apply folds one Alpaca orderbook message into the book. A reset message
+// carries the complete book, so anything held before it is discarded.
+func (b *alpacaLocalBook) apply(reset bool, bids, asks []alpacaBookLevel) {
+	if reset {
+		b.bids = make(map[float64]float64, len(bids))
+		b.asks = make(map[float64]float64, len(asks))
+	}
+	applyAlpacaLevels(b.bids, bids)
+	applyAlpacaLevels(b.asks, asks)
+}
+
+func applyAlpacaLevels(side map[float64]float64, levels []alpacaBookLevel) {
+	for _, l := range levels {
+		if l.Size == 0 {
+			delete(side, l.Price)
+			continue
+		}
+		side[l.Price] = l.Size
+	}
+}
+
+// snapshot returns the best n levels per side: bids high to low, asks low to high.
+func (b *alpacaLocalBook) snapshot(n int) (bids, asks []alpacaBookLevel) {
+	return topAlpacaLevels(b.bids, n, true), topAlpacaLevels(b.asks, n, false)
+}
+
+func topAlpacaLevels(side map[float64]float64, n int, descending bool) []alpacaBookLevel {
+	out := make([]alpacaBookLevel, 0, len(side))
+	for p, s := range side {
+		out = append(out, alpacaBookLevel{Price: p, Size: s})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if descending {
+			return out[i].Price > out[j].Price
+		}
+		return out[i].Price < out[j].Price
+	})
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out
+}
+
+// alpacaDepthSub is one live depth subscription (one symbol, one client).
+type alpacaDepthSub struct {
+	mu    sync.Mutex
+	book  *alpacaLocalBook
+	limit int
+	strm  chan []byte
 }
 
 type AlpacaAdapter struct {
@@ -62,6 +127,9 @@ type AlpacaAdapter struct {
 	stocksStreamCancel context.CancelFunc
 	cryptoStreamClient *stream.CryptoClient
 	cryptoStreamCancel context.CancelFunc
+
+	depthMu   sync.Mutex
+	depthSubs map[string]*alpacaDepthSub
 }
 
 func NewAlpacaAdapter(accountConnClient *clients.AccountConnectClient, assetProvider assetmeta.Provider) *AlpacaAdapter {
@@ -543,9 +611,87 @@ func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.
 	return nil
 }
 
-
 func (a *AlpacaAdapter) SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
-	return fmt.Errorf("depth stream not yet supported for alpaca")
+	if a.client == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for depth stream")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for depth stream")
+	}
+	if !strings.Contains(ap.SymbolName, "/") {
+		return fmt.Errorf("alpaca only supports depth streaming for crypto symbols, got %q", ap.SymbolName)
+	}
+
+	//TODO: wire to ap.Limit here if the Alpaca payload  if available
+	limit := alpacaDefaultDepthLimit
+
+	streamId := fmt.Sprintf("depth_alpaca_%d_%s", ap.AccountID, ap.SymbolName)
+	if err := a.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	strm := a.AccountConnClient.Streams[streamId]
+
+	sub := &alpacaDepthSub{book: newAlpacaLocalBook(), limit: limit, strm: strm}
+	a.depthMu.Lock()
+	if a.depthSubs == nil {
+		a.depthSubs = make(map[string]*alpacaDepthSub)
+	}
+	a.depthSubs[ap.SymbolName] = sub
+	a.depthMu.Unlock()
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if err := a.ensureCryptoStreamClient(); err != nil {
+		a.dropDepthSub(ap.SymbolName)
+		return err
+	}
+
+	if err := a.cryptoStreamClient.SubscribeToOrderbooks(a.handleCryptoOrderbook, ap.SymbolName); err != nil {
+		a.dropDepthSub(ap.SymbolName)
+		return fmt.Errorf("failed to subscribe to alpaca crypto order book for %s: %w", ap.SymbolName, err)
+	}
+
+	go func() {
+		for depthB := range strm {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthUpdate, messages.Alpaca, a.AccountConnClient.ID, depthB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal alpaca depth stream message: %v", err)
+				continue
+			}
+			a.AccountConnClient.Send <- msgB
+		}
+	}()
+	return nil
+}
+
+// UnsubscribeDepth stops the live order book for one symbol.
+func (a *AlpacaAdapter) UnsubscribeDepth(ctx context.Context, symbol string) error {
+	a.dropDepthSub(symbol)
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+	if a.cryptoStreamClient == nil {
+		return nil
+	}
+	if err := a.cryptoStreamClient.UnsubscribeFromOrderbooks(symbol); err != nil {
+		return fmt.Errorf("failed to unsubscribe from alpaca crypto order book for %s: %w", symbol, err)
+	}
+	return nil
+}
+
+func (a *AlpacaAdapter) dropDepthSub(symbol string) {
+	a.depthMu.Lock()
+	delete(a.depthSubs, symbol)
+	a.depthMu.Unlock()
 }
 
 func (a *AlpacaAdapter) SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
@@ -566,6 +712,10 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 		a.cryptoStreamClient = nil
 		a.cryptoStreamCancel = nil
 	}
+
+	a.depthMu.Lock()
+	a.depthSubs = nil
+	a.depthMu.Unlock()
 
 	a.client = nil
 	a.marketClient = nil
@@ -610,4 +760,71 @@ func (a *AlpacaAdapter) fetchCryptoOrderbook(ctx context.Context, symbol string)
 		return nil, fmt.Errorf("no orderbook returned for %s", symbol)
 	}
 	return &book, nil
+}
+
+// handleCryptoOrderbook runs on the read goroutine for every orderbook
+// message, whatever the symbol.
+func (a *AlpacaAdapter) handleCryptoOrderbook(o stream.CryptoOrderbook) {
+	a.depthMu.Lock()
+	sub := a.depthSubs[o.Symbol]
+	a.depthMu.Unlock()
+	if sub == nil {
+		return
+	}
+
+	bidsIn := make([]alpacaBookLevel, 0, len(o.Bids))
+	for _, e := range o.Bids {
+		bidsIn = append(bidsIn, alpacaBookLevel{Price: e.Price, Size: e.Size})
+	}
+	asksIn := make([]alpacaBookLevel, 0, len(o.Asks))
+	for _, e := range o.Asks {
+		asksIn = append(asksIn, alpacaBookLevel{Price: e.Price, Size: e.Size})
+	}
+
+	sub.mu.Lock()
+	sub.book.apply(o.Reset, bidsIn, asksIn)
+	bids, asks := sub.book.snapshot(sub.limit)
+	sub.mu.Unlock()
+
+	res := messages.AccountConnectDepthRes{
+		Bids:         toAlpacaDepthLevels(bids),
+		Asks:         toAlpacaDepthLevels(asks),
+		LastUpdateId: o.Timestamp.UnixMilli(),
+		SymbolName:   o.Symbol,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		log.Printf("Failed to marshal alpaca depth for %s: %v", o.Symbol, err)
+		return
+	}
+	select {
+	case sub.strm <- resB:
+	default:
+		log.Printf("Depth stream channel full for alpaca %s, dropping update", o.Symbol)
+	}
+}
+
+// ensureCryptoStreamClient connects the shared crypto stream client on first
+// use. The caller must hold a.streamMu.
+func (a *AlpacaAdapter) ensureCryptoStreamClient() error {
+	if a.cryptoStreamClient != nil {
+		return nil
+	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	client := stream.NewCryptoClient("us", stream.WithCredentials(a.apiKey, a.secretKey))
+	if err := client.Connect(streamCtx); err != nil {
+		cancel()
+		return fmt.Errorf("failed to connect alpaca crypto stream: %w", err)
+	}
+	a.cryptoStreamClient = client
+	a.cryptoStreamCancel = cancel
+	return nil
+}
+
+func toAlpacaDepthLevels(in []alpacaBookLevel) []messages.AccountConnectDepthLevel {
+	out := make([]messages.AccountConnectDepthLevel, 0, len(in))
+	for _, l := range in {
+		out = append(out, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+	return out
 }
