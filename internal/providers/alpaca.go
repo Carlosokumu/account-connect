@@ -37,6 +37,10 @@ const (
 
 var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
+type alpacaBBOSub struct {
+	strm chan []byte
+}
+
 type alpacaBookLevel struct {
 	Price float64 `json:"p"`
 	Size  float64 `json:"s"`
@@ -130,6 +134,9 @@ type AlpacaAdapter struct {
 
 	depthMu   sync.Mutex
 	depthSubs map[string]*alpacaDepthSub
+
+	bboMu   sync.Mutex
+	bboSubs map[string]*alpacaBBOSub
 }
 
 func NewAlpacaAdapter(accountConnClient *clients.AccountConnectClient, assetProvider assetmeta.Provider) *AlpacaAdapter {
@@ -695,7 +702,141 @@ func (a *AlpacaAdapter) dropDepthSub(symbol string) {
 }
 
 func (a *AlpacaAdapter) SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
-	return fmt.Errorf("bbo stream not yet supported for alpaca")
+	if a.client == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for BBO stream")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for alpaca BBO stream")
+	}
+
+	symbol := ap.SymbolName
+	isCrypto := strings.Contains(symbol, "/")
+
+	streamId := fmt.Sprintf("bbo_alpaca_%d_%s", ap.AccountID, symbol)
+	if err := a.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	strm := a.AccountConnClient.Streams[streamId]
+
+	a.bboMu.Lock()
+	if a.bboSubs == nil {
+		a.bboSubs = make(map[string]*alpacaBBOSub)
+	}
+	a.bboSubs[symbol] = &alpacaBBOSub{strm: strm}
+	a.bboMu.Unlock()
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if isCrypto {
+		if err := a.ensureCryptoStreamClient(); err != nil {
+			a.dropBBOSub(symbol)
+			return err
+		}
+		if err := a.cryptoStreamClient.SubscribeToQuotes(a.handleCryptoQuote, symbol); err != nil {
+			a.dropBBOSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca crypto quotes for %s: %w", symbol, err)
+		}
+	} else {
+		if err := a.ensureStocksStreamClient(); err != nil {
+			a.dropBBOSub(symbol)
+			return err
+		}
+		if err := a.stocksStreamClient.SubscribeToQuotes(a.handleStockQuote, symbol); err != nil {
+			a.dropBBOSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca stock quotes for %s: %w", symbol, err)
+		}
+	}
+
+	// Started only after the subscription succeeded.
+	go func() {
+		for bboB := range strm {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeBBOUpdate, messages.Alpaca, a.AccountConnClient.ID, bboB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal alpaca BBO stream message: %v", err)
+				continue
+			}
+			a.AccountConnClient.Send <- msgB
+		}
+	}()
+	return nil
+}
+
+// handleCryptoQuote runs on the read goroutine for every crypto quote.
+func (a *AlpacaAdapter) handleCryptoQuote(q stream.CryptoQuote) {
+	a.sendBBO(q.Symbol, q.BidPrice, q.BidSize, q.AskPrice, q.AskSize, q.Timestamp)
+}
+
+// handleStockQuote runs on the  read goroutine for every stock quote.
+func (a *AlpacaAdapter) handleStockQuote(q stream.Quote) {
+	a.sendBBO(q.Symbol, q.BidPrice, float64(q.BidSize), q.AskPrice, float64(q.AskSize), q.Timestamp)
+}
+
+func (a *AlpacaAdapter) sendBBO(symbol string, bidPrice, bidQty, askPrice, askQty float64, ts time.Time) {
+	a.bboMu.Lock()
+	sub := a.bboSubs[symbol]
+	a.bboMu.Unlock()
+	if sub == nil {
+		return
+	}
+
+	bbo := messages.AccountConnectBBO{
+		SymbolName: symbol,
+		BidPrice:   bidPrice,
+		BidQty:     bidQty,
+		AskPrice:   askPrice,
+		AskQty:     askQty,
+		UpdateId:   ts.UnixNano(), // Alpaca has no update sequence; the quote timestamp is monotonic per symbol
+	}
+	bboB, err := json.Marshal(bbo)
+	if err != nil {
+		log.Printf("Failed to marshal alpaca BBO for %s: %v", symbol, err)
+		return
+	}
+	select {
+	case sub.strm <- bboB:
+	default:
+		log.Printf("BBO stream channel full for alpaca %s, dropping update", symbol)
+	}
+}
+
+// UnsubscribeBBO stops the BBO stream for one symbol.
+func (a *AlpacaAdapter) UnsubscribeBBO(ctx context.Context, symbol string) error {
+	a.dropBBOSub(symbol)
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if strings.Contains(symbol, "/") {
+		if a.cryptoStreamClient == nil {
+			return nil
+		}
+		if err := a.cryptoStreamClient.UnsubscribeFromQuotes(symbol); err != nil {
+			return fmt.Errorf("failed to unsubscribe from alpaca crypto quotes for %s: %w", symbol, err)
+		}
+		return nil
+	}
+	if a.stocksStreamClient == nil {
+		return nil
+	}
+	if err := a.stocksStreamClient.UnsubscribeFromQuotes(symbol); err != nil {
+		return fmt.Errorf("failed to unsubscribe from alpaca stock quotes for %s: %w", symbol, err)
+	}
+	return nil
+}
+
+func (a *AlpacaAdapter) dropBBOSub(symbol string) {
+	a.bboMu.Lock()
+	delete(a.bboSubs, symbol)
+	a.bboMu.Unlock()
 }
 
 func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
@@ -716,6 +857,10 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 	a.depthMu.Lock()
 	a.depthSubs = nil
 	a.depthMu.Unlock()
+
+	a.bboMu.Lock()
+	a.bboSubs = nil
+	a.bboMu.Unlock()
 
 	a.client = nil
 	a.marketClient = nil
@@ -805,7 +950,7 @@ func (a *AlpacaAdapter) handleCryptoOrderbook(o stream.CryptoOrderbook) {
 }
 
 // ensureCryptoStreamClient connects the shared crypto stream client on first
-// use. The caller must hold a.streamMu.
+// use
 func (a *AlpacaAdapter) ensureCryptoStreamClient() error {
 	if a.cryptoStreamClient != nil {
 		return nil
@@ -818,6 +963,23 @@ func (a *AlpacaAdapter) ensureCryptoStreamClient() error {
 	}
 	a.cryptoStreamClient = client
 	a.cryptoStreamCancel = cancel
+	return nil
+}
+
+// ensureStocksStreamClient connects the shared stocks stream client on first
+// use.
+func (a *AlpacaAdapter) ensureStocksStreamClient() error {
+	if a.stocksStreamClient != nil {
+		return nil
+	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	client := stream.NewStocksClient("iex", stream.WithCredentials(a.apiKey, a.secretKey))
+	if err := client.Connect(streamCtx); err != nil {
+		cancel()
+		return fmt.Errorf("failed to connect alpaca stocks stream: %w", err)
+	}
+	a.stocksStreamClient = client
+	a.stocksStreamCancel = cancel
 	return nil
 }
 
