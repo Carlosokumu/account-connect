@@ -532,7 +532,7 @@ type BinanceBBORequestPayload struct {
 
 type AccountConnectDepthPayload struct {
 	Binance *BinanceDepthRequestPayload `json:"binance,omitempty"`
-	Alpaca *AlpacaDepthRequestPayload `json:"alpaca,omitempty"`
+	Alpaca  *AlpacaDepthRequestPayload `json:"alpaca,omitempty"`
 }
 
 type AccountConnectDepthLevel struct {
