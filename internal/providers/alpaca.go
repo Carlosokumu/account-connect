@@ -6,8 +6,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +30,21 @@ import (
 const (
 	alpacaPaperBaseURL = "https://paper-api.alpaca.markets"
 	alpacaLiveBaseURL  = "https://api.alpaca.markets"
+	alpacaDataBaseURL  = "https://data.alpaca.markets"
 )
+
+var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+type alpacaBookLevel struct {
+	Price float64 `json:"p"`
+	Size  float64 `json:"s"`
+}
+
+type alpacaOrderbook struct {
+	Timestamp time.Time         `json:"t"`
+	Bids      []alpacaBookLevel `json:"b"`
+	Asks      []alpacaBookLevel `json:"a"`
+}
 
 type AlpacaAdapter struct {
 	AccountConnClient *clients.AccountConnectClient
@@ -474,8 +491,58 @@ func (a *AlpacaAdapter) SubscribeTicks(ctx context.Context, payload messages.Acc
 }
 
 func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
-	return fmt.Errorf("order book depth not yet supported for alpaca")
+	if a.client == nil || a.marketClient == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for order book depth")
+	}
+
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for order book depth")
+	}
+	if !strings.Contains(ap.SymbolName, "/") {
+		return fmt.Errorf("alpaca only supports order book depth for crypto symbols, got %q", ap.SymbolName)
+	}
+
+	book, err := a.fetchCryptoOrderbook(ctx, ap.SymbolName)
+	if err != nil {
+		return fmt.Errorf("failed to fetch alpaca crypto order book: %w", err)
+	}
+
+	bids := make([]messages.AccountConnectDepthLevel, 0, len(book.Bids))
+	for _, l := range book.Bids {
+		bids = append(bids, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+	asks := make([]messages.AccountConnectDepthLevel, 0, len(book.Asks))
+	for _, l := range book.Asks {
+		asks = append(asks, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+
+	res := messages.AccountConnectDepthRes{
+		Bids:         bids,
+		Asks:         asks,
+		LastUpdateId: book.Timestamp.UnixMilli(),
+		SymbolName:   ap.SymbolName,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal alpaca order book: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSnapshot, messages.Alpaca, a.AccountConnClient.ID, resB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	a.AccountConnClient.Send <- msgB
+	return nil
 }
+
 
 func (a *AlpacaAdapter) SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
 	return fmt.Errorf("depth stream not yet supported for alpaca")
@@ -507,4 +574,40 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 	a.secretKey = ""
 
 	return nil
+}
+
+func (a *AlpacaAdapter) fetchCryptoOrderbook(ctx context.Context, symbol string) (*alpacaOrderbook, error) {
+	q := url.Values{}
+	q.Set("symbols", symbol)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		alpacaDataBaseURL+"/v1beta3/crypto/us/latest/orderbooks?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("APCA-API-KEY-ID", a.apiKey)
+	req.Header.Set("APCA-API-SECRET-KEY", a.secretKey)
+
+	resp, err := alpacaHTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("alpaca orderbook request failed: %s: %s", resp.Status, string(body))
+	}
+
+	var out struct {
+		Orderbooks map[string]alpacaOrderbook `json:"orderbooks"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	book, ok := out.Orderbooks[symbol]
+	if !ok {
+		return nil, fmt.Errorf("no orderbook returned for %s", symbol)
+	}
+	return &book, nil
 }
