@@ -6,8 +6,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -25,9 +29,91 @@ import (
 )
 
 const (
-	alpacaPaperBaseURL = "https://paper-api.alpaca.markets"
-	alpacaLiveBaseURL  = "https://api.alpaca.markets"
+	alpacaPaperBaseURL      = "https://paper-api.alpaca.markets"
+	alpacaLiveBaseURL       = "https://api.alpaca.markets"
+	alpacaDataBaseURL       = "https://data.alpaca.markets"
+	alpacaDefaultDepthLimit = 20
 )
+
+var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+type alpacaBBOSub struct {
+	strm chan []byte
+}
+
+type alpacaBookLevel struct {
+	Price float64 `json:"p"`
+	Size  float64 `json:"s"`
+}
+
+type alpacaOrderbook struct {
+	Timestamp time.Time         `json:"t"`
+	Bids      []alpacaBookLevel `json:"b"`
+	Asks      []alpacaBookLevel `json:"a"`
+}
+
+type alpacaLocalBook struct {
+	bids map[float64]float64
+	asks map[float64]float64
+}
+
+func newAlpacaLocalBook() *alpacaLocalBook {
+	return &alpacaLocalBook{
+		bids: make(map[float64]float64),
+		asks: make(map[float64]float64),
+	}
+}
+
+// apply folds one Alpaca orderbook message into the book. A reset message
+// carries the complete book, so anything held before it is discarded.
+func (b *alpacaLocalBook) apply(reset bool, bids, asks []alpacaBookLevel) {
+	if reset {
+		b.bids = make(map[float64]float64, len(bids))
+		b.asks = make(map[float64]float64, len(asks))
+	}
+	applyAlpacaLevels(b.bids, bids)
+	applyAlpacaLevels(b.asks, asks)
+}
+
+func applyAlpacaLevels(side map[float64]float64, levels []alpacaBookLevel) {
+	for _, l := range levels {
+		if l.Size == 0 {
+			delete(side, l.Price)
+			continue
+		}
+		side[l.Price] = l.Size
+	}
+}
+
+// snapshot returns the best n levels per side: bids high to low, asks low to high.
+func (b *alpacaLocalBook) snapshot(n int) (bids, asks []alpacaBookLevel) {
+	return topAlpacaLevels(b.bids, n, true), topAlpacaLevels(b.asks, n, false)
+}
+
+func topAlpacaLevels(side map[float64]float64, n int, descending bool) []alpacaBookLevel {
+	out := make([]alpacaBookLevel, 0, len(side))
+	for p, s := range side {
+		out = append(out, alpacaBookLevel{Price: p, Size: s})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if descending {
+			return out[i].Price > out[j].Price
+		}
+		return out[i].Price < out[j].Price
+	})
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out
+}
+
+// alpacaDepthSub is one live depth subscription (one symbol, one client).
+type alpacaDepthSub struct {
+	mu    sync.Mutex
+	book  *alpacaLocalBook
+	limit int
+	strm  chan []byte
+}
 
 type AlpacaAdapter struct {
 	AccountConnClient *clients.AccountConnectClient
@@ -45,6 +131,12 @@ type AlpacaAdapter struct {
 	stocksStreamCancel context.CancelFunc
 	cryptoStreamClient *stream.CryptoClient
 	cryptoStreamCancel context.CancelFunc
+
+	depthMu   sync.Mutex
+	depthSubs map[string]*alpacaDepthSub
+
+	bboMu   sync.Mutex
+	bboSubs map[string]*alpacaBBOSub
 }
 
 func NewAlpacaAdapter(accountConnClient *clients.AccountConnectClient, assetProvider assetmeta.Provider) *AlpacaAdapter {
@@ -474,15 +566,277 @@ func (a *AlpacaAdapter) SubscribeTicks(ctx context.Context, payload messages.Acc
 }
 
 func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
-	return fmt.Errorf("order book depth not yet supported for alpaca")
+	if a.client == nil || a.marketClient == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for order book depth")
+	}
+
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for order book depth")
+	}
+	if !strings.Contains(ap.SymbolName, "/") {
+		return fmt.Errorf("alpaca only supports order book depth for crypto symbols, got %q", ap.SymbolName)
+	}
+
+	book, err := a.fetchCryptoOrderbook(ctx, ap.SymbolName)
+	if err != nil {
+		return fmt.Errorf("failed to fetch alpaca crypto order book: %w", err)
+	}
+
+	bids := make([]messages.AccountConnectDepthLevel, 0, len(book.Bids))
+	for _, l := range book.Bids {
+		bids = append(bids, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+	asks := make([]messages.AccountConnectDepthLevel, 0, len(book.Asks))
+	for _, l := range book.Asks {
+		asks = append(asks, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+
+	res := messages.AccountConnectDepthRes{
+		Bids:         bids,
+		Asks:         asks,
+		LastUpdateId: book.Timestamp.UnixMilli(),
+		SymbolName:   ap.SymbolName,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal alpaca order book: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSnapshot, messages.Alpaca, a.AccountConnClient.ID, resB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	a.AccountConnClient.Send <- msgB
+	return nil
 }
 
 func (a *AlpacaAdapter) SubscribeDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
-	return fmt.Errorf("depth stream not yet supported for alpaca")
+	if a.client == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for depth stream")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for depth stream")
+	}
+	if !strings.Contains(ap.SymbolName, "/") {
+		return fmt.Errorf("alpaca only supports depth streaming for crypto symbols, got %q", ap.SymbolName)
+	}
+
+	//TODO: wire to ap.Limit here if the Alpaca payload  if available
+	limit := alpacaDefaultDepthLimit
+
+	streamId := fmt.Sprintf("depth_alpaca_%d_%s", ap.AccountID, ap.SymbolName)
+	if err := a.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	strm := a.AccountConnClient.Streams[streamId]
+
+	sub := &alpacaDepthSub{book: newAlpacaLocalBook(), limit: limit, strm: strm}
+	a.depthMu.Lock()
+	if a.depthSubs == nil {
+		a.depthSubs = make(map[string]*alpacaDepthSub)
+	}
+	a.depthSubs[ap.SymbolName] = sub
+	a.depthMu.Unlock()
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if err := a.ensureCryptoStreamClient(); err != nil {
+		a.dropDepthSub(ap.SymbolName)
+		return err
+	}
+
+	if err := a.cryptoStreamClient.SubscribeToOrderbooks(a.handleCryptoOrderbook, ap.SymbolName); err != nil {
+		a.dropDepthSub(ap.SymbolName)
+		return fmt.Errorf("failed to subscribe to alpaca crypto order book for %s: %w", ap.SymbolName, err)
+	}
+
+	go func() {
+		for depthB := range strm {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthUpdate, messages.Alpaca, a.AccountConnClient.ID, depthB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal alpaca depth stream message: %v", err)
+				continue
+			}
+			a.AccountConnClient.Send <- msgB
+		}
+	}()
+	return nil
+}
+
+// UnsubscribeDepth stops the live order book for one symbol.
+func (a *AlpacaAdapter) UnsubscribeDepth(ctx context.Context, symbol string) error {
+	a.dropDepthSub(symbol)
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+	if a.cryptoStreamClient == nil {
+		return nil
+	}
+	if err := a.cryptoStreamClient.UnsubscribeFromOrderbooks(symbol); err != nil {
+		return fmt.Errorf("failed to unsubscribe from alpaca crypto order book for %s: %w", symbol, err)
+	}
+	return nil
+}
+
+func (a *AlpacaAdapter) dropDepthSub(symbol string) {
+	a.depthMu.Lock()
+	delete(a.depthSubs, symbol)
+	a.depthMu.Unlock()
 }
 
 func (a *AlpacaAdapter) SubscribeBBO(ctx context.Context, payload messages.AccountConnectBBOPayload) error {
-	return fmt.Errorf("bbo stream not yet supported for alpaca")
+	if a.client == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for BBO stream")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for alpaca BBO stream")
+	}
+
+	symbol := ap.SymbolName
+	isCrypto := strings.Contains(symbol, "/")
+
+	streamId := fmt.Sprintf("bbo_alpaca_%d_%s", ap.AccountID, symbol)
+	if err := a.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	strm := a.AccountConnClient.Streams[streamId]
+
+	a.bboMu.Lock()
+	if a.bboSubs == nil {
+		a.bboSubs = make(map[string]*alpacaBBOSub)
+	}
+	a.bboSubs[symbol] = &alpacaBBOSub{strm: strm}
+	a.bboMu.Unlock()
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if isCrypto {
+		if err := a.ensureCryptoStreamClient(); err != nil {
+			a.dropBBOSub(symbol)
+			return err
+		}
+		if err := a.cryptoStreamClient.SubscribeToQuotes(a.handleCryptoQuote, symbol); err != nil {
+			a.dropBBOSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca crypto quotes for %s: %w", symbol, err)
+		}
+	} else {
+		if err := a.ensureStocksStreamClient(); err != nil {
+			a.dropBBOSub(symbol)
+			return err
+		}
+		if err := a.stocksStreamClient.SubscribeToQuotes(a.handleStockQuote, symbol); err != nil {
+			a.dropBBOSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca stock quotes for %s: %w", symbol, err)
+		}
+	}
+
+	// Started only after the subscription succeeded.
+	go func() {
+		for bboB := range strm {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeBBOUpdate, messages.Alpaca, a.AccountConnClient.ID, bboB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal alpaca BBO stream message: %v", err)
+				continue
+			}
+			a.AccountConnClient.Send <- msgB
+		}
+	}()
+	return nil
+}
+
+// handleCryptoQuote runs on the read goroutine for every crypto quote.
+func (a *AlpacaAdapter) handleCryptoQuote(q stream.CryptoQuote) {
+	a.sendBBO(q.Symbol, q.BidPrice, q.BidSize, q.AskPrice, q.AskSize, q.Timestamp)
+}
+
+// handleStockQuote runs on the  read goroutine for every stock quote.
+func (a *AlpacaAdapter) handleStockQuote(q stream.Quote) {
+	a.sendBBO(q.Symbol, q.BidPrice, float64(q.BidSize), q.AskPrice, float64(q.AskSize), q.Timestamp)
+}
+
+func (a *AlpacaAdapter) sendBBO(symbol string, bidPrice, bidQty, askPrice, askQty float64, ts time.Time) {
+	a.bboMu.Lock()
+	sub := a.bboSubs[symbol]
+	a.bboMu.Unlock()
+	if sub == nil {
+		return
+	}
+
+	bbo := messages.AccountConnectBBO{
+		SymbolName: symbol,
+		BidPrice:   bidPrice,
+		BidQty:     bidQty,
+		AskPrice:   askPrice,
+		AskQty:     askQty,
+		UpdateId:   ts.UnixNano(), // Alpaca has no update sequence; the quote timestamp is monotonic per symbol
+	}
+	bboB, err := json.Marshal(bbo)
+	if err != nil {
+		log.Printf("Failed to marshal alpaca BBO for %s: %v", symbol, err)
+		return
+	}
+	select {
+	case sub.strm <- bboB:
+	default:
+		log.Printf("BBO stream channel full for alpaca %s, dropping update", symbol)
+	}
+}
+
+// UnsubscribeBBO stops the BBO stream for one symbol.
+func (a *AlpacaAdapter) UnsubscribeBBO(ctx context.Context, symbol string) error {
+	a.dropBBOSub(symbol)
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if strings.Contains(symbol, "/") {
+		if a.cryptoStreamClient == nil {
+			return nil
+		}
+		if err := a.cryptoStreamClient.UnsubscribeFromQuotes(symbol); err != nil {
+			return fmt.Errorf("failed to unsubscribe from alpaca crypto quotes for %s: %w", symbol, err)
+		}
+		return nil
+	}
+	if a.stocksStreamClient == nil {
+		return nil
+	}
+	if err := a.stocksStreamClient.UnsubscribeFromQuotes(symbol); err != nil {
+		return fmt.Errorf("failed to unsubscribe from alpaca stock quotes for %s: %w", symbol, err)
+	}
+	return nil
+}
+
+func (a *AlpacaAdapter) dropBBOSub(symbol string) {
+	a.bboMu.Lock()
+	delete(a.bboSubs, symbol)
+	a.bboMu.Unlock()
 }
 
 func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
@@ -500,6 +854,14 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 		a.cryptoStreamCancel = nil
 	}
 
+	a.depthMu.Lock()
+	a.depthSubs = nil
+	a.depthMu.Unlock()
+
+	a.bboMu.Lock()
+	a.bboSubs = nil
+	a.bboMu.Unlock()
+
 	a.client = nil
 	a.marketClient = nil
 	a.account = nil
@@ -507,4 +869,124 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 	a.secretKey = ""
 
 	return nil
+}
+
+func (a *AlpacaAdapter) fetchCryptoOrderbook(ctx context.Context, symbol string) (*alpacaOrderbook, error) {
+	q := url.Values{}
+	q.Set("symbols", symbol)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		alpacaDataBaseURL+"/v1beta3/crypto/us/latest/orderbooks?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("APCA-API-KEY-ID", a.apiKey)
+	req.Header.Set("APCA-API-SECRET-KEY", a.secretKey)
+
+	resp, err := alpacaHTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("alpaca orderbook request failed: %s: %s", resp.Status, string(body))
+	}
+
+	var out struct {
+		Orderbooks map[string]alpacaOrderbook `json:"orderbooks"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	book, ok := out.Orderbooks[symbol]
+	if !ok {
+		return nil, fmt.Errorf("no orderbook returned for %s", symbol)
+	}
+	return &book, nil
+}
+
+// handleCryptoOrderbook runs on the read goroutine for every orderbook
+// message, whatever the symbol.
+func (a *AlpacaAdapter) handleCryptoOrderbook(o stream.CryptoOrderbook) {
+	a.depthMu.Lock()
+	sub := a.depthSubs[o.Symbol]
+	a.depthMu.Unlock()
+	if sub == nil {
+		return
+	}
+
+	bidsIn := make([]alpacaBookLevel, 0, len(o.Bids))
+	for _, e := range o.Bids {
+		bidsIn = append(bidsIn, alpacaBookLevel{Price: e.Price, Size: e.Size})
+	}
+	asksIn := make([]alpacaBookLevel, 0, len(o.Asks))
+	for _, e := range o.Asks {
+		asksIn = append(asksIn, alpacaBookLevel{Price: e.Price, Size: e.Size})
+	}
+
+	sub.mu.Lock()
+	sub.book.apply(o.Reset, bidsIn, asksIn)
+	bids, asks := sub.book.snapshot(sub.limit)
+	sub.mu.Unlock()
+
+	res := messages.AccountConnectDepthRes{
+		Bids:         toAlpacaDepthLevels(bids),
+		Asks:         toAlpacaDepthLevels(asks),
+		LastUpdateId: o.Timestamp.UnixMilli(),
+		SymbolName:   o.Symbol,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		log.Printf("Failed to marshal alpaca depth for %s: %v", o.Symbol, err)
+		return
+	}
+	select {
+	case sub.strm <- resB:
+	default:
+		log.Printf("Depth stream channel full for alpaca %s, dropping update", o.Symbol)
+	}
+}
+
+// ensureCryptoStreamClient connects the shared crypto stream client on first
+// use
+func (a *AlpacaAdapter) ensureCryptoStreamClient() error {
+	if a.cryptoStreamClient != nil {
+		return nil
+	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	client := stream.NewCryptoClient("us", stream.WithCredentials(a.apiKey, a.secretKey))
+	if err := client.Connect(streamCtx); err != nil {
+		cancel()
+		return fmt.Errorf("failed to connect alpaca crypto stream: %w", err)
+	}
+	a.cryptoStreamClient = client
+	a.cryptoStreamCancel = cancel
+	return nil
+}
+
+// ensureStocksStreamClient connects the shared stocks stream client on first
+// use.
+func (a *AlpacaAdapter) ensureStocksStreamClient() error {
+	if a.stocksStreamClient != nil {
+		return nil
+	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	client := stream.NewStocksClient("iex", stream.WithCredentials(a.apiKey, a.secretKey))
+	if err := client.Connect(streamCtx); err != nil {
+		cancel()
+		return fmt.Errorf("failed to connect alpaca stocks stream: %w", err)
+	}
+	a.stocksStreamClient = client
+	a.stocksStreamCancel = cancel
+	return nil
+}
+
+func toAlpacaDepthLevels(in []alpacaBookLevel) []messages.AccountConnectDepthLevel {
+	out := make([]messages.AccountConnectDepthLevel, 0, len(in))
+	for _, l := range in {
+		out = append(out, messages.AccountConnectDepthLevel{Price: l.Price, Quantity: l.Size})
+	}
+	return out
 }

@@ -519,13 +519,25 @@ type BinanceDepthRequestPayload struct {
 	Limit      *int      `json:"limit,omitempty"`
 }
 
+type AlpacaDepthRequestPayload struct {
+	AccountID  AccountID `json:"account_id"`
+	SymbolName string    `json:"symbol_name"`
+	Limit      *int      `json:"limit,omitempty"`
+}
+
 type BinanceBBORequestPayload struct {
+	AccountID  AccountID `json:"account_id"`
+	SymbolName string    `json:"symbol_name,omitempty"` // empty means all-symbols
+}
+
+type AlpacaBBORequestPayload struct {
 	AccountID  AccountID `json:"account_id"`
 	SymbolName string    `json:"symbol_name,omitempty"` // empty means all-symbols
 }
 
 type AccountConnectDepthPayload struct {
 	Binance *BinanceDepthRequestPayload `json:"binance,omitempty"`
+	Alpaca  *AlpacaDepthRequestPayload  `json:"alpaca,omitempty"`
 }
 
 type AccountConnectDepthLevel struct {
@@ -551,6 +563,7 @@ type AccountConnectBBO struct {
 
 type AccountConnectBBOPayload struct {
 	Binance *BinanceBBORequestPayload `json:"binance,omitempty"`
+	Alpaca  *AlpacaBBORequestPayload  `json:"alpaca,omitempty"`
 }
 
 type CTraderTradingAccountsResponse struct {
