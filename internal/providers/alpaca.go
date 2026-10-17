@@ -33,6 +33,8 @@ const (
 	alpacaLiveBaseURL       = "https://api.alpaca.markets"
 	alpacaDataBaseURL       = "https://data.alpaca.markets"
 	alpacaDefaultDepthLimit = 20
+	alpacaDefaultTickLimit  = 500
+	alpacaMaxTickLimit      = 1000 // same cap as Binance's maxTickLimit
 )
 
 var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
@@ -558,7 +560,82 @@ func (a *AlpacaAdapter) GetAccountOrders(ctx context.Context, payload messages.A
 }
 
 func (a *AlpacaAdapter) GetHistoricalTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
-	return fmt.Errorf("historical ticks not yet supported for alpaca")
+	if a.marketClient == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for historical tick data")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for historical tick data")
+	}
+
+	limit := alpacaDefaultTickLimit
+	if ap.Limit != nil {
+		limit = *ap.Limit
+	}
+	if limit <= 0 {
+		return fmt.Errorf("limit must be positive, got %d", limit)
+	}
+	if limit > alpacaMaxTickLimit {
+		limit = alpacaMaxTickLimit
+	}
+
+	var start, end time.Time
+	if ap.FromTimestamp != nil {
+		start = time.UnixMilli(*ap.FromTimestamp)
+	}
+	if ap.ToTimestamp != nil {
+		end = time.UnixMilli(*ap.ToTimestamp)
+	}
+
+	var ticks []messages.AccountConnectTick
+
+	if strings.Contains(ap.SymbolName, "/") {
+		trades, err := a.marketClient.GetCryptoTrades(ap.SymbolName, marketdata.GetCryptoTradesRequest{
+			Start:      start,
+			End:        end,
+			TotalLimit: limit,
+			Sort:       marketdata.SortAsc,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch alpaca crypto trades: %w", err)
+		}
+		ticks = mappers.AlpacaCryptoTradesToTicks(trades)
+	} else {
+		trades, err := a.marketClient.GetTrades(ap.SymbolName, marketdata.GetTradesRequest{
+			Start:      start,
+			End:        end,
+			TotalLimit: limit,
+			Sort:       marketdata.SortAsc,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch alpaca stock trades: %w", err)
+		}
+		ticks = mappers.AlpacaTradesToTicks(trades)
+	}
+
+	res := messages.AccountConnectTickDataRes{
+		Ticks:      ticks,
+		HasMore:    len(ticks) == limit,
+		SymbolName: ap.SymbolName,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal alpaca tick data: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksHistory, messages.Alpaca, a.AccountConnClient.ID, resB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	a.AccountConnClient.Send <- msgB
+	return nil
 }
 
 func (a *AlpacaAdapter) SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
