@@ -589,3 +589,31 @@ func PeriodStrToAlpacaTimeFrame(period string) (marketdata.TimeFrame, error) {
 		return marketdata.TimeFrame{}, fmt.Errorf("unsupported period: %q", period)
 	}
 }
+
+func AlpacaTradesToTicks(trades []marketdata.Trade) []messages.AccountConnectTick {
+	ticks := make([]messages.AccountConnectTick, 0, len(trades))
+	for _, t := range trades {
+		qty := float64(t.Size)
+		ticks = append(ticks, messages.AccountConnectTick{
+			Timestamp: t.Timestamp.UnixMilli(),
+			Price:     t.Price,
+			Quantity:  qty,
+			QuoteQty:  t.Price * qty,
+		})
+	}
+	return ticks
+}
+
+func AlpacaCryptoTradesToTicks(trades []marketdata.CryptoTrade) []messages.AccountConnectTick {
+	ticks := make([]messages.AccountConnectTick, 0, len(trades))
+	for _, t := range trades {
+		ticks = append(ticks, messages.AccountConnectTick{
+			Timestamp:    t.Timestamp.UnixMilli(),
+			Price:        t.Price,
+			Quantity:     t.Size,
+			QuoteQty:     t.Price * t.Size,
+			IsBuyerMaker: t.TakerSide == marketdata.TakerSideSell,
+		})
+	}
+	return ticks
+}

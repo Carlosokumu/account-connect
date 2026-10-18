@@ -33,6 +33,8 @@ const (
 	alpacaLiveBaseURL       = "https://api.alpaca.markets"
 	alpacaDataBaseURL       = "https://data.alpaca.markets"
 	alpacaDefaultDepthLimit = 20
+	alpacaDefaultTickLimit  = 500
+	alpacaMaxTickLimit      = 1000 // same cap as Binance's maxTickLimit
 )
 
 var alpacaHTTPClient = &http.Client{Timeout: 10 * time.Second}
@@ -115,6 +117,11 @@ type alpacaDepthSub struct {
 	strm  chan []byte
 }
 
+// alpacaTickSub is one live tick subscription (one symbol, one client).
+type alpacaTickSub struct {
+	strm chan []byte
+}
+
 type AlpacaAdapter struct {
 	AccountConnClient *clients.AccountConnectClient
 
@@ -135,8 +142,10 @@ type AlpacaAdapter struct {
 	depthMu   sync.Mutex
 	depthSubs map[string]*alpacaDepthSub
 
-	bboMu   sync.Mutex
-	bboSubs map[string]*alpacaBBOSub
+	bboMu    sync.Mutex
+	bboSubs  map[string]*alpacaBBOSub
+	tickMu   sync.Mutex
+	tickSubs map[string]*alpacaTickSub
 }
 
 func NewAlpacaAdapter(accountConnClient *clients.AccountConnectClient, assetProvider assetmeta.Provider) *AlpacaAdapter {
@@ -558,11 +567,184 @@ func (a *AlpacaAdapter) GetAccountOrders(ctx context.Context, payload messages.A
 }
 
 func (a *AlpacaAdapter) GetHistoricalTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
-	return fmt.Errorf("historical ticks not yet supported for alpaca")
+	if a.marketClient == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for historical tick data")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for historical tick data")
+	}
+
+	limit := alpacaDefaultTickLimit
+	if ap.Limit != nil {
+		limit = *ap.Limit
+	}
+	if limit <= 0 {
+		return fmt.Errorf("limit must be positive, got %d", limit)
+	}
+	if limit > alpacaMaxTickLimit {
+		limit = alpacaMaxTickLimit
+	}
+
+	var start, end time.Time
+	if ap.FromTimestamp != nil {
+		start = time.UnixMilli(*ap.FromTimestamp)
+	}
+	if ap.ToTimestamp != nil {
+		end = time.UnixMilli(*ap.ToTimestamp)
+	}
+
+	var ticks []messages.AccountConnectTick
+
+	if strings.Contains(ap.SymbolName, "/") {
+		trades, err := a.marketClient.GetCryptoTrades(ap.SymbolName, marketdata.GetCryptoTradesRequest{
+			Start:      start,
+			End:        end,
+			TotalLimit: limit,
+			Sort:       marketdata.SortAsc,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch alpaca crypto trades: %w", err)
+		}
+		ticks = mappers.AlpacaCryptoTradesToTicks(trades)
+	} else {
+		trades, err := a.marketClient.GetTrades(ap.SymbolName, marketdata.GetTradesRequest{
+			Start:      start,
+			End:        end,
+			TotalLimit: limit,
+			Sort:       marketdata.SortAsc,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to fetch alpaca stock trades: %w", err)
+		}
+		ticks = mappers.AlpacaTradesToTicks(trades)
+	}
+
+	res := messages.AccountConnectTickDataRes{
+		Ticks:      ticks,
+		HasMore:    len(ticks) == limit,
+		SymbolName: ap.SymbolName,
+	}
+	resB, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal alpaca tick data: %w", err)
+	}
+
+	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksHistory, messages.Alpaca, a.AccountConnClient.ID, resB)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	a.AccountConnClient.Send <- msgB
+	return nil
 }
 
 func (a *AlpacaAdapter) SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
-	return fmt.Errorf("tick stream not yet supported for alpaca")
+	if a.client == nil {
+		return fmt.Errorf("alpaca account not connected")
+	}
+	if payload.Alpaca == nil {
+		return fmt.Errorf("alpaca payload is required for tick stream")
+	}
+	ap := payload.Alpaca
+	if ap.AccountID != a.accountID {
+		return fmt.Errorf("unknown or expired account id: %d", ap.AccountID)
+	}
+	if ap.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for tick stream")
+	}
+
+	// top of SubscribeTicks
+	log.Printf("SubscribeTicks: symbol=%q crypto=%v", ap.SymbolName, strings.Contains(ap.SymbolName, "/"))
+
+	symbol := ap.SymbolName
+	isCrypto := strings.Contains(symbol, "/")
+
+	streamId := fmt.Sprintf("ticks_alpaca_%d_%s", ap.AccountID, symbol)
+	if err := a.AccountConnClient.AddStream(ctx, streamId); err != nil {
+		return err
+	}
+	strm := a.AccountConnClient.Streams[streamId]
+
+	a.tickMu.Lock()
+	if a.tickSubs == nil {
+		a.tickSubs = make(map[string]*alpacaTickSub)
+	}
+	a.tickSubs[symbol] = &alpacaTickSub{strm: strm}
+	a.tickMu.Unlock()
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if isCrypto {
+		if err := a.ensureCryptoStreamClient(); err != nil {
+			a.dropTickSub(symbol)
+			return err
+		}
+		if err := a.cryptoStreamClient.SubscribeToTrades(a.handleCryptoTrade, symbol); err != nil {
+			a.dropTickSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca crypto trades for %s: %w", symbol, err)
+		}
+	} else {
+		if err := a.ensureStocksStreamClient(); err != nil {
+			a.dropTickSub(symbol)
+			return err
+		}
+		if err := a.stocksStreamClient.SubscribeToTrades(a.handleStockTrade, symbol); err != nil {
+			a.dropTickSub(symbol)
+			return fmt.Errorf("failed to subscribe to alpaca stock trades for %s: %w", symbol, err)
+		}
+	}
+
+	go func() {
+		for tickB := range strm {
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksUpdate, messages.Alpaca, a.AccountConnClient.ID, tickB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("Failed to marshal alpaca tick stream message: %v", err)
+				continue
+			}
+			a.AccountConnClient.Send <- msgB
+		}
+	}()
+	return nil
+}
+
+// UnsubscribeTicks stops the tick stream for one symbol.
+func (a *AlpacaAdapter) UnsubscribeTicks(ctx context.Context, symbol string) error {
+	a.dropTickSub(symbol)
+
+	a.streamMu.Lock()
+	defer a.streamMu.Unlock()
+
+	if strings.Contains(symbol, "/") {
+		if a.cryptoStreamClient == nil {
+			return nil
+		}
+		if err := a.cryptoStreamClient.UnsubscribeFromTrades(symbol); err != nil {
+			return fmt.Errorf("failed to unsubscribe from alpaca crypto trades for %s: %w", symbol, err)
+		}
+		return nil
+	}
+	if a.stocksStreamClient == nil {
+		return nil
+	}
+	if err := a.stocksStreamClient.UnsubscribeFromTrades(symbol); err != nil {
+		return fmt.Errorf("failed to unsubscribe from alpaca stock trades for %s: %w", symbol, err)
+	}
+	return nil
+}
+
+func (a *AlpacaAdapter) dropTickSub(symbol string) {
+	a.tickMu.Lock()
+	delete(a.tickSubs, symbol)
+	a.tickMu.Unlock()
 }
 
 func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.AccountConnectDepthPayload) error {
@@ -862,6 +1044,10 @@ func (a *AlpacaAdapter) Disconnect(ctx context.Context) error {
 	a.bboSubs = nil
 	a.bboMu.Unlock()
 
+	a.tickMu.Lock()
+	a.tickSubs = nil
+	a.tickMu.Unlock()
+
 	a.client = nil
 	a.marketClient = nil
 	a.account = nil
@@ -946,6 +1132,44 @@ func (a *AlpacaAdapter) handleCryptoOrderbook(o stream.CryptoOrderbook) {
 	case sub.strm <- resB:
 	default:
 		log.Printf("Depth stream channel full for alpaca %s, dropping update", o.Symbol)
+	}
+}
+
+// handleCryptoTrade runs on the SDK's read goroutine for every crypto trade.
+func (a *AlpacaAdapter) handleCryptoTrade(t stream.CryptoTrade) {
+	a.sendTick(t.Symbol, t.Price, t.Size, t.Timestamp)
+}
+
+// handleStockTrade runs on the SDK's read goroutine for every stock trade.
+func (a *AlpacaAdapter) handleStockTrade(t stream.Trade) {
+	a.sendTick(t.Symbol, t.Price, float64(t.Size), t.Timestamp)
+}
+
+func (a *AlpacaAdapter) sendTick(symbol string, price, qty float64, ts time.Time) {
+	// top of sendTick
+	log.Printf("sendTick: symbol=%q price=%v subFound=%v", symbol, price, a.tickSubs[symbol] != nil)
+	a.tickMu.Lock()
+	sub := a.tickSubs[symbol]
+	a.tickMu.Unlock()
+	if sub == nil {
+		return
+	}
+
+	tick := messages.AccountConnectTickStreamMsg{
+		SymbolName: symbol,
+		Price:      price,
+		Quantity:   qty,
+		Timestamp:  ts.UnixMilli(),
+	}
+	tickB, err := json.Marshal(tick)
+	if err != nil {
+		log.Printf("Failed to marshal alpaca tick for %s: %v", symbol, err)
+		return
+	}
+	select {
+	case sub.strm <- tickB:
+	default:
+		log.Printf("Tick stream channel full for alpaca %s, dropping trade", symbol)
 	}
 }
 

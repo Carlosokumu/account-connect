@@ -468,6 +468,7 @@ type CtraderOrdersRequestPayload struct {
 type AccountConnectTickDataPayload struct {
 	Ctrader *CtraderTickDataRequestPayload `json:"ctrader,omitempty"`
 	Binance *BinanceTickDataRequestPayload `json:"binance,omitempty"`
+	Alpaca  *AlpacaTickDataRequestPayload  `json:"alpaca,omitempty"`
 }
 
 type CtraderTickDataRequestPayload struct {
@@ -484,6 +485,14 @@ type BinanceTickDataRequestPayload struct {
 	Limit         *int      `json:"limit,omitempty"`
 	FromTimestamp *int64    `json:"from_timestamp,omitempty"`
 	ToTimestamp   *int64    `json:"to_timestamp,omitempty"`
+}
+
+type AlpacaTickDataRequestPayload struct {
+	AccountID     AccountID `json:"account_id"`
+	SymbolName    string    `json:"symbol_name"`
+	FromTimestamp *int64    `json:"from_timestamp,omitempty"`
+	ToTimestamp   *int64    `json:"to_timestamp,omitempty"`
+	Limit         *int      `json:"limit,omitempty"`
 }
 
 type AccountConnectTick struct {

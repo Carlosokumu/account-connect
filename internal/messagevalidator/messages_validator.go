@@ -42,6 +42,7 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 			messages.TypeTicksUpdate,
 			messages.TypeDepthSnapshot,
 			messages.TypeDepthSubscribe,
+			messages.TypeTicksSubscribe,
 			messages.TypeBBOSubscribe,
 			messages.TypeAccountOrders:
 			return true
@@ -50,7 +51,7 @@ func (msgvalidator *AccountConnectMessageValidator) RegisterValidations() {
 		}
 	})
 
-	msgvalidator.validator.RegisterValidation("platform_enum", func(fl validator.FieldLevel) bool {
+	msgvalidator.validator.RegisterValidation("provider_enum", func(fl validator.FieldLevel) bool {
 		mt, ok := fl.Field().Interface().(messages.Provider)
 		if !ok {
 			return false
