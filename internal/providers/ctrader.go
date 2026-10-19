@@ -31,6 +31,7 @@ const (
 	MESSAGE_TYPE             = websocket.BinaryMessage
 	ctraderHeartbeatInterval = 10 * time.Second
 	ctraderPriceScale        = 100000.0
+	ctraderCallTimeout       = 20 * time.Second
 )
 
 type MessageHandler func(ctx context.Context, clientMsgId string, payload []byte) error
@@ -318,7 +319,8 @@ func (t *CTrader) connectToEnvironment(ctx context.Context, env string) error {
 	t.mutex.Unlock()
 
 	t.registerHandlers()
-	go t.StartConnectionReader(connCtx)
+
+	go t.StartConnectionReader(connCtx, conn)
 	go t.startHeartbeatTicker(connCtx)
 
 	if err := t.AuthorizeApplication(connCtx, appauthcredentials{
@@ -502,13 +504,15 @@ func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig 
 	return t.connectToEnvironment(ctx, "demo")
 }
 
-// safeWriteMessage serializes all writes to PlatformConn. Gorilla forbids
-// concurrent WriteMessage calls; with the heartbeat ticker running
-// continuously alongside every request-issuing method, an unsynchronized
+// safeWriteMessage serializes all writes to PlatformConn.
 func (t *CTrader) safeWriteMessage(data []byte) error {
+	conn := t.PlatformConn
+	if conn == nil {
+		return errors.New("not connected to ctrader")
+	}
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
-	return t.PlatformConn.WriteMessage(MESSAGE_TYPE, data)
+	return conn.WriteMessage(MESSAGE_TYPE, data)
 }
 
 // startHeartbeatTicker proactively sends a heartbeat to cTrader on a fixed interval
@@ -538,14 +542,13 @@ func (t *CTrader) startHeartbeatTicker(ctx context.Context) {
 	}
 }
 
-// StartConnectionReader will start a goroutine whose work will be to continously read protobuf messages sent by ctrader through
-// the PlatformConn
-func (t *CTrader) StartConnectionReader(ctx context.Context) {
-
+// StartConnectionReader continuously reads protobuf messages from conn until it
+// fails.
+func (t *CTrader) StartConnectionReader(ctx context.Context, conn *websocket.Conn) {
 	for {
-		_, msgB, err := t.PlatformConn.ReadMessage()
+		_, msgB, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("WebSocket read error: %v", err)
+			t.handleConnectionLost(ctx, conn, err)
 			return
 		}
 
@@ -555,15 +558,51 @@ func (t *CTrader) StartConnectionReader(ctx context.Context) {
 			continue
 		}
 
-		if handler, ok := t.handlers[msgP.GetPayloadType()]; ok {
-			if err := handler(ctx, msgP.GetClientMsgId(), msgP.Payload); err != nil {
-				log.Printf("Handler error for type %d: %v", msgP.GetPayloadType(), err)
-			}
-
-		} else {
+		handler, ok := t.handlers[msgP.GetPayloadType()]
+		if !ok {
 			log.Printf("No handler for message type %d", msgP.GetPayloadType())
+			continue
+		}
+
+		id := msgP.GetClientMsgId()
+		var (
+			req    *pendingRequest
+			hasReq bool
+		)
+		if id != "" {
+			req, hasReq = t.reqs.Get(id)
+		}
+
+		if err := handler(ctx, id, msgP.Payload); err != nil {
+			log.Printf("Handler error for type %d: %v", msgP.GetPayloadType(), err)
+			if hasReq {
+				t.reqs.Take(id)
+				go t.sendFailure(req.Ctx, acount_connect_messages.TypeError, err)
+			}
 		}
 	}
+}
+
+// handleConnectionLost runs when a read fails. A cancelled ctx means we closed
+// the connection ourselves (disconnect or environment switch), which is not a
+// failure. Otherwise the connection is dropped from the adapter, so later
+// requests fail cleanly and the next account authorization reconnects, and the
+// client is told.
+func (t *CTrader) handleConnectionLost(ctx context.Context, conn *websocket.Conn, err error) {
+	if ctx.Err() != nil {
+		return
+	}
+	log.Printf("cTrader connection lost: %v", err)
+	conn.Close()
+
+	t.connMu.Lock()
+	if t.PlatformConn == conn {
+		t.PlatformConn = nil
+	}
+	t.connMu.Unlock()
+
+	go t.sendFailure(ctx, acount_connect_messages.TypeError,
+		fmt.Errorf("connection to ctrader was lost: authorize the account again and resubscribe"))
 }
 
 // AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
@@ -606,6 +645,9 @@ func (t *CTrader) AuthorizeApplication(ctx context.Context, creds appauthcredent
 
 }
 
+// DisconnectPlatformConn is idempotent. It used to return an error when there
+// was no connection, and handleClientDisconnect returns on the first adapter
+// error, so one already-dropped adapter skipped closing the client's streams.
 func (t *CTrader) DisconnectPlatformConn() error {
 	t.connMu.Lock()
 	defer t.connMu.Unlock()
@@ -614,12 +656,12 @@ func (t *CTrader) DisconnectPlatformConn() error {
 		t.connCancel()
 		t.connCancel = nil
 	}
-	if t.PlatformConn != nil {
-		err := t.PlatformConn.Close()
-		t.PlatformConn = nil
-		return err
+	if t.PlatformConn == nil {
+		return nil
 	}
-	return fmt.Errorf("close failed for nil ctrader platform connection")
+	err := t.PlatformConn.Close()
+	t.PlatformConn = nil
+	return err
 }
 
 func (t *CTrader) AuthorizeAccount(ctx context.Context, accountId *int64) error {
@@ -1120,18 +1162,21 @@ func (t *CTrader) handleApplicationAuthResponse(ctx context.Context, clientMsgId
 
 	if !req.Meta.isReconnect {
 		go func() {
-			ch := <-req.Ch
-			msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeConnect, acount_connect_messages.Ctrader, t.AccountConnClient.ID, ch.Payload)
-			msgB, err := json.Marshal(msg)
-			if err != nil {
-				log.Printf("Failed to marshal application auth: %v", err)
-				return
+			select {
+			case ch := <-req.Ch:
+				if err := t.sendSuccess(req.Ctx, acount_connect_messages.TypeConnect, ch.Payload); err != nil {
+					log.Printf("Failed to send connect response: %v", err)
+				}
+			case <-req.Ctx.Done():
 			}
-			t.AccountConnClient.Send <- msgB
 		}()
 	}
 
-	return t.GetUserAcountListByAccessToken(t.AccessToken)
+	if err := t.GetUserAcountListByAccessToken(t.AccessToken); err != nil {
+		t.sendFailure(req.Ctx, acount_connect_messages.TypeConnect, err)
+		return err
+	}
+	return nil
 }
 
 func (t *CTrader) handleAccountListResponse(ctx context.Context, clientMsgId string, payload []byte) error {
@@ -1152,15 +1197,16 @@ func (t *CTrader) handleAccountListResponse(ctx context.Context, clientMsgId str
 	}
 
 	if r.AccessToken == nil || *r.AccessToken == "" {
-		return errors.New("account list response missing access token")
+		cause := fmt.Errorf("account list response missing access token")
+		t.sendFailure(req.Ctx, acount_connect_messages.TypeConnect, cause)
+		return cause
 	}
 
 	accounts, err := t.getTradingAccounts(ctx, *r.AccessToken)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to retrieve full trading account information: %w",
-			err,
-		)
+		cause := fmt.Errorf("failed to retrieve full trading account information: %w", err)
+		t.sendFailure(req.Ctx, acount_connect_messages.TypeConnect, cause)
+		return cause
 	}
 
 	t.accountEnvMu.Lock()
@@ -1321,50 +1367,45 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, clientMsgId strin
 	}
 
 	go func() {
-		digits, err := t.getSymbolDigits(req.Ctx, res.CtidTraderAccountId, *res.SymbolId)
-		if err != nil {
-			log.Printf("failed to fetch symbol digits for trend bars: %v", err)
-			return
+		if err := t.sendTrendBars(req, &res); err != nil {
+			log.Printf("trend bars for %s failed: %v", req.Meta.symbolName, err)
+			t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
 		}
-		p := math.Pow(10, float64(digits))
-		round := func(v float64) float64 { return math.Round(v*p) / p }
-
-		trendBars := mappers.ProotoOAToTrendBars(&res)
-
-		mappedTrendBars := make([]acount_connect_messages.AccountConnectTrendBar, 0, len(trendBars))
-		for _, bar := range trendBars {
-			mappedTrendBars = append(mappedTrendBars, acount_connect_messages.AccountConnectTrendBar{
-				High:                  round(bar.High / ctraderPriceScale),
-				Low:                   round(bar.Low / ctraderPriceScale),
-				Close:                 round(bar.Close / ctraderPriceScale),
-				Open:                  round(bar.Open / ctraderPriceScale),
-				Volume:                bar.Volume,
-				UtcTimestampInMinutes: bar.UtcTimestampInMinutes,
-			})
-		}
-
-		trendBarsRes := acount_connect_messages.AccountConnectTrendBarRes{
-			Trendbars: mappedTrendBars,
-			Symbol:    req.Meta.symbolName,
-			Period:    req.Meta.period,
-		}
-		trendBarsResB, err := json.Marshal(trendBarsRes)
-		if err != nil {
-			log.Printf("failed to marshal scaled trend bars: %v", err)
-			return
-		}
-
-		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeOHLCHistory, acount_connect_messages.Ctrader, t.AccountConnClient.ID, trendBarsResB)
-		msgB, err := json.Marshal(msg)
-		if err != nil {
-			log.Printf("failed to marshal final message: %v", err)
-			return
-		}
-
-		t.AccountConnClient.Send <- msgB
 	}()
 
 	return nil
+}
+
+func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGetTrendbarsRes) error {
+	digits, err := t.getSymbolDigits(req.Ctx, res.CtidTraderAccountId, *res.SymbolId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch symbol digits: %w", err)
+	}
+	p := math.Pow(10, float64(digits))
+	round := func(v float64) float64 { return math.Round(v*p) / p }
+
+	trendBars := mappers.ProotoOAToTrendBars(res)
+	mapped := make([]acount_connect_messages.AccountConnectTrendBar, 0, len(trendBars))
+	for _, bar := range trendBars {
+		mapped = append(mapped, acount_connect_messages.AccountConnectTrendBar{
+			High:                  round(bar.High / ctraderPriceScale),
+			Low:                   round(bar.Low / ctraderPriceScale),
+			Close:                 round(bar.Close / ctraderPriceScale),
+			Open:                  round(bar.Open / ctraderPriceScale),
+			Volume:                bar.Volume,
+			UtcTimestampInMinutes: bar.UtcTimestampInMinutes,
+		})
+	}
+
+	resB, err := json.Marshal(acount_connect_messages.AccountConnectTrendBarRes{
+		Trendbars: mapped,
+		Symbol:    req.Meta.symbolName,
+		Period:    req.Meta.period,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode trend bars: %w", err)
+	}
+	return t.sendSuccess(req.Ctx, acount_connect_messages.TypeOHLCHistory, resB)
 }
 
 func (t *CTrader) handleSymbolListResponse(ctx context.Context, clientMsgId string, payload []byte) error {
@@ -1456,15 +1497,19 @@ func (t *CTrader) enrichSymbolsWithAssetInfo(ctid int64, syms []acount_connect_m
 }
 
 func (t *CTrader) handleSymbolInfoForSymbolList(ctx context.Context, syms []acount_connect_messages.AccountConnectSymbol, key string, symReq *pendingRequest) {
-	payload, err := t.reqs.Await(ctx, key, symReq)
+	waitCtx, cancel := context.WithTimeout(ctx, ctraderCallTimeout)
+	defer cancel()
+	payload, err := t.reqs.Await(waitCtx, key, symReq)
 	if err != nil {
 		log.Printf("failed to enrich symbol list: %v", err)
+		t.sendFailure(ctx, acount_connect_messages.TypeSymbolsList, err)
 		return
 	}
 
 	var symbolRes gen_messages.ProtoOASymbolByIdRes
 	if err := proto.Unmarshal(payload, &symbolRes); err != nil {
 		log.Printf("failed to unmarshal symbol info for enrichment: %v", err)
+		t.sendFailure(ctx, acount_connect_messages.TypeSymbolsList, err)
 		return
 	}
 
@@ -1486,8 +1531,10 @@ func (t *CTrader) handleSymbolInfoForSymbolList(ctx context.Context, syms []acou
 		}
 		syms[i].Ctrader.Digits = d.Digits
 	}
-
-	t.sendSymbolListResponse(ctx, syms)
+	if err := t.sendSymbolListResponse(ctx, syms); err != nil {
+		log.Printf("failed to send symbol list: %v", err)
+		t.sendFailure(ctx, acount_connect_messages.TypeSymbolsList, err)
+	}
 }
 
 func (t *CTrader) sendSymbolListResponse(ctx context.Context, syms []acount_connect_messages.AccountConnectSymbol) error {
@@ -1584,52 +1631,63 @@ func (t *CTrader) handleTickDataResponse(ctx context.Context, clientMsgId string
 	}
 
 	go func() {
-		digits, err := t.getSymbolDigits(req.Ctx, req.Meta.ctid, req.Meta.symbolId)
-		if err != nil {
-			log.Printf("failed to fetch symbol digits for tick decode: %v", err)
-			return
+		if err := t.sendTickHistory(req, &r); err != nil {
+			log.Printf("tick history for symbol %d failed: %v", req.Meta.symbolId, err)
+			t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
 		}
-		roundFactor := math.Pow(10, float64(digits))
-		round := func(v float64) float64 { return math.Round(v*roundFactor) / roundFactor }
-
-		ticks := make([]acount_connect_messages.AccountConnectTick, 0, len(r.TickData))
-		var lastTimestamp, lastPrice int64
-		for i, td := range r.TickData {
-			if td.Timestamp == nil || td.Tick == nil {
-				continue
-			}
-			if i == 0 {
-				lastTimestamp, lastPrice = *td.Timestamp, *td.Tick
-			} else {
-				lastTimestamp += *td.Timestamp
-				lastPrice += *td.Tick
-			}
-			ticks = append(ticks, acount_connect_messages.AccountConnectTick{
-				Timestamp: lastTimestamp,
-				Price:     round(float64(lastPrice) / ctraderPriceScale),
-			})
-		}
-
-		res := acount_connect_messages.AccountConnectTickDataRes{
-			Ticks:   ticks,
-			HasMore: r.GetHasMore(),
-			Symbol:  req.Meta.symbolId,
-		}
-		resB, err := json.Marshal(res)
-		if err != nil {
-			log.Printf("failed to marshal tick data response: %v", err)
-			return
-		}
-
-		msg := messageutils.CreateSuccessResponse(req.Ctx, acount_connect_messages.TypeTicksHistory, acount_connect_messages.Ctrader, t.AccountConnClient.ID, resB)
-		msgB, err := json.Marshal(msg)
-		if err != nil {
-			log.Printf("failed to marshal final message: %v", err)
-			return
-		}
-		t.AccountConnClient.Send <- msgB
 	}()
 
+	return nil
+}
+
+func (t *CTrader) sendTickHistory(req *pendingRequest, r *gen_messages.ProtoOAGetTickDataRes) error {
+	digits, err := t.getSymbolDigits(req.Ctx, req.Meta.ctid, req.Meta.symbolId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch symbol digits: %w", err)
+	}
+	roundFactor := math.Pow(10, float64(digits))
+	round := func(v float64) float64 { return math.Round(v*roundFactor) / roundFactor }
+
+	ticks := make([]acount_connect_messages.AccountConnectTick, 0, len(r.TickData))
+	var lastTimestamp, lastPrice int64
+	for i, td := range r.TickData {
+		if td.Timestamp == nil || td.Tick == nil {
+			continue
+		}
+		if i == 0 {
+			lastTimestamp, lastPrice = *td.Timestamp, *td.Tick
+		} else {
+			lastTimestamp += *td.Timestamp
+			lastPrice += *td.Tick
+		}
+		ticks = append(ticks, acount_connect_messages.AccountConnectTick{
+			Timestamp: lastTimestamp,
+			Price:     round(float64(lastPrice) / ctraderPriceScale),
+		})
+	}
+
+	resB, err := json.Marshal(acount_connect_messages.AccountConnectTickDataRes{
+		Ticks:   ticks,
+		HasMore: r.GetHasMore(),
+		Symbol:  req.Meta.symbolId,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode tick data: %w", err)
+	}
+	return t.sendSuccess(req.Ctx, acount_connect_messages.TypeTicksHistory, resB)
+}
+
+// sendSuccess wraps and sends a success response, giving up if the client is gone.
+func (t *CTrader) sendSuccess(ctx context.Context, msgType acount_connect_messages.MessageType, payload []byte) error {
+	msg := messageutils.CreateSuccessResponse(ctx, msgType, acount_connect_messages.Ctrader, t.AccountConnClient.ID, payload)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to encode response: %w", err)
+	}
+	select {
+	case t.AccountConnClient.Send <- msgB:
+	case <-ctx.Done():
+	}
 	return nil
 }
 
@@ -1706,26 +1764,59 @@ func (t *CTrader) handleSpotEvent(ctx context.Context, clientMsgId string, paylo
 	return nil
 }
 
+// Errors for fire-and-forget requests.
 func (t *CTrader) handleErrorReponse(ctx context.Context, clientMsgId string, payload []byte) error {
 	var r gen_messages.ProtoOAErrorRes
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal error response: %w", err)
 	}
 
-	log.Printf("Received an error response: %s  with error code: %s", string(*r.Description), r.GetErrorCode())
-	pErr := mappers.ProtoOAErrorResToError(&r)
-	pErrB, err := json.Marshal(pErr)
-	if err != nil {
-		return fmt.Errorf("failed to marshal error response: %s", err)
+	cause := fmt.Errorf("ctrader error %s: %s", r.GetErrorCode(), r.GetDescription())
+	log.Printf("Received an error response for %q: %v", clientMsgId, cause)
+
+	errCtx := ctx
+	if req, ok := t.reqs.Take(clientMsgId); ok {
+		errCtx = req.Ctx
 	}
-	msg := messageutils.CreateErrorResponse(t.AccountConnClient.ID, pErrB)
+	t.sendFailure(errCtx, acount_connect_messages.TypeError, cause)
+	return nil
+}
+
+// sendFailure reports a background failure to the client, with the request id
+// carried by ctx. It gives up if the client's context is cancelled.
+func (t *CTrader) sendFailure(ctx context.Context, msgType acount_connect_messages.MessageType, cause error) {
+	msg := messageutils.CreateFailureResponse(ctx, msgType, acount_connect_messages.Ctrader, t.AccountConnClient.ID, cause)
 	msgB, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		log.Printf("failed to marshal failure response: %v", err)
+		return
 	}
-	t.AccountConnClient.Send <- msgB
+	select {
+	case t.AccountConnClient.Send <- msgB:
+	case <-ctx.Done():
+	}
+}
 
-	return nil
+// callReq is call with a caller-supplied pendingRequest, for requests that
+// need metadata set first (for example Meta.silent).
+func (t *CTrader) callReq(ctx context.Context, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
+	key, err := t.send(prefix, payloadType, msg, req)
+	if err != nil {
+		return nil, err
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, ctraderCallTimeout)
+	defer cancel()
+
+	payload, err := t.reqs.Await(waitCtx, key, req)
+	if err != nil {
+		t.reqs.Take(key) // no-op if the handler already took it
+		if waitCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("ctrader did not answer within %s", ctraderCallTimeout)
+		}
+		return nil, err
+	}
+	return payload, nil
 }
 
 // candleBuilder holds the per-(symbol, period) state needed to convert cTrader's live
@@ -1851,9 +1942,6 @@ func newCtraderPending(ctx context.Context) *pendingRequest {
 // send marshals msg, wraps it in a ProtoMessage envelope with a fresh client
 // message id, optionally registers req under that id, and writes it to the
 // socket. If the write fails the registration is rolled back.
-//
-// It returns the client message id so callers can correlate or clean up.
-// Pass req == nil for fire-and-forget requests.
 func (t *CTrader) send(prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) (string, error) {
 	payload, err := proto.Marshal(msg)
 	if err != nil {
@@ -1885,14 +1973,4 @@ func (t *CTrader) send(prefix string, payloadType uint32, msg proto.Message, req
 // call is send plus a context-aware wait for the response payload.
 func (t *CTrader) call(ctx context.Context, prefix string, payloadType uint32, msg proto.Message) ([]byte, error) {
 	return t.callReq(ctx, prefix, payloadType, msg, newCtraderPending(ctx))
-}
-
-// callReq is call with a caller-supplied pendingRequest, for requests that
-// need metadata set first (for example Meta.silent).
-func (t *CTrader) callReq(ctx context.Context, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
-	key, err := t.send(prefix, payloadType, msg, req)
-	if err != nil {
-		return nil, err
-	}
-	return t.reqs.Await(ctx, key, req)
 }

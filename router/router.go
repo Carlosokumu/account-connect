@@ -174,7 +174,6 @@ func (r *Router) RequestTrendBars(ctx context.Context, platformadapter adapters.
 		return fmt.Errorf("failed to unmarshal account connect trend bars requests: %w", err)
 	}
 	trendBarArgs := messages.AccountConnectTrendBarsPayload{
-		// SymbolId:      req.SymbolId,
 		SymbolName:    req.SymbolName,
 		AccountID:     req.AccountID,
 		Period:        req.Period,
@@ -342,7 +341,7 @@ func (h *messageHandler) handleAccountAuthorize(ctx context.Context, msg message
 	}
 
 	if err := h.router.AuthorizeAccount(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeAccountInfo, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -498,7 +497,7 @@ func (h *messageHandler) handleTraderInfo(ctx context.Context, msg messages.Acco
 	}
 
 	if err := h.router.RequestTraderInfo(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeAccountInfo, err)
+		return h.writeErrorResponse(msg, err)
 	}
 
 	return nil
@@ -519,7 +518,7 @@ func (h *messageHandler) handleTrendBars(ctx context.Context, msg messages.Accou
 	}
 
 	if err := h.router.RequestTrendBars(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeOHLCHistory, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -539,7 +538,7 @@ func (h *messageHandler) handleAccountSymbols(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestAccountSymbols(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeSymbolsList, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -558,7 +557,7 @@ func (h *messageHandler) handleCandlestickStream(ctx context.Context, msg messag
 	}
 
 	if err := h.router.RequestCandlestickStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeOHLCUpdate, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -578,7 +577,7 @@ func (h *messageHandler) handleHistoricalTicks(ctx context.Context, msg messages
 	}
 
 	if err := h.router.RequestHistoricalTicks(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTicksHistory, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -598,7 +597,7 @@ func (h *messageHandler) handleLiveTickStream(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestLiveTradesStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeTicksSubscribe, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -618,7 +617,7 @@ func (h *messageHandler) handleOrderBookDepth(ctx context.Context, msg messages.
 	}
 
 	if err := h.router.RequestOrderBookDepth(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeDepthSnapshot, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -638,7 +637,7 @@ func (h *messageHandler) handleBookDepthStream(ctx context.Context, msg messages
 	}
 
 	if err := h.router.RequestOrderBookDepthStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeDepthSubscribe, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
@@ -658,27 +657,24 @@ func (h *messageHandler) handleBBOStream(ctx context.Context, msg messages.Accou
 	}
 
 	if err := h.router.RequestBBOStream(ctx, platformadapter, payload); err != nil {
-		return h.writeErrorResponse(messages.TypeBBOSubscribe, err)
+		return h.writeErrorResponse(msg, err)
 	}
 	return nil
 }
 
-func (h *messageHandler) writeErrorResponse(msgType messages.MessageType, err error) error {
-	accErr := messages.AccountConnectError{
-		Description: err.Error(),
-	}
-
-	accErrB, err := json.Marshal(accErr)
+func (h *messageHandler) writeErrorResponse(msg messages.AccountConnectMsg, cause error) error {
+	body, err := json.Marshal(messages.AccountConnectError{Description: cause.Error()})
 	if err != nil {
 		log.Printf("Failed to marshal acc err: %v", err)
 		return err
 	}
-	response := messages.AccountConnectMsgRes{
-		AccountConnectMessageType: msgType,
+	return h.writeClientMessage(messages.AccountConnectMsgRes{
+		AccountConnectMessageType: msg.AccountConnectMessageType,
+		Provider:                  msg.Provider,
+		RequestId:                 msg.RequestId,
 		Status:                    messages.StatusFailure,
-		Payload:                   accErrB,
-	}
-	return h.writeClientMessage(response)
+		Payload:                   body,
+	})
 }
 
 // writeClientMessage writes a message to the  client's [Send] channel
