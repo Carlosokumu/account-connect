@@ -104,9 +104,9 @@ type CTraderConnectPayload struct {
 
 // BinanceConnectPayload is payload structure defining fields  required to establish a binance connection.
 type BinanceConnectPayload struct {
-	APIKey      string             `json:"api_key"`
-	APISecret   string             `json:"api_secret"`
-	AccountType BinanceAccountType `json:"account_type"`
+	APIKey    string `json:"api_key"`
+	APISecret string `json:"api_secret"`
+	Paper     bool   `json:"paper"`
 }
 
 // AlpacaConnectPayload is payload structure defining fields  required to establish an alpaca connection.
