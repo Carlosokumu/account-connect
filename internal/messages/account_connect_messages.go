@@ -472,11 +472,11 @@ type AccountConnectTickDataPayload struct {
 }
 
 type CtraderTickDataRequestPayload struct {
-	Ctid          *int64 `json:"ctid"`
-	SymbolId      int64  `json:"symbol_id"`
-	QuoteType     string `json:"quote_type"` // "bid" | "ask"
-	FromTimestamp *int64 `json:"from_timestamp"`
-	ToTimestamp   *int64 `json:"to_timestamp"`
+	AccountID     AccountID `json:"account_id"`
+	SymbolName    string    `json:"symbol_name"`
+	QuoteType     string    `json:"quote_type"` // "bid" | "ask"
+	FromTimestamp *int64    `json:"from_timestamp"`
+	ToTimestamp   *int64    `json:"to_timestamp"`
 }
 
 type BinanceTickDataRequestPayload struct {
