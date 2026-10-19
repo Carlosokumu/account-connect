@@ -225,19 +225,19 @@ type ConnectResult struct {
 	Errors   map[messages.BinanceAccountType]error
 }
 
-func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegistry, apiKey, secretKey string) (*ConnectResult, error) {
+func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegistry, cfg config.BinanceConfig) (*ConnectResult, error) {
 	var (
 		wg sync.WaitGroup
 		mu sync.Mutex
 	)
 
-	if apiKey == "" || secretKey == "" {
-		return nil, fmt.Errorf("binance api key and secret key are required")
+	if cfg.ApiKey == "" || cfg.SecretKey == "" {
+		return nil, fmt.Errorf("binance api key and secret key are required or specify environment to connect to")
 	}
 
-	binance.UseDemo = true
-	futures.UseDemo = true
-	delivery.UseDemo = true
+	binance.UseDemo = cfg.Paper
+	futures.UseDemo = cfg.Paper
+	delivery.UseDemo = cfg.Paper
 
 	result := &ConnectResult{
 		Accounts: make(map[messages.BinanceAccountType]messages.AccountID),
@@ -257,7 +257,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		spotClient := binance.NewClient(apiKey, secretKey)
+		spotClient := binance.NewClient(cfg.ApiKey, cfg.SecretKey)
 
 		spotAcct, err := spotClient.NewGetAccountService().Do(ctx)
 		if err != nil {
@@ -292,7 +292,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		client := futures.NewClient(apiKey, secretKey)
+		client := futures.NewClient(cfg.ApiKey, cfg.SecretKey)
 		futuresAcct, err := client.NewGetAccountService().Do(ctx)
 		if err != nil {
 			record(messages.BinanceAccountTypeFutures, 0, fmt.Errorf("failed to authenticate binance futures account: %w", err))
@@ -311,7 +311,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		client := delivery.NewClient(apiKey, secretKey)
+		client := delivery.NewClient(cfg.ApiKey, cfg.SecretKey)
 		deliveryAcct, err := client.NewGetAccountService().Do(ctx)
 		if err != nil {
 			record(messages.BinanceAccountTypeDelivery, 0, fmt.Errorf("failed to authenticate binance delivery account: %w", err))
@@ -795,7 +795,7 @@ type BinanceAdapter struct {
 func (b *BinanceAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
 	registry := NewAccountRegistry()
 
-	result, err := b.binanceConn.Connect(ctx, registry, cfg.Binance.ApiKey, cfg.Binance.SecretKey)
+	result, err := b.binanceConn.Connect(ctx, registry, cfg.Binance)
 	if err != nil {
 		return err
 	}

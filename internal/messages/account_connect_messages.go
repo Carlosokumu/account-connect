@@ -104,9 +104,9 @@ type CTraderConnectPayload struct {
 
 // BinanceConnectPayload is payload structure defining fields  required to establish a binance connection.
 type BinanceConnectPayload struct {
-	APIKey      string             `json:"api_key"`
-	APISecret   string             `json:"api_secret"`
-	AccountType BinanceAccountType `json:"account_type"`
+	APIKey    string `json:"api_key"`
+	APISecret string `json:"api_secret"`
+	Paper     bool   `json:"paper"`
 }
 
 // AlpacaConnectPayload is payload structure defining fields  required to establish an alpaca connection.
@@ -472,11 +472,11 @@ type AccountConnectTickDataPayload struct {
 }
 
 type CtraderTickDataRequestPayload struct {
-	Ctid          *int64 `json:"ctid"`
-	SymbolId      int64  `json:"symbol_id"`
-	QuoteType     string `json:"quote_type"` // "bid" | "ask"
-	FromTimestamp *int64 `json:"from_timestamp"`
-	ToTimestamp   *int64 `json:"to_timestamp"`
+	AccountID     AccountID `json:"account_id"`
+	SymbolName    string    `json:"symbol_name"`
+	QuoteType     string    `json:"quote_type"` // "bid" | "ask"
+	FromTimestamp *int64    `json:"from_timestamp"`
+	ToTimestamp   *int64    `json:"to_timestamp"`
 }
 
 type BinanceTickDataRequestPayload struct {
