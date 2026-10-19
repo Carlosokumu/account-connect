@@ -1,11 +1,9 @@
 package config
 
-import "account-connect/internal/messages"
-
 type BinanceConfig struct {
-	ApiKey      string
-	SecretKey   string
-	AccountType messages.BinanceAccountType
+	ApiKey    string
+	SecretKey string
+	Paper     bool
 }
 
 type CtraderConfig struct {
