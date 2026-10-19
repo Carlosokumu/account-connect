@@ -1073,6 +1073,8 @@ func (b *BinanceAdapter) GetHistoricalTrades(ctx context.Context, payload messag
 }
 
 // GetHistoricalTicks fetches historical aggregate trades for a symbol.
+// Validation errors are returned (the router answers them). Fetch errors happen
+// in the background and are sent to the client as failure messages.
 func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {
 	if payload.Binance == nil {
 		return fmt.Errorf("binance payload is required for historical tick data")
@@ -1090,65 +1092,33 @@ func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload message
 	limit := 500
 	if bp.Limit != nil {
 		limit = *bp.Limit
-		if limit > maxTickLimit {
-			limit = maxTickLimit
-		}
+	}
+	if limit <= 0 {
+		return fmt.Errorf("limit must be positive, got %d", limit)
+	}
+	if limit > maxTickLimit {
+		limit = maxTickLimit
 	}
 
+	symbol, from, to := bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp
+
 	go func() {
-		var ticks []messages.AccountConnectTick
-
-		switch acct.accountType {
-		case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
-			if acct.spotClient == nil {
-				log.Printf("no spot client for account %d", acct.id)
-				return
-			}
-			trades, err := b.binanceConn.fetchAllSpotAggTrades(ctx, acct.spotClient, bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp, limit)
-			if err != nil {
-				log.Printf("failed to fetch spot agg trades: %v", err)
-				return
-			}
-			ticks = mappers.BinanceAggTradesToTicks(trades)
-
-		case messages.BinanceAccountTypeFutures:
-			if acct.futuresClient == nil {
-				log.Printf("no futures client for account %d", acct.id)
-				return
-			}
-			svc := acct.futuresClient.NewAggTradesService().Symbol(bp.SymbolName).Limit(limit)
-			if bp.FromTimestamp != nil {
-				svc = svc.StartTime(*bp.FromTimestamp)
-			}
-			if bp.ToTimestamp != nil {
-				svc = svc.EndTime(*bp.ToTimestamp)
-			}
-
-			trades, err := b.binanceConn.fetchAllFuturesAggTrades(ctx, acct.futuresClient, bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp, limit)
-			// trades, err := svc.Do(ctx)
-			if err != nil {
-				log.Printf("failed to fetch futures agg trades: %v", err)
-				return
-			}
-			ticks = mappers.BinanceFuturesAggTradesToTicks(trades)
-
-		case messages.BinanceAccountTypeDelivery:
-			log.Printf("historical tick data not yet supported for delivery accounts")
-			return
-
-		default:
-			log.Printf("unsupported account type for historical tick data: %s", acct.accountType)
+		ticks, err := b.fetchHistoricalTicks(ctx, acct, symbol, from, to, limit)
+		if err != nil {
+			log.Printf("historical ticks for %s failed: %v", symbol, err)
+			b.sendFailure(ctx, messages.TypeTicksHistory, err)
 			return
 		}
 
 		res := messages.AccountConnectTickDataRes{
 			Ticks:      ticks,
 			HasMore:    len(ticks) == limit,
-			SymbolName: bp.SymbolName,
+			SymbolName: symbol,
 		}
 		resB, err := json.Marshal(res)
 		if err != nil {
 			log.Printf("failed to marshal tick data response: %v", err)
+			b.sendFailure(ctx, messages.TypeTicksHistory, fmt.Errorf("failed to encode tick data"))
 			return
 		}
 
@@ -1156,12 +1126,47 @@ func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload message
 		msgB, err := json.Marshal(msg)
 		if err != nil {
 			log.Printf("failed to marshal final message: %v", err)
+			b.sendFailure(ctx, messages.TypeTicksHistory, fmt.Errorf("failed to encode tick data"))
 			return
 		}
-		b.AccountConnClient.Send <- msgB
+		select {
+		case b.AccountConnClient.Send <- msgB:
+		case <-ctx.Done():
+		}
 	}()
 
 	return nil
+}
+
+// fetchHistoricalTicks does the account-type specific fetch and mapping.
+func (b *BinanceAdapter) fetchHistoricalTicks(ctx context.Context, acct *Naccount, symbol string, from, to *int64, limit int) ([]messages.AccountConnectTick, error) {
+	switch acct.accountType {
+	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
+		if acct.spotClient == nil {
+			return nil, fmt.Errorf("no spot client for account %d", acct.id)
+		}
+		trades, err := b.binanceConn.fetchAllSpotAggTrades(ctx, acct.spotClient, symbol, from, to, limit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch spot agg trades: %w", err)
+		}
+		return mappers.BinanceAggTradesToTicks(trades), nil
+
+	case messages.BinanceAccountTypeFutures:
+		if acct.futuresClient == nil {
+			return nil, fmt.Errorf("no futures client for account %d", acct.id)
+		}
+		trades, err := b.binanceConn.fetchAllFuturesAggTrades(ctx, acct.futuresClient, symbol, from, to, limit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch futures agg trades: %w", err)
+		}
+		return mappers.BinanceFuturesAggTradesToTicks(trades), nil
+
+	case messages.BinanceAccountTypeDelivery:
+		return nil, fmt.Errorf("historical tick data not yet supported for delivery accounts")
+
+	default:
+		return nil, fmt.Errorf("unsupported account type for historical tick data: %s", acct.accountType)
+	}
 }
 
 func (b *BinanceAdapter) GetAccountInfo(ctx context.Context, payload messages.AccountConnectAccountInfoPayload) error {
@@ -1626,6 +1631,7 @@ func (b *BinanceAdapter) GetOrderBookDepth(ctx context.Context, payload messages
 	res.SymbolName = bp.SymbolName
 	resB, err := json.Marshal(res)
 	if err != nil {
+		return fmt.Errorf("failed to marshal order book depth: %w", err)
 	}
 
 	msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSnapshot, messages.Binance, b.AccountConnClient.ID, resB)
@@ -1717,6 +1723,21 @@ func (b *BinanceAdapter) SubscribeBBO(ctx context.Context, payload messages.Acco
 	}()
 
 	return b.binanceConn.StartBBOStream(ctx, acct.accountType, symbolName, stream)
+}
+
+// sendFailure reports a background failure to the client. It gives up if the
+// client's context is cancelled, so it can't block on a gone client.
+func (b *BinanceAdapter) sendFailure(ctx context.Context, msgType messages.MessageType, cause error) {
+	msg := messageutils.CreateFailureResponse(ctx, msgType, messages.Binance, b.AccountConnClient.ID, cause)
+	msgB, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("failed to marshal failure response: %v", err)
+		return
+	}
+	select {
+	case b.AccountConnClient.Send <- msgB:
+	case <-ctx.Done():
+	}
 }
 
 func parseFloat(s string) float64 {
