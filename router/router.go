@@ -360,9 +360,9 @@ func (h *messageHandler) handleBinanceConnect(
 	adapter := providers.NewBinanceAdapter(accountConnClient, cache, h.router.assetProvider)
 	if err := adapter.EstablishConnection(ctx, config.PlatformConfigs{
 		Binance: config.BinanceConfig{
-			ApiKey:      binanceMsg.APIKey,
-			SecretKey:   binanceMsg.APISecret,
-			AccountType: binanceMsg.AccountType,
+			ApiKey:    binanceMsg.APIKey,
+			SecretKey: binanceMsg.APISecret,
+			Paper:     binanceMsg.Paper,
 		},
 	}); err != nil {
 		return nil, err
