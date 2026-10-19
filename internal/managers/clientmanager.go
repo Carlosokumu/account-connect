@@ -141,14 +141,17 @@ func (m *AccountConnectClientManager) StartClientManagement(ctx context.Context)
 			m.RUnlock()
 			err := m.msgRouter.Route(m.clientContexts[client.ID].ctx, client, msg)
 			if err != nil {
-				errR := messageutils.CreateErrorResponse(client.ID, []byte(err.Error()))
-				errRB, err := json.Marshal(errR)
-				if err != nil {
-					log.Printf("Failed to marshal error response for client %s: %v", client.ID, err)
-					return
+				res := messageutils.CreateErrorResponse(client.ID, []byte(err.Error()))
+				res.RequestId = msg.RequestId
+				res.Provider = msg.Provider
+
+				resB, mErr := json.Marshal(res)
+				if mErr != nil {
+					log.Printf("Failed to marshal error response for client %s: %v", client.ID, mErr)
+					continue
 				}
 				select {
-				case client.Send <- errRB:
+				case client.Send <- resB:
 				default:
 					log.Printf("Failed to send error to client %s: channel blocked", client.ID)
 				}
@@ -195,7 +198,7 @@ func (m *AccountConnectClientManager) handleClientMessages(ctx context.Context, 
 					log.Printf("Client: %s message write fail: %v", client.ID, err)
 				}
 			} else if accountConnectMsgRes.Status == messages.StatusFailure {
-				if err := m.HandleClientError(client, accountConnectMsgRes.Payload); err != nil {
+				if err := m.HandleClientError(client, accountConnectMsgRes); err != nil {
 					log.Printf("client platform error return: %v", err)
 				}
 			} else {
@@ -230,13 +233,21 @@ func (m *AccountConnectClientManager) writeClientConnMessage(ctx context.Context
 	return m.writeJSONWithTimeout(client, msg)
 }
 
-func (m *AccountConnectClientManager) HandleClientError(client *clients.AccountConnectClient, errData []byte) error {
-	msg := messageutils.CreateErrorResponse(client.ID, errData)
+func (m *AccountConnectClientManager) HandleClientError(client *clients.AccountConnectClient, failed messages.AccountConnectMsgRes) error {
+	desc := string(failed.Payload)
+	var inner messages.AccountConnectError
+	if json.Unmarshal(failed.Payload, &inner) == nil && inner.Description != "" {
+		desc = inner.Description
+	}
+
+	msg := messageutils.CreateErrorResponse(client.ID, []byte(desc))
+	msg.RequestId = failed.RequestId
+	msg.Provider = failed.Provider
 
 	if err := m.writeJSONWithTimeout(client, msg); err != nil {
 		return err
 	}
-	return fmt.Errorf("error condition: %s", string(msg.Payload))
+	return fmt.Errorf("error condition: %s", desc)
 }
 
 func (m *AccountConnectClientManager) writeJSONWithTimeout(client *clients.AccountConnectClient, v interface{}) error {
