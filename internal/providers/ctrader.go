@@ -393,9 +393,6 @@ func (cta *CtraderAdapter) GetHistoricalTicks(ctx context.Context, payload acoun
 	if payload.Ctrader == nil {
 		return fmt.Errorf("ctrader payload is required for tick data")
 	}
-	if err := cta.requireCtid(payload.Ctrader.Ctid); err != nil {
-		return err
-	}
 	return cta.ctrader.GetAccountHistoricalTicks(ctx, *payload.Ctrader)
 }
 
@@ -450,15 +447,16 @@ func (cta *CtraderAdapter) SubscribeTicks(ctx context.Context, payload acount_co
 	if payload.Ctrader == nil {
 		return fmt.Errorf("ctrader payload is required for tick stream")
 	}
-	cp := payload.Ctrader
-	if err := cta.requireCtid(cp.Ctid); err != nil {
-		return err
+	if payload.Ctrader.AccountID == 0 {
+		return fmt.Errorf("account_id is required for ctrader candlestick stream")
 	}
-	if cp.SymbolId == 0 {
-		return fmt.Errorf("symbol_id is required for tick stream")
+	if payload.Ctrader.SymbolName == "" {
+		return fmt.Errorf("symbol_name is required for ctrader subscribe")
 	}
 
-	streamId := fmt.Sprintf("ticks_ctrader_%d", cp.SymbolId)
+	ctid := (*int64)(&payload.Ctrader.AccountID)
+
+	streamId := fmt.Sprintf("ticks_ctrader_%s", payload.Ctrader.SymbolName)
 	if err := cta.ctrader.AccountConnClient.AddStream(ctx, streamId); err != nil {
 		return err
 	}
@@ -476,7 +474,7 @@ func (cta *CtraderAdapter) SubscribeTicks(ctx context.Context, payload acount_co
 		}
 	}()
 
-	return cta.ctrader.StartTickStream(ctx, cp.Ctid, cp.SymbolId, stream)
+	return cta.ctrader.StartTickStream(ctx, ctid, payload.Ctrader.SymbolName, stream)
 }
 
 func (cta *CtraderAdapter) GetOrderBookDepth(ctx context.Context, payload acount_connect_messages.AccountConnectDepthPayload) error {
@@ -811,7 +809,11 @@ func (t *CTrader) StartCandlestickStream(ctx context.Context, payload acount_con
 }
 
 // StartTickStream subscribes strm to live bid/ask updates for a symbol.
-func (t *CTrader) StartTickStream(ctx context.Context, ctid *int64, symbolId int64, strm chan []byte) error {
+func (t *CTrader) StartTickStream(ctx context.Context, ctid *int64, symbolName string, strm chan []byte) error {
+	symbolId, err := t.resolveSymbolId(ctx, ctid, symbolName)
+	if err != nil {
+		return err
+	}
 	if _, err := t.getSymbolDigits(ctx, ctid, symbolId); err != nil {
 		return fmt.Errorf("failed to fetch symbol digits: %w", err)
 	}
@@ -976,19 +978,25 @@ func (t *CTrader) GetAccountHistoricalDeals(ctx context.Context, payload acount_
 }
 
 func (t *CTrader) GetAccountHistoricalTicks(ctx context.Context, payload acount_connect_messages.CtraderTickDataRequestPayload) error {
+	ctid := (*int64)(&payload.AccountID)
+	symbolId, err := t.resolveSymbolId(ctx, ctid, payload.SymbolName)
+	if err != nil {
+		return err
+	}
+
 	quoteType, err := mappers.QuoteTypeStrToProto(payload.QuoteType)
 	if err != nil {
 		return fmt.Errorf("invalid quote_type: %w", err)
 	}
 
 	req := newCtraderPending(ctx)
-	req.Meta.ctid = payload.Ctid
-	req.Meta.symbolId = payload.SymbolId
+	req.Meta.ctid = ctid
+	req.Meta.symbolId = symbolId
 
 	_, err = t.send(common.REQ_TICK_DATA, common.TickDataMsgType,
 		&gen_messages.ProtoOAGetTickDataReq{
-			CtidTraderAccountId: payload.Ctid,
-			SymbolId:            &payload.SymbolId,
+			CtidTraderAccountId: ctid,
+			SymbolId:            &symbolId,
 			Type:                &quoteType,
 			FromTimestamp:       payload.FromTimestamp,
 			ToTimestamp:         payload.ToTimestamp,
