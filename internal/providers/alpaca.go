@@ -2,10 +2,9 @@ package providers
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
 	"math"
@@ -155,15 +154,12 @@ func NewAlpacaAdapter(accountConnClient *clients.AccountConnectClient, assetProv
 	}
 }
 
-func newAlpacaAccountID() messages.AccountID {
-	var b [8]byte
-	for {
-		_, _ = rand.Read(b[:])
-		n := int64(binary.BigEndian.Uint64(b[:]) & math.MaxInt64)
-		if n != 0 {
-			return messages.AccountID(n)
-		}
-	}
+func newAlpacaAccountID(n string) messages.AccountID {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(n))
+
+	num := int64(h.Sum64() & math.MaxInt64)
+	return messages.AccountID(num)
 }
 
 func (a *AlpacaAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
@@ -197,7 +193,7 @@ func (a *AlpacaAdapter) EstablishConnection(ctx context.Context, cfg config.Plat
 
 	a.client = client
 	a.account = acct
-	a.accountID = newAlpacaAccountID()
+	a.accountID = newAlpacaAccountID(acct.ID)
 
 	info := buildAlpacaAccountInfo(a.accountID, acct)
 
