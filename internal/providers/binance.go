@@ -1107,70 +1107,161 @@ func (b *BinanceAdapter) GetHistoricalTicks(ctx context.Context, payload message
 	symbol, from, to := bp.SymbolName, bp.FromTimestamp, bp.ToTimestamp
 
 	go func() {
-		ticks, err := b.fetchHistoricalTicks(ctx, acct, symbol, from, to, limit)
-		if err != nil {
+		emit := func(ticks []messages.AccountConnectTick, hasMore bool) error {
+			resB, err := json.Marshal(messages.BinanceAccountConnectTickDataRes{
+				Ticks:      ticks,
+				HasMore:    hasMore,
+				SymbolName: symbol,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to encode tick data: %w", err)
+			}
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksHistory, messages.Binance, b.AccountConnClient.ID, resB)
+			msgB, err := json.Marshal(msg)
+			if err != nil {
+				return fmt.Errorf("failed to encode tick history response: %w", err)
+			}
+			select {
+			case b.AccountConnClient.Send <- msgB:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		if err := b.streamHistoricalTicks(ctx, acct, symbol, from, to, limit, emit); err != nil {
 			log.Printf("historical ticks for %s failed: %v", symbol, err)
 			b.sendFailure(ctx, messages.TypeTicksHistory, err)
-			return
-		}
-
-		res := messages.AccountConnectTickDataRes{
-			Ticks:      ticks,
-			HasMore:    len(ticks) == limit,
-			SymbolName: symbol,
-		}
-		resB, err := json.Marshal(res)
-		if err != nil {
-			log.Printf("failed to marshal tick data response: %v", err)
-			b.sendFailure(ctx, messages.TypeTicksHistory, fmt.Errorf("failed to encode tick data"))
-			return
-		}
-
-		msg := messageutils.CreateSuccessResponse(ctx, messages.TypeTicksHistory, messages.Binance, b.AccountConnClient.ID, resB)
-		msgB, err := json.Marshal(msg)
-		if err != nil {
-			log.Printf("failed to marshal final message: %v", err)
-			b.sendFailure(ctx, messages.TypeTicksHistory, fmt.Errorf("failed to encode tick data"))
-			return
-		}
-		select {
-		case b.AccountConnClient.Send <- msgB:
-		case <-ctx.Done():
 		}
 	}()
 
 	return nil
 }
 
-// fetchHistoricalTicks does the account-type specific fetch and mapping.
-func (b *BinanceAdapter) fetchHistoricalTicks(ctx context.Context, acct *Naccount, symbol string, from, to *int64, limit int) ([]messages.AccountConnectTick, error) {
+// streamHistoricalTicks fetches and emits each account-type-specific page.
+func (b *BinanceAdapter) streamHistoricalTicks(
+	ctx context.Context,
+	acct *Naccount,
+	symbol string,
+	from, to *int64,
+	limit int,
+	emit func([]messages.AccountConnectTick, bool) error,
+) error {
 	switch acct.accountType {
 	case messages.BinanceAccountTypeSpot, messages.BinanceAccountTypeMargin:
 		if acct.spotClient == nil {
-			return nil, fmt.Errorf("no spot client for account %d", acct.id)
+			return fmt.Errorf("no spot client for account %d", acct.id)
 		}
-		trades, err := b.binanceConn.fetchAllSpotAggTrades(ctx, acct.spotClient, symbol, from, to, limit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch spot agg trades: %w", err)
+		fetchPage := func(fromID *int64) ([]*binance.AggTrade, error) {
+			svc := acct.spotClient.NewAggTradesService().Symbol(symbol).Limit(limit)
+			if fromID != nil {
+				svc = svc.FromID(*fromID)
+			} else {
+				if from != nil {
+					svc = svc.StartTime(*from)
+				}
+				if to != nil {
+					svc = svc.EndTime(*to)
+				}
+			}
+			return svc.Do(ctx)
 		}
-		return mappers.BinanceAggTradesToTicks(trades), nil
+		return streamAggTradePages(ctx, limit, to, fetchPage,
+			func(trade *binance.AggTrade) int64 { return trade.AggTradeID },
+			func(trade *binance.AggTrade) int64 { return trade.Timestamp },
+			mappers.BinanceAggTradesToTicks,
+			emit,
+		)
 
 	case messages.BinanceAccountTypeFutures:
 		if acct.futuresClient == nil {
-			return nil, fmt.Errorf("no futures client for account %d", acct.id)
+			return fmt.Errorf("no futures client for account %d", acct.id)
 		}
-		trades, err := b.binanceConn.fetchAllFuturesAggTrades(ctx, acct.futuresClient, symbol, from, to, limit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch futures agg trades: %w", err)
+		fetchPage := func(fromID *int64) ([]*futures.AggTrade, error) {
+			svc := acct.futuresClient.NewAggTradesService().Symbol(symbol).Limit(limit)
+			if fromID != nil {
+				svc = svc.FromID(*fromID)
+			} else if from != nil {
+				svc = svc.StartTime(*from)
+			}
+			return svc.Do(ctx)
 		}
-		return mappers.BinanceFuturesAggTradesToTicks(trades), nil
+		return streamAggTradePages(ctx, limit, to, fetchPage,
+			func(trade *futures.AggTrade) int64 { return trade.AggTradeID },
+			func(trade *futures.AggTrade) int64 { return trade.Timestamp },
+			mappers.BinanceFuturesAggTradesToTicks,
+			emit,
+		)
 
 	case messages.BinanceAccountTypeDelivery:
-		return nil, fmt.Errorf("historical tick data not yet supported for delivery accounts")
+		return fmt.Errorf("historical tick data not yet supported for delivery accounts")
 
 	default:
-		return nil, fmt.Errorf("unsupported account type for historical tick data: %s", acct.accountType)
+		return fmt.Errorf("unsupported account type for historical tick data: %s", acct.accountType)
 	}
+}
+
+func streamAggTradePages[T any](
+	ctx context.Context,
+	limit int,
+	to *int64,
+	fetchPage func(*int64) ([]T, error),
+	tradeID func(T) int64,
+	tradeTimestamp func(T) int64,
+	mapPage func([]T) []messages.AccountConnectTick,
+	emit func([]messages.AccountConnectTick, bool) error,
+) error {
+	batch, err := fetchPage(nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch agg trades page 0: %w", err)
+	}
+	if len(batch) == 0 {
+		return emit(nil, false)
+	}
+
+	for page := 0; page < maxTickPages; page++ {
+		cutoff := len(batch)
+		hitCutoff := false
+		if to != nil {
+			for i, trade := range batch {
+				if tradeTimestamp(trade) > *to {
+					cutoff = i
+					hitCutoff = true
+					break
+				}
+			}
+		}
+		batch = batch[:cutoff]
+
+		if len(batch) == 0 {
+			return emit(nil, false)
+		}
+
+		hasMore := false
+		var nextBatch []T
+		if len(batch) == limit && !hitCutoff && page+1 < maxTickPages {
+			nextID := tradeID(batch[len(batch)-1]) + 1
+			time.Sleep(time.Duration(pageDelayMs) * time.Millisecond)
+			nextBatch, err = fetchPage(&nextID)
+			if err != nil {
+				if emitErr := emit(mapPage(batch), false); emitErr != nil {
+					return emitErr
+				}
+				return fmt.Errorf("failed to fetch agg trades page %d: %w", page+1, err)
+			}
+			hasMore = len(nextBatch) > 0
+		}
+
+		if err := emit(mapPage(batch), hasMore); err != nil {
+			return err
+		}
+		if !hasMore {
+			return nil
+		}
+		batch = nextBatch
+	}
+
+	return nil
 }
 
 func (b *BinanceAdapter) GetAccountInfo(ctx context.Context, payload messages.AccountConnectAccountInfoPayload) error {

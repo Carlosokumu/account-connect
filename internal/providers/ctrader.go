@@ -34,6 +34,8 @@ const (
 	ctraderPriceScale        = 100000.0
 	ctraderCallTimeout       = 20 * time.Second
 	maxCtraderTickages       = 300
+	ctraderBulkTimeout       = 45 * time.Second
+	symbolInfoChunk          = 300
 )
 
 type MessageHandler func(ctx context.Context, clientMsgId string, payload []byte) error
@@ -70,23 +72,23 @@ type ctraderReqMeta struct {
 }
 
 type trendbarPaging struct {
-	ctid     *int64
-	symbolId int64
-	period   gen_messages.ProtoOATrendbarPeriod
-	from, to int64
-	bars     []*gen_messages.ProtoOATrendbar
+	ctid                 *int64
+	symbolId             int64
+	period               gen_messages.ProtoOATrendbarPeriod
+	from, to             int64
+	lastEmittedTimestamp uint32
+	hasEmittedTimestamp  bool
 }
 
 type rawTick struct{ ts, px int64 }
 
 type tickPaging struct {
-	ctid      *int64
-	symbolId  int64
-	quoteType gen_messages.ProtoOAQuoteType
-	from, to  int64     // `to` moves back as pages arrive
-	ticks     []rawTick // newest-first, absolute timestamps
-	pages     int
-	truncated bool
+	ctid             *int64
+	symbolId         int64
+	quoteType        gen_messages.ProtoOAQuoteType
+	from, to         int64 // `to` moves back as pages arrive
+	overlapTimestamp *int64
+	pages            int
 }
 
 // pendingRequest and pendingResponse are the shared tracker's types, fixed to
@@ -964,6 +966,9 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 	if err != nil {
 		return fmt.Errorf("invalid trend period: %w", err)
 	}
+	if _, err := t.getSymbolDigits(ctx, ctid, symbolId); err != nil {
+		return fmt.Errorf("failed to fetch symbol digits: %w", err)
+	}
 
 	req := newCtraderPending(ctx)
 	req.Meta.symbolName = trendbarsArgs.SymbolName
@@ -1024,6 +1029,9 @@ func (t *CTrader) GetAccountHistoricalTicks(ctx context.Context, payload acount_
 	quoteType, err := mappers.QuoteTypeStrToProto(payload.QuoteType)
 	if err != nil {
 		return fmt.Errorf("invalid quote_type: %w", err)
+	}
+	if _, err := t.getSymbolDigits(ctx, ctid, symbolId); err != nil {
+		return fmt.Errorf("failed to fetch symbol digits: %w", err)
 	}
 
 	req := newCtraderPending(ctx)
@@ -1422,49 +1430,76 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, clientMsgId strin
 	}
 
 	p := req.Meta.trendbarspaging
-	p.bars = append(p.bars, res.Trendbar...)
+	if p == nil {
+		err := fmt.Errorf("trend bars response without paging state")
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+		return err
+	}
 
-	if res.GetHasMore() && len(res.Trendbar) > 0 {
-		oldestMs := int64(res.Trendbar[0].GetUtcTimestampInMinutes()) * 60_000
+	page := append([]*gen_messages.ProtoOATrendbar(nil), res.Trendbar...)
+	sort.Slice(page, func(i, j int) bool {
+		return page[i].GetUtcTimestampInMinutes() < page[j].GetUtcTimestampInMinutes()
+	})
+	page = dedupeBars(page)
+	if p.hasEmittedTimestamp {
+		uniquePage := page[:0]
+		for _, bar := range page {
+			if bar.GetUtcTimestampInMinutes() < p.lastEmittedTimestamp {
+				uniquePage = append(uniquePage, bar)
+			}
+		}
+		page = uniquePage
+	}
+
+	var oldestMs int64
+	if len(res.Trendbar) > 0 {
+		oldestMs = int64(res.Trendbar[0].GetUtcTimestampInMinutes()) * 60_000
 		for _, b := range res.Trendbar {
 			if ms := int64(b.GetUtcTimestampInMinutes()) * 60_000; ms < oldestMs {
 				oldestMs = ms
 			}
 		}
-		next := oldestMs - 1
+	}
+
+	var next int64
+	hasMore := false
+	if res.GetHasMore() && len(res.Trendbar) > 0 {
+		next = oldestMs - 1
 		if next >= p.from && next < p.to {
-			if err := req.Ctx.Err(); err != nil {
-				go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
-				return nil
-			}
-			p.to = next
-			_, err := t.send(common.REQ_TREND_BARS, common.TrendBarsMsyType,
-				&gen_messages.ProtoOAGetTrendbarsReq{
-					CtidTraderAccountId: p.ctid,
-					Period:              &p.period,
-					SymbolId:            &p.symbolId,
-					FromTimestamp:       &p.from,
-					ToTimestamp:         &p.to,
-				}, req)
-			if err != nil {
-				go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
-			}
-			return nil
+			hasMore = true
 		}
 	}
 
-	sort.Slice(p.bars, func(i, j int) bool {
-		return p.bars[i].GetUtcTimestampInMinutes() < p.bars[j].GetUtcTimestampInMinutes()
-	})
-	p.bars = dedupeBars(p.bars)
-	res.Trendbar = p.bars
+	res.Trendbar = page
+	if err := t.sendTrendBars(req, &res, hasMore); err != nil {
+		log.Printf("trend bars for %s failed: %v", req.Meta.symbolName, err)
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+		return nil
+	}
+	if len(page) > 0 {
+		p.lastEmittedTimestamp = page[0].GetUtcTimestampInMinutes()
+		p.hasEmittedTimestamp = true
+	}
+	if !hasMore {
+		return nil
+	}
+	if err := req.Ctx.Err(); err != nil {
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+		return nil
+	}
+	p.to = next
+	_, err := t.send(common.REQ_TREND_BARS, common.TrendBarsMsyType,
+		&gen_messages.ProtoOAGetTrendbarsReq{
+			CtidTraderAccountId: p.ctid,
+			Period:              &p.period,
+			SymbolId:            &p.symbolId,
+			FromTimestamp:       &p.from,
+			ToTimestamp:         &p.to,
+		}, req)
+	if err != nil {
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+	}
 
-	go func() {
-		if err := t.sendTrendBars(req, &res); err != nil {
-			log.Printf("trend bars for %s failed: %v", req.Meta.symbolName, err)
-			t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
-		}
-	}()
 	return nil
 }
 
@@ -1484,7 +1519,7 @@ func dedupeBars(bars []*gen_messages.ProtoOATrendbar) []*gen_messages.ProtoOATre
 	return out
 }
 
-func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGetTrendbarsRes) error {
+func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGetTrendbarsRes, hasMore bool) error {
 	digits, err := t.getSymbolDigits(req.Ctx, res.CtidTraderAccountId, *res.SymbolId)
 	if err != nil {
 		return fmt.Errorf("failed to fetch symbol digits: %w", err)
@@ -1509,6 +1544,7 @@ func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGe
 		Trendbars: mapped,
 		Symbol:    req.Meta.symbolName,
 		Period:    req.Meta.period,
+		HasMore:   hasMore,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode trend bars: %w", err)
@@ -1566,16 +1602,56 @@ func (t *CTrader) handleSymbolListResponse(ctx context.Context, clientMsgId stri
 		return t.sendSymbolListResponse(req.Ctx, syms)
 	}
 
-	symInfoKey, symInfoReq, err := t.getSymbolListInformation(req.Ctx, acount_connect_messages.AccountConnectSymbolInfoPayload{
-		SymbolId: symbolIds,
-		Ctid:     r.CtidTraderAccountId,
-	})
-	if err != nil {
-		return err
+	// symInfoKey, symInfoReq, err := t.getSymbolListInformation(req.Ctx, acount_connect_messages.AccountConnectSymbolInfoPayload{
+	// 	SymbolId: symbolIds,
+	// 	Ctid:     r.CtidTraderAccountId,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+	go t.enrichDigitsAndSend(req.Ctx, r.CtidTraderAccountId, syms, symbolIds)
+
+	// go t.handleSymbolInfoForSymbolList(req.Ctx, syms, symInfoKey, symInfoReq)
+	return nil
+}
+
+func (t *CTrader) enrichDigitsAndSend(ctx context.Context, ctid *int64, syms []acount_connect_messages.AccountConnectSymbol, ids []int64) {
+	digits := make(map[int64]int32, len(ids))
+	for start := 0; start < len(ids); start += symbolInfoChunk {
+		end := min(start+symbolInfoChunk, len(ids))
+		payload, err := t.callReqTimeout(ctx, ctraderBulkTimeout, common.REQ_SYMBOL_INFO, common.AccountSymbolInfo,
+			&gen_messages.ProtoOASymbolByIdReq{CtidTraderAccountId: ctid, SymbolId: ids[start:end]},
+			newCtraderPending(ctx))
+		if err != nil {
+			log.Printf("symbol enrichment stopped at %d/%d: %v (sending list without remaining digits)", start, len(ids), err)
+			break
+		}
+		var res gen_messages.ProtoOASymbolByIdRes
+		if err := proto.Unmarshal(payload, &res); err != nil {
+			log.Printf("symbol enrichment: bad chunk: %v", err)
+			break
+		}
+		t.builderMutex.Lock()
+		for _, s := range res.Symbol {
+			if s.SymbolId != nil && s.Digits != nil {
+				digits[*s.SymbolId] = *s.Digits
+				t.symbolDigits[*s.SymbolId] = *s.Digits // also warms getSymbolDigits
+			}
+		}
+		t.builderMutex.Unlock()
 	}
 
-	go t.handleSymbolInfoForSymbolList(req.Ctx, syms, symInfoKey, symInfoReq)
-	return nil
+	for i := range syms {
+		if c := syms[i].Ctrader; c != nil {
+			if d, ok := digits[c.SymbolId]; ok {
+				c.Digits = &d
+			}
+		}
+	}
+	if err := t.sendSymbolListResponse(ctx, syms); err != nil {
+		log.Printf("failed to send symbol list: %v", err)
+		t.sendFailure(ctx, acount_connect_messages.TypeSymbolsList, err)
+	}
 }
 
 // enrichSymbolsWithAssetInfo attaches base/quote asset display names to each
@@ -1743,53 +1819,63 @@ func (t *CTrader) handleTickDataResponse(ctx context.Context, clientMsgId string
 	}
 
 	page := decodeTickPage(&r)
-	p.ticks = append(p.ticks, page...)
 	p.pages++
 
-	if r.GetHasMore() && len(page) > 0 {
-		oldest := page[len(page)-1].ts
+	var oldest int64
+	if len(page) > 0 {
+		oldest = page[0].ts
 		for _, tk := range page {
 			if tk.ts < oldest {
 				oldest = tk.ts
 			}
 		}
-		if oldest > p.from {
-			if p.pages >= maxCtraderTickages {
-				p.truncated = true
-			} else if err := req.Ctx.Err(); err != nil {
-				go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
-				return nil
-			} else {
-				if oldest < p.to {
-					n := len(p.ticks)
-					for n > 0 && p.ticks[n-1].ts >= oldest {
-						n--
-					}
-					p.ticks = p.ticks[:n]
-					p.to = oldest
-				} else {
-					p.to = oldest - 1
-				}
-				if err := t.sendTickPage(req); err != nil {
-					go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
-				}
-				return nil
-			}
-		}
 	}
 
-	out := p.ticks[:0]
-	for _, tk := range p.ticks {
+	if p.overlapTimestamp != nil {
+		boundary := *p.overlapTimestamp
+		nonOverlapping := page[:0]
+		for _, tk := range page {
+			if tk.ts < boundary {
+				nonOverlapping = append(nonOverlapping, tk)
+			}
+		}
+		page = nonOverlapping
+		p.overlapTimestamp = nil
+	}
+
+	out := page[:0]
+	for _, tk := range page {
 		if tk.ts >= p.from {
 			out = append(out, tk)
 		}
 	}
-	go func() {
-		if err := t.sendTickHistory(req, out, p.truncated); err != nil {
-			log.Printf("tick history for symbol %d failed: %v", req.Meta.symbolId, err)
-			t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+
+	hasMore := r.GetHasMore() && len(page) > 0 && oldest > p.from
+	if hasMore && p.pages < maxCtraderTickages {
+		if err := req.Ctx.Err(); err != nil {
+			go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+			return nil
 		}
-	}()
+	}
+
+	if err := t.sendTickHistory(req, out, hasMore); err != nil {
+		log.Printf("tick history for symbol %d failed: %v", req.Meta.symbolId, err)
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+		return nil
+	}
+
+	if !hasMore || p.pages >= maxCtraderTickages {
+		return nil
+	}
+	if oldest < p.to {
+		p.to = oldest
+		p.overlapTimestamp = &oldest
+	} else {
+		p.to = oldest - 1
+	}
+	if err := t.sendTickPage(req); err != nil {
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+	}
 	return nil
 }
 
@@ -1818,16 +1904,20 @@ func (t *CTrader) sendTickHistory(req *pendingRequest, raw []rawTick, hasMore bo
 	if err != nil {
 		return fmt.Errorf("failed to fetch symbol digits: %w", err)
 	}
+	quoteType, err := mappers.QuoteTypeProtoToStr(req.Meta.tickPaging.quoteType)
+	if err != nil {
+		return err
+	}
 	f := math.Pow(10, float64(digits))
-	ticks := make([]acount_connect_messages.AccountConnectTick, 0, len(raw))
+	ticks := make([]acount_connect_messages.CtraderAccountConnectTick, 0, len(raw))
 	for _, tk := range raw {
-		ticks = append(ticks, acount_connect_messages.AccountConnectTick{
+		ticks = append(ticks, acount_connect_messages.CtraderAccountConnectTick{
 			Timestamp: tk.ts,
 			Price:     math.Round(float64(tk.px)/ctraderPriceScale*f) / f,
 		})
 	}
-	resB, err := json.Marshal(acount_connect_messages.AccountConnectTickDataRes{
-		Ticks: ticks, HasMore: hasMore, Symbol: req.Meta.symbolId,
+	resB, err := json.Marshal(acount_connect_messages.CtraderAccountConnectTickDataRes{
+		Ticks: ticks, HasMore: hasMore, Symbol: req.Meta.symbolId, QuoteType: quoteType,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode tick data: %w", err)
@@ -1957,25 +2047,52 @@ func (t *CTrader) sendFailure(ctx context.Context, msgType acount_connect_messag
 
 // callReq is call with a caller-supplied pendingRequest, for requests that
 // need metadata set first (for example Meta.silent).
+// callReq becomes a thin wrapper so bulk calls can pick their own timeout.
 func (t *CTrader) callReq(ctx context.Context, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
+	return t.callReqTimeout(ctx, ctraderCallTimeout, prefix, payloadType, msg, req)
+}
+
+func (t *CTrader) callReqTimeout(ctx context.Context, timeout time.Duration, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
 	key, err := t.send(prefix, payloadType, msg, req)
 	if err != nil {
 		return nil, err
 	}
-
-	waitCtx, cancel := context.WithTimeout(ctx, ctraderCallTimeout)
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	payload, err := t.reqs.Await(waitCtx, key, req)
 	if err != nil {
-		t.reqs.Take(key) // no-op if the handler already took it
-		if waitCtx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("ctrader did not answer within %s", ctraderCallTimeout)
+		t.reqs.Take(key)
+		switch {
+		case ctx.Err() != nil: // the caller's own context ended
+			return nil, fmt.Errorf("%s: request context ended (%v): %w", prefix, context.Cause(ctx), err)
+		case waitCtx.Err() == context.DeadlineExceeded:
+			return nil, fmt.Errorf("ctrader did not answer %s within %s", prefix, timeout)
 		}
 		return nil, err
 	}
 	return payload, nil
 }
+
+// func (t *CTrader) callReq(ctx context.Context, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
+// 	key, err := t.send(prefix, payloadType, msg, req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	waitCtx, cancel := context.WithTimeout(ctx, ctraderCallTimeout)
+// 	defer cancel()
+
+// 	payload, err := t.reqs.Await(waitCtx, key, req)
+// 	if err != nil {
+// 		t.reqs.Take(key) // no-op if the handler already took it
+// 		if waitCtx.Err() == context.DeadlineExceeded {
+// 			return nil, fmt.Errorf("ctrader did not answer within %s", ctraderCallTimeout)
+// 		}
+// 		return nil, err
+// 	}
+// 	return payload, nil
+// }
 
 // candleBuilder holds the per-(symbol, period) state needed to convert cTrader's live
 // ProtoOATrendbar pushes into AccountConnectCandlestickBar messages and relay them onto
