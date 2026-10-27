@@ -147,14 +147,18 @@ func NewBinanceConnection(accountConnClient *clients.AccountConnectClient, cache
 	}
 }
 
-func newAccountID() messages.AccountID {
-	var b [8]byte
-	for {
-		_, _ = rand.Read(b[:])
-		n := int64(binary.BigEndian.Uint64(b[:]) & math.MaxInt64) // mask sign bit, always positive
-		if n != 0 {
-			return messages.AccountID(n)
+func newAccountID(accountid *int64) messages.AccountID {
+	if accountid == nil {
+		var b [8]byte
+		for {
+			_, _ = rand.Read(b[:])
+			n := int64(binary.BigEndian.Uint64(b[:]) & math.MaxInt64) // mask sign bit, always positive
+			if n != 0 {
+				return messages.AccountID(n)
+			}
 		}
+	} else {
+		return messages.AccountID(*accountid)
 	}
 }
 
@@ -263,7 +267,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 		if err != nil {
 			record(messages.BinanceAccountTypeSpot, 0, fmt.Errorf("failed to authenticate binance spot account: %w", err))
 		} else {
-			id := newAccountID()
+			id := newAccountID(&spotAcct.UID)
 			registry.put(&Naccount{
 				id:          id,
 				accountType: messages.BinanceAccountTypeSpot,
@@ -278,7 +282,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 		if err != nil {
 			record(messages.BinanceAccountTypeMargin, 0, fmt.Errorf("failed to authenticate binance margin account: %w", err))
 		} else {
-			id := newAccountID()
+			id := newAccountID(&spotAcct.UID)
 			registry.put(&Naccount{
 				id:          id,
 				accountType: messages.BinanceAccountTypeMargin,
@@ -298,7 +302,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 			record(messages.BinanceAccountTypeFutures, 0, fmt.Errorf("failed to authenticate binance futures account: %w", err))
 			return
 		}
-		id := newAccountID()
+		id := newAccountID(nil)
 		registry.put(&Naccount{
 			id:            id,
 			accountType:   messages.BinanceAccountTypeFutures,
@@ -317,7 +321,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 			record(messages.BinanceAccountTypeDelivery, 0, fmt.Errorf("failed to authenticate binance delivery account: %w", err))
 			return
 		}
-		id := newAccountID()
+		id := newAccountID(nil)
 		registry.put(&Naccount{
 			id:             id,
 			accountType:    messages.BinanceAccountTypeDelivery,
