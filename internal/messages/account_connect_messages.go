@@ -292,6 +292,7 @@ type AccountConnectTrendBarRes struct {
 	Trendbars []AccountConnectTrendBar `json:"trendbars"`
 	Symbol    string                   `json:"symbol"`
 	Period    string                   `json:"period"`
+	HasMore   bool                     `json:"has_more"`
 }
 
 // AccountConnectDeal  is model message containing information about a deal that happened for a particular trade
@@ -510,6 +511,24 @@ type AccountConnectTickDataRes struct {
 	Symbol     int64                `json:"symbol_id"`
 	Quote      string               `json:"quote_type"`
 	SymbolName string               `json:"symbol_name,omitempty"`
+}
+
+type BinanceAccountConnectTickDataRes struct {
+	Ticks      []AccountConnectTick `json:"ticks"`
+	HasMore    bool                 `json:"has_more"`
+	SymbolName string               `json:"symbol_name"`
+}
+
+type CtraderAccountConnectTick struct {
+	Timestamp int64   `json:"timestamp"`
+	Price     float64 `json:"price"`
+}
+
+type CtraderAccountConnectTickDataRes struct {
+	Ticks     []CtraderAccountConnectTick `json:"ticks"`
+	HasMore   bool                        `json:"has_more"`
+	Symbol    int64                       `json:"symbol_id"`
+	QuoteType string                      `json:"quote_type"`
 }
 
 type AccountConnectTickStreamMsg struct {
