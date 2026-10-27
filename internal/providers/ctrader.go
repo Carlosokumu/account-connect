@@ -15,6 +15,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ const (
 	ctraderHeartbeatInterval = 10 * time.Second
 	ctraderPriceScale        = 100000.0
 	ctraderCallTimeout       = 20 * time.Second
+	maxCtraderTickages       = 300
 )
 
 type MessageHandler func(ctx context.Context, clientMsgId string, payload []byte) error
@@ -57,12 +59,34 @@ type AssetInfo struct {
 // ctraderReqMeta is the cTrader-specific data a request carries alongside the
 // generic context and response channel.
 type ctraderReqMeta struct {
-	ctid        *int64
-	symbolId    int64
-	isReconnect bool
-	silent      bool
-	symbolName  string
-	period      string
+	ctid            *int64
+	symbolId        int64
+	isReconnect     bool
+	silent          bool
+	symbolName      string
+	period          string
+	trendbarspaging *trendbarPaging
+	tickPaging      *tickPaging
+}
+
+type trendbarPaging struct {
+	ctid     *int64
+	symbolId int64
+	period   gen_messages.ProtoOATrendbarPeriod
+	from, to int64
+	bars     []*gen_messages.ProtoOATrendbar
+}
+
+type rawTick struct{ ts, px int64 }
+
+type tickPaging struct {
+	ctid      *int64
+	symbolId  int64
+	quoteType gen_messages.ProtoOAQuoteType
+	from, to  int64     // `to` moves back as pages arrive
+	ticks     []rawTick // newest-first, absolute timestamps
+	pages     int
+	truncated bool
 }
 
 // pendingRequest and pendingResponse are the shared tracker's types, fixed to
@@ -898,7 +922,7 @@ func (t *CTrader) subscribeLiveTrendbar(ctx context.Context, ctid *int64, symbol
 	return nil
 }
 
-// GetAccountTradingSymbols  retrieves a list of trading for the specified ctid
+// GetAccountTradingSymbols  retrieves a list of trading symbols for the specified ctid
 func (t *CTrader) GetAccountTradingSymbols(ctx context.Context, accountId acount_connect_messages.AccountID) error {
 	ctid := int64(accountId)
 	_, err := t.send(common.REQ_SYMBOL_LIST, common.AccountSymbolListMsgType,
@@ -932,6 +956,10 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 		return err
 	}
 
+	if trendbarsArgs.FromTimestamp == nil || trendbarsArgs.ToTimestamp == nil {
+		return fmt.Errorf("trend bars request requires from and to timestamps")
+	}
+
 	trendPeriod, err := mappers.PeriodStrToBarPeriod(trendbarsArgs.Period)
 	if err != nil {
 		return fmt.Errorf("invalid trend period: %w", err)
@@ -940,6 +968,13 @@ func (t *CTrader) GetChartTrendBars(ctx context.Context, trendbarsArgs acount_co
 	req := newCtraderPending(ctx)
 	req.Meta.symbolName = trendbarsArgs.SymbolName
 	req.Meta.period = trendbarsArgs.Period
+	req.Meta.trendbarspaging = &trendbarPaging{
+		ctid:     ctid,
+		symbolId: symbolId,
+		period:   trendPeriod,
+		from:     *trendbarsArgs.FromTimestamp,
+		to:       *trendbarsArgs.ToTimestamp,
+	}
 
 	_, err = t.send(common.REQ_TREND_BARS, common.TrendBarsMsyType,
 		&gen_messages.ProtoOAGetTrendbarsReq{
@@ -983,7 +1018,9 @@ func (t *CTrader) GetAccountHistoricalTicks(ctx context.Context, payload acount_
 	if err != nil {
 		return err
 	}
-
+	if payload.FromTimestamp == nil || payload.ToTimestamp == nil {
+		return fmt.Errorf("tick data request requires from and to timestamps")
+	}
 	quoteType, err := mappers.QuoteTypeStrToProto(payload.QuoteType)
 	if err != nil {
 		return fmt.Errorf("invalid quote_type: %w", err)
@@ -992,14 +1029,22 @@ func (t *CTrader) GetAccountHistoricalTicks(ctx context.Context, payload acount_
 	req := newCtraderPending(ctx)
 	req.Meta.ctid = ctid
 	req.Meta.symbolId = symbolId
+	req.Meta.tickPaging = &tickPaging{
+		ctid: ctid, symbolId: symbolId, quoteType: quoteType,
+		from: *payload.FromTimestamp, to: *payload.ToTimestamp,
+	}
+	return t.sendTickPage(req)
+}
 
-	_, err = t.send(common.REQ_TICK_DATA, common.TickDataMsgType,
+func (t *CTrader) sendTickPage(req *pendingRequest) error {
+	p := req.Meta.tickPaging
+	_, err := t.send(common.REQ_TICK_DATA, common.TickDataMsgType,
 		&gen_messages.ProtoOAGetTickDataReq{
-			CtidTraderAccountId: ctid,
-			SymbolId:            &symbolId,
-			Type:                &quoteType,
-			FromTimestamp:       payload.FromTimestamp,
-			ToTimestamp:         payload.ToTimestamp,
+			CtidTraderAccountId: p.ctid,
+			SymbolId:            &p.symbolId,
+			Type:                &p.quoteType,
+			FromTimestamp:       &p.from,
+			ToTimestamp:         &p.to,
 		}, req)
 	if err != nil {
 		return fmt.Errorf("failed to send tick data request: %w", err)
@@ -1371,8 +1416,48 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, clientMsgId strin
 	}
 
 	if res.SymbolId == nil || res.CtidTraderAccountId == nil {
-		return fmt.Errorf("trend bars response missing symbol_id or ctid")
+		err := fmt.Errorf("trend bars response missing symbol_id or ctid")
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+		return err
 	}
+
+	p := req.Meta.trendbarspaging
+	p.bars = append(p.bars, res.Trendbar...)
+
+	if res.GetHasMore() && len(res.Trendbar) > 0 {
+		oldestMs := int64(res.Trendbar[0].GetUtcTimestampInMinutes()) * 60_000
+		for _, b := range res.Trendbar {
+			if ms := int64(b.GetUtcTimestampInMinutes()) * 60_000; ms < oldestMs {
+				oldestMs = ms
+			}
+		}
+		next := oldestMs - 1
+		if next >= p.from && next < p.to {
+			if err := req.Ctx.Err(); err != nil {
+				go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+				return nil
+			}
+			p.to = next
+			_, err := t.send(common.REQ_TREND_BARS, common.TrendBarsMsyType,
+				&gen_messages.ProtoOAGetTrendbarsReq{
+					CtidTraderAccountId: p.ctid,
+					Period:              &p.period,
+					SymbolId:            &p.symbolId,
+					FromTimestamp:       &p.from,
+					ToTimestamp:         &p.to,
+				}, req)
+			if err != nil {
+				go t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
+			}
+			return nil
+		}
+	}
+
+	sort.Slice(p.bars, func(i, j int) bool {
+		return p.bars[i].GetUtcTimestampInMinutes() < p.bars[j].GetUtcTimestampInMinutes()
+	})
+	p.bars = dedupeBars(p.bars)
+	res.Trendbar = p.bars
 
 	go func() {
 		if err := t.sendTrendBars(req, &res); err != nil {
@@ -1380,8 +1465,23 @@ func (t *CTrader) handleTrendBarsResponse(ctx context.Context, clientMsgId strin
 			t.sendFailure(req.Ctx, acount_connect_messages.TypeOHLCHistory, err)
 		}
 	}()
-
 	return nil
+}
+
+// dedupeBars removes bars with a duplicate UtcTimestampInMinutes.
+// The input must already be sorted ascending by timestamp.
+func dedupeBars(bars []*gen_messages.ProtoOATrendbar) []*gen_messages.ProtoOATrendbar {
+	if len(bars) < 2 {
+		return bars
+	}
+
+	out := bars[:1]
+	for _, b := range bars[1:] {
+		if b.GetUtcTimestampInMinutes() != out[len(out)-1].GetUtcTimestampInMinutes() {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGetTrendbarsRes) error {
@@ -1631,53 +1731,103 @@ func (t *CTrader) handleTickDataResponse(ctx context.Context, clientMsgId string
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal tick data: %w", err)
 	}
-
 	req, ok := t.reqs.Take(clientMsgId)
-
 	if !ok {
 		return fmt.Errorf("failed to find pending request for key: %s", clientMsgId)
 	}
+	p := req.Meta.tickPaging
+	if p == nil {
+		err := fmt.Errorf("tick data response without paging state")
+		go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+		return err
+	}
 
+	page := decodeTickPage(&r)
+	p.ticks = append(p.ticks, page...)
+	p.pages++
+
+	if r.GetHasMore() && len(page) > 0 {
+		oldest := page[len(page)-1].ts
+		for _, tk := range page {
+			if tk.ts < oldest {
+				oldest = tk.ts
+			}
+		}
+		if oldest > p.from {
+			if p.pages >= maxCtraderTickages {
+				p.truncated = true
+			} else if err := req.Ctx.Err(); err != nil {
+				go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+				return nil
+			} else {
+				if oldest < p.to {
+					n := len(p.ticks)
+					for n > 0 && p.ticks[n-1].ts >= oldest {
+						n--
+					}
+					p.ticks = p.ticks[:n]
+					p.to = oldest
+				} else {
+					p.to = oldest - 1
+				}
+				if err := t.sendTickPage(req); err != nil {
+					go t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
+				}
+				return nil
+			}
+		}
+	}
+
+	out := p.ticks[:0]
+	for _, tk := range p.ticks {
+		if tk.ts >= p.from {
+			out = append(out, tk)
+		}
+	}
 	go func() {
-		if err := t.sendTickHistory(req, &r); err != nil {
+		if err := t.sendTickHistory(req, out, p.truncated); err != nil {
 			log.Printf("tick history for symbol %d failed: %v", req.Meta.symbolId, err)
 			t.sendFailure(req.Ctx, acount_connect_messages.TypeTicksHistory, err)
 		}
 	}()
-
 	return nil
 }
 
-func (t *CTrader) sendTickHistory(req *pendingRequest, r *gen_messages.ProtoOAGetTickDataRes) error {
+// decodeTickPage undoes cTrader's delta encoding for ONE page.
+func decodeTickPage(r *gen_messages.ProtoOAGetTickDataRes) []rawTick {
+	out := make([]rawTick, 0, len(r.TickData))
+	var ts, px int64
+	first := true
+	for _, td := range r.TickData {
+		if td.Timestamp == nil || td.Tick == nil {
+			continue
+		}
+		if first {
+			ts, px, first = *td.Timestamp, *td.Tick, false
+		} else {
+			ts += *td.Timestamp
+			px += *td.Tick
+		}
+		out = append(out, rawTick{ts, px})
+	}
+	return out
+}
+
+func (t *CTrader) sendTickHistory(req *pendingRequest, raw []rawTick, hasMore bool) error {
 	digits, err := t.getSymbolDigits(req.Ctx, req.Meta.ctid, req.Meta.symbolId)
 	if err != nil {
 		return fmt.Errorf("failed to fetch symbol digits: %w", err)
 	}
-	roundFactor := math.Pow(10, float64(digits))
-	round := func(v float64) float64 { return math.Round(v*roundFactor) / roundFactor }
-
-	ticks := make([]acount_connect_messages.AccountConnectTick, 0, len(r.TickData))
-	var lastTimestamp, lastPrice int64
-	for i, td := range r.TickData {
-		if td.Timestamp == nil || td.Tick == nil {
-			continue
-		}
-		if i == 0 {
-			lastTimestamp, lastPrice = *td.Timestamp, *td.Tick
-		} else {
-			lastTimestamp += *td.Timestamp
-			lastPrice += *td.Tick
-		}
+	f := math.Pow(10, float64(digits))
+	ticks := make([]acount_connect_messages.AccountConnectTick, 0, len(raw))
+	for _, tk := range raw {
 		ticks = append(ticks, acount_connect_messages.AccountConnectTick{
-			Timestamp: lastTimestamp,
-			Price:     round(float64(lastPrice) / ctraderPriceScale),
+			Timestamp: tk.ts,
+			Price:     math.Round(float64(tk.px)/ctraderPriceScale*f) / f,
 		})
 	}
-
 	resB, err := json.Marshal(acount_connect_messages.AccountConnectTickDataRes{
-		Ticks:   ticks,
-		HasMore: r.GetHasMore(),
-		Symbol:  req.Meta.symbolId,
+		Ticks: ticks, HasMore: hasMore, Symbol: req.Meta.symbolId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode tick data: %w", err)
