@@ -504,6 +504,17 @@ func QuoteTypeStrToProto(quoteType string) (pb.ProtoOAQuoteType, error) {
 	}
 }
 
+func QuoteTypeProtoToStr(quoteType pb.ProtoOAQuoteType) (string, error) {
+	switch quoteType {
+	case pb.ProtoOAQuoteType_BID:
+		return "bid", nil
+	case pb.ProtoOAQuoteType_ASK:
+		return "ask", nil
+	default:
+		return "", fmt.Errorf("unknown cTrader quote type: %s", quoteType)
+	}
+}
+
 func BinanceAggTradesToTicks(trades []*binance.AggTrade) []messages.AccountConnectTick {
 	ticks := make([]messages.AccountConnectTick, 0, len(trades))
 	for _, t := range trades {
