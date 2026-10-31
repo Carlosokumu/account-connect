@@ -1531,12 +1531,12 @@ func (t *CTrader) sendTrendBars(req *pendingRequest, res *gen_messages.ProtoOAGe
 	mapped := make([]acount_connect_messages.AccountConnectTrendBar, 0, len(trendBars))
 	for _, bar := range trendBars {
 		mapped = append(mapped, acount_connect_messages.AccountConnectTrendBar{
-			High:                  round(bar.High / ctraderPriceScale),
-			Low:                   round(bar.Low / ctraderPriceScale),
-			Close:                 round(bar.Close / ctraderPriceScale),
-			Open:                  round(bar.Open / ctraderPriceScale),
-			Volume:                bar.Volume,
-			UtcTimestampInMinutes: bar.UtcTimestampInMinutes,
+			High:                      round(bar.High / ctraderPriceScale),
+			Low:                       round(bar.Low / ctraderPriceScale),
+			Close:                     round(bar.Close / ctraderPriceScale),
+			Open:                      round(bar.Open / ctraderPriceScale),
+			Volume:                    bar.Volume,
+			UtcTimestampInNanoSeconds: bar.UtcTimestampInNanoSeconds,
 		})
 	}
 
@@ -1912,7 +1912,7 @@ func (t *CTrader) sendTickHistory(req *pendingRequest, raw []rawTick, hasMore bo
 	ticks := make([]acount_connect_messages.CtraderAccountConnectTick, 0, len(raw))
 	for _, tk := range raw {
 		ticks = append(ticks, acount_connect_messages.CtraderAccountConnectTick{
-			Timestamp: tk.ts,
+			Timestamp: mappers.MillisecondsToNanoseconds(tk.ts),
 			Price:     math.Round(float64(tk.px)/ctraderPriceScale*f) / f,
 		})
 	}
@@ -1989,7 +1989,7 @@ func (t *CTrader) handleSpotEvent(ctx context.Context, clientMsgId string, paylo
 			tick := acount_connect_messages.AccountConnectTickStreamMsg{
 				SymbolId:  *ev.SymbolId,
 				Price:     bid,
-				Timestamp: time.Now().UnixMilli(),
+				Timestamp: time.Now().UnixNano(),
 				Bid:       bid,
 				Ask:       ask,
 			}
@@ -2074,26 +2074,6 @@ func (t *CTrader) callReqTimeout(ctx context.Context, timeout time.Duration, pre
 	return payload, nil
 }
 
-// func (t *CTrader) callReq(ctx context.Context, prefix string, payloadType uint32, msg proto.Message, req *pendingRequest) ([]byte, error) {
-// 	key, err := t.send(prefix, payloadType, msg, req)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	waitCtx, cancel := context.WithTimeout(ctx, ctraderCallTimeout)
-// 	defer cancel()
-
-// 	payload, err := t.reqs.Await(waitCtx, key, req)
-// 	if err != nil {
-// 		t.reqs.Take(key) // no-op if the handler already took it
-// 		if waitCtx.Err() == context.DeadlineExceeded {
-// 			return nil, fmt.Errorf("ctrader did not answer within %s", ctraderCallTimeout)
-// 		}
-// 		return nil, err
-// 	}
-// 	return payload, nil
-// }
-
 // candleBuilder holds the per-(symbol, period) state needed to convert cTrader's live
 // ProtoOATrendbar pushes into AccountConnectCandlestickBar messages and relay them onto
 // the client's output stream. cTrader does the OHLC aggregation server-side; this type
@@ -2169,17 +2149,17 @@ func (cb *candleBuilder) onTrendbar(tb *gen_messages.ProtoOATrendbar) {
 	ts := int64(*tb.UtcTimestampInMinutes) * 60
 
 	newBar := acount_connect_messages.AccountConnectCandlestickBar{
-		OpenTime:  ts,
+		OpenTime:  mappers.SecondsToNanoseconds(ts),
 		Open:      open,
 		High:      high,
 		Low:       low,
 		Close:     close,
 		Volume:    float64(volume),
-		CloseTime: ts + cb.periodSeconds,
+		CloseTime: mappers.SecondsToNanoseconds(ts + cb.periodSeconds),
 		IsFinal:   false,
 	}
 
-	if cb.hasSeenBar && cb.lastBar.OpenTime != ts {
+	if cb.hasSeenBar && cb.lastBar.OpenTime != mappers.SecondsToNanoseconds(ts) {
 		finalBar := cb.lastBar
 		finalBar.IsFinal = true
 		cb.emitBar(finalBar)

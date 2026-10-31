@@ -289,12 +289,12 @@ func (a *AlpacaAdapter) GetSymbolTrendBars(ctx context.Context, payload messages
 		}
 		for _, b := range bars {
 			trendBars = append(trendBars, messages.AccountConnectTrendBar{
-				Open:                  b.Open,
-				High:                  b.High,
-				Low:                   b.Low,
-				Close:                 b.Close,
-				Volume:                int64(b.Volume),
-				UtcTimestampInMinutes: uint32(b.Timestamp.Unix() / 60),
+				Open:                      b.Open,
+				High:                      b.High,
+				Low:                       b.Low,
+				Close:                     b.Close,
+				Volume:                    int64(b.Volume),
+				UtcTimestampInNanoSeconds: b.Timestamp.UnixNano(),
 			})
 		}
 	} else {
@@ -308,12 +308,12 @@ func (a *AlpacaAdapter) GetSymbolTrendBars(ctx context.Context, payload messages
 		}
 		for _, b := range bars {
 			trendBars = append(trendBars, messages.AccountConnectTrendBar{
-				Open:                  b.Open,
-				High:                  b.High,
-				Low:                   b.Low,
-				Close:                 b.Close,
-				Volume:                int64(b.Volume),
-				UtcTimestampInMinutes: uint32(b.Timestamp.Unix() / 60),
+				Open:                      b.Open,
+				High:                      b.High,
+				Low:                       b.Low,
+				Close:                     b.Close,
+				Volume:                    int64(b.Volume),
+				UtcTimestampInNanoSeconds: b.Timestamp.UnixNano(),
 			})
 		}
 	}
@@ -477,14 +477,14 @@ func (a *AlpacaAdapter) subscribeStockBars(ctx context.Context, symbol string, s
 
 	handler := func(b stream.Bar) {
 		bar := messages.AccountConnectCandlestickBar{
-			OpenTime:  b.Timestamp.Unix(),
+			OpenTime:  b.Timestamp.UnixNano(),
 			Open:      b.Open,
 			High:      b.High,
 			Low:       b.Low,
 			Close:     b.Close,
 			Volume:    float64(b.Volume),
-			CloseTime: b.Timestamp.Unix() + 60, // Alpaca bars are always 1-minute
-			IsFinal:   true,                    // Alpaca only pushes completed bars, no in-progress updates
+			CloseTime: b.Timestamp.Add(time.Minute).UnixNano(), // Alpaca bars are always 1-minute
+			IsFinal:   true,                                    // Alpaca only pushes completed bars, no in-progress updates
 		}
 		barRes := messages.AccountConnectCandlestickBarRes{
 			Bars:     []messages.AccountConnectCandlestickBar{bar},
@@ -526,13 +526,13 @@ func (a *AlpacaAdapter) subscribeCryptoBars(ctx context.Context, symbol string, 
 
 	handler := func(b stream.CryptoBar) {
 		bar := messages.AccountConnectCandlestickBar{
-			OpenTime:  b.Timestamp.Unix(),
+			OpenTime:  b.Timestamp.UnixNano(),
 			Open:      b.Open,
 			High:      b.High,
 			Low:       b.Low,
 			Close:     b.Close,
 			Volume:    b.Volume,
-			CloseTime: b.Timestamp.Unix() + 60,
+			CloseTime: b.Timestamp.Add(time.Minute).UnixNano(),
 			IsFinal:   true,
 		}
 		barRes := messages.AccountConnectCandlestickBarRes{
@@ -779,7 +779,7 @@ func (a *AlpacaAdapter) GetOrderBookDepth(ctx context.Context, payload messages.
 	res := messages.AccountConnectDepthRes{
 		Bids:         bids,
 		Asks:         asks,
-		LastUpdateId: book.Timestamp.UnixMilli(),
+		LastUpdateId: book.Timestamp.UnixNano(),
 		SymbolName:   ap.SymbolName,
 	}
 	resB, err := json.Marshal(res)
@@ -1116,7 +1116,7 @@ func (a *AlpacaAdapter) handleCryptoOrderbook(o stream.CryptoOrderbook) {
 	res := messages.AccountConnectDepthRes{
 		Bids:         toAlpacaDepthLevels(bids),
 		Asks:         toAlpacaDepthLevels(asks),
-		LastUpdateId: o.Timestamp.UnixMilli(),
+		LastUpdateId: o.Timestamp.UnixNano(),
 		SymbolName:   o.Symbol,
 	}
 	resB, err := json.Marshal(res)
@@ -1155,7 +1155,7 @@ func (a *AlpacaAdapter) sendTick(symbol string, price, qty float64, ts time.Time
 		SymbolName: symbol,
 		Price:      price,
 		Quantity:   qty,
-		Timestamp:  ts.UnixMilli(),
+		Timestamp:  ts.UnixNano(),
 	}
 	tickB, err := json.Marshal(tick)
 	if err != nil {

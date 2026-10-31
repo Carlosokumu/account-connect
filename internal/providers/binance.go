@@ -740,7 +740,7 @@ func (b *BinanceConnection) StartTickStream(ctx context.Context, symbolName stri
 					SymbolName: event.Symbol,
 					Price:      parseFloat(event.Price),
 					Quantity:   parseFloat(event.Quantity),
-					Timestamp:  event.TradeTime,
+					Timestamp:  mappers.MillisecondsToNanoseconds(event.TradeTime),
 				}
 				tickB, err := json.Marshal(tick)
 				if err != nil {
@@ -1568,13 +1568,13 @@ func (b *BinanceAdapter) StartCandlestickStream(ctx context.Context, payload mes
 					continue
 				}
 				bar := messages.AccountConnectCandlestickBar{
-					OpenTime:  event.Kline.StartTime,
+					OpenTime:  mappers.MillisecondsToNanoseconds(event.Kline.StartTime),
 					Open:      parseFloat(event.Kline.Open),
 					High:      parseFloat(event.Kline.High),
 					Low:       parseFloat(event.Kline.Low),
 					Close:     parseFloat(event.Kline.Close),
 					Volume:    parseFloat(event.Kline.Volume),
-					CloseTime: event.Kline.EndTime,
+					CloseTime: mappers.MillisecondsToNanoseconds(event.Kline.EndTime),
 					IsFinal:   event.Kline.IsFinal,
 				}
 				barRes := messages.AccountConnectCandlestickBarRes{
@@ -1767,7 +1767,7 @@ func (b *BinanceAdapter) SubscribeDepth(ctx context.Context, payload messages.Ac
 
 	go func() {
 		for depthB := range stream {
-			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthSubscribe, messages.Binance, b.AccountConnClient.ID, depthB)
+			msg := messageutils.CreateSuccessResponse(ctx, messages.TypeDepthUpdate, messages.Binance, b.AccountConnClient.ID, depthB)
 			msgB, err := json.Marshal(msg)
 			if err != nil {
 				log.Printf("Failed to marshal depth stream message: %v", err)
