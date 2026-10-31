@@ -238,6 +238,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 	if cfg.ApiKey == "" || cfg.SecretKey == "" {
 		return nil, fmt.Errorf("binance api key and secret key are required or specify environment to connect to")
 	}
+	log.Printf("Connecting to Binance with API Key: %s, Paper Trading: %v", cfg.ApiKey, cfg.Paper)
 
 	binance.UseDemo = cfg.Paper
 	futures.UseDemo = cfg.Paper
@@ -265,6 +266,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 
 		spotAcct, err := spotClient.NewGetAccountService().Do(ctx)
 		if err != nil {
+			log.Printf("Failed to authenticate binance spot account: %v", err)
 			record(messages.BinanceAccountTypeSpot, 0, fmt.Errorf("failed to authenticate binance spot account: %w", err))
 		} else {
 			id := newAccountID(&spotAcct.UID)
@@ -280,6 +282,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 		// Margin reuses the spot client, but gets its own account ID.
 		marginAcct, err := spotClient.NewGetMarginAccountService().Do(ctx)
 		if err != nil {
+			log.Printf("Failed to authenticate binance margin account: %v", err)
 			record(messages.BinanceAccountTypeMargin, 0, fmt.Errorf("failed to authenticate binance margin account: %w", err))
 		} else {
 			id := newAccountID(&spotAcct.UID)
@@ -318,6 +321,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 		client := delivery.NewClient(cfg.ApiKey, cfg.SecretKey)
 		deliveryAcct, err := client.NewGetAccountService().Do(ctx)
 		if err != nil {
+			log.Printf("Failed to authenticate binance delivery account: %v", err)
 			record(messages.BinanceAccountTypeDelivery, 0, fmt.Errorf("failed to authenticate binance delivery account: %w", err))
 			return
 		}
