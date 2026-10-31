@@ -16,6 +16,21 @@ import (
 	"github.com/alpacahq/alpaca-trade-api-go/v3/marketdata"
 )
 
+// MillisecondsToNanoseconds converts an epoch timestamp from milliseconds to nanoseconds.
+func MillisecondsToNanoseconds(timestamp int64) int64 {
+	return timestamp * int64(time.Millisecond)
+}
+
+// MinutesToNanoseconds converts an epoch timestamp from minutes to nanoseconds.
+func MinutesToNanoseconds(timestamp int64) int64 {
+	return timestamp * int64(time.Minute)
+}
+
+// SecondsToNanoseconds converts an epoch timestamp from seconds to nanoseconds.
+func SecondsToNanoseconds(timestamp int64) int64 {
+	return timestamp * int64(time.Second)
+}
+
 // ProtoOADealToAccountConnectDeal converts a list of ProtoOADeal messages from a ProtoOADealListRes
 // into a slice of AccountConnectDeal domain objects used by the application.
 // It maps relevant fields such as execution price, commission, direction, and symbol.
@@ -24,10 +39,15 @@ func ProtoOADealToAccountConnectDeal(r *pb.ProtoOADealListRes) []messages.Accoun
 
 	for _, deal := range r.Deal {
 		if deal.ClosePositionDetail != nil {
+			var entryTime *int64
+			if deal.ExecutionTimestamp != nil {
+				timestamp := MillisecondsToNanoseconds(*deal.ExecutionTimestamp)
+				entryTime = &timestamp
+			}
 			vdeal := messages.AccountConnectDeal{
 				ExecutionPrice: deal.ExecutionPrice,
 				Commission:     deal.Commission,
-				EntryTime:      deal.ExecutionTimestamp,
+				EntryTime:      entryTime,
 				Lots:           deal.Volume,
 				Symbol:         deal.SymbolId,
 				DealId:         deal.DealId,
@@ -102,7 +122,7 @@ func ProtoOATraderToaccountConnectTrader(r *pb.ProtoOATraderRes) messages.Accoun
 		info.TraderLogin = *t.TraderLogin
 	}
 	if t.RegistrationTimestamp != nil {
-		info.RegistrationTimestamp = *t.RegistrationTimestamp
+		info.RegistrationTimestamp = MillisecondsToNanoseconds(*t.RegistrationTimestamp)
 	}
 	if t.AccountType != nil {
 		info.AccountType = t.AccountType.String() // enum's generated String() method
@@ -145,12 +165,12 @@ func ProotoOAToTrendBars(r *pb.ProtoOAGetTrendbarsRes) []messages.AccountConnect
 		}
 
 		tBar := messages.AccountConnectTrendBar{
-			Low:                   low,
-			High:                  low + float64(deltaHigh),
-			Open:                  low + float64(deltaOpen),
-			Close:                 low + float64(deltaClose),
-			UtcTimestampInMinutes: *trendBar.UtcTimestampInMinutes,
-			Volume:                volume,
+			Low:                       low,
+			High:                      low + float64(deltaHigh),
+			Open:                      low + float64(deltaOpen),
+			Close:                     low + float64(deltaClose),
+			UtcTimestampInNanoSeconds: MinutesToNanoseconds(int64(*trendBar.UtcTimestampInMinutes)),
+			Volume:                    volume,
 		}
 		trendBars = append(trendBars, tBar)
 	}
@@ -284,15 +304,13 @@ func BinanceKlineDataToAccountConnectTrendBar(ohlc []*binance.Kline) ([]messages
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Volume: %v", err)
 		}
-		openTimeMinutes := kline.OpenTime / (1000 * 60)
-
 		acctrendbars = append(acctrendbars, messages.AccountConnectTrendBar{
-			High:                  high,
-			Low:                   low,
-			Close:                 close,
-			UtcTimestampInMinutes: uint32(openTimeMinutes),
-			Open:                  open,
-			Volume:                int64(volume),
+			High:                      high,
+			Low:                       low,
+			Close:                     close,
+			UtcTimestampInNanoSeconds: MillisecondsToNanoseconds(kline.OpenTime),
+			Open:                      open,
+			Volume:                    int64(volume),
 		})
 	}
 
@@ -448,7 +466,7 @@ func BinanceTradeToAccountConnectDeal(t *binance.TradeV3, symbol string) message
 		Quantity:        qty,
 		Commission:      commission,
 		CommissionAsset: t.CommissionAsset,
-		Time:            t.Time,
+		Time:            MillisecondsToNanoseconds(t.Time),
 		IsBuyer:         t.IsBuyer,
 		IsMaker:         t.IsMaker,
 	}
@@ -467,7 +485,7 @@ func BinanceFuturesTradeToAccountConnectDeal(t *futures.AccountTrade) messages.B
 		Quantity:        qty,
 		Commission:      commission,
 		CommissionAsset: t.CommissionAsset,
-		Time:            t.Time,
+		Time:            MillisecondsToNanoseconds(t.Time),
 		IsBuyer:         t.Buyer,
 		IsMaker:         t.Maker,
 		RealizedPnl:     pnl,
@@ -521,7 +539,7 @@ func BinanceAggTradesToTicks(trades []*binance.AggTrade) []messages.AccountConne
 		price := parseFloat(t.Price)
 		qty := parseFloat(t.Quantity)
 		ticks = append(ticks, messages.AccountConnectTick{
-			Timestamp:        t.Timestamp,
+			Timestamp:        MillisecondsToNanoseconds(t.Timestamp),
 			Price:            price,
 			Quantity:         qty,
 			QuoteQty:         price * qty,
@@ -538,7 +556,7 @@ func BinanceFuturesAggTradesToTicks(trades []*futures.AggTrade) []messages.Accou
 		price := parseFloat(t.Price)
 		qty := parseFloat(t.Quantity)
 		ticks = append(ticks, messages.AccountConnectTick{
-			Timestamp:    t.Timestamp,
+			Timestamp:    MillisecondsToNanoseconds(t.Timestamp),
 			Price:        price,
 			Quantity:     qty,
 			QuoteQty:     price * qty,
@@ -606,7 +624,7 @@ func AlpacaTradesToTicks(trades []marketdata.Trade) []messages.AccountConnectTic
 	for _, t := range trades {
 		qty := float64(t.Size)
 		ticks = append(ticks, messages.AccountConnectTick{
-			Timestamp: t.Timestamp.UnixMilli(),
+			Timestamp: t.Timestamp.UnixNano(),
 			Price:     t.Price,
 			Quantity:  qty,
 			QuoteQty:  t.Price * qty,
@@ -619,7 +637,7 @@ func AlpacaCryptoTradesToTicks(trades []marketdata.CryptoTrade) []messages.Accou
 	ticks := make([]messages.AccountConnectTick, 0, len(trades))
 	for _, t := range trades {
 		ticks = append(ticks, messages.AccountConnectTick{
-			Timestamp:    t.Timestamp.UnixMilli(),
+			Timestamp:    t.Timestamp.UnixNano(),
 			Price:        t.Price,
 			Quantity:     t.Size,
 			QuoteQty:     t.Price * t.Size,
