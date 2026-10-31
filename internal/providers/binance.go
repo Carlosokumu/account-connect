@@ -238,7 +238,6 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 	if cfg.ApiKey == "" || cfg.SecretKey == "" {
 		return nil, fmt.Errorf("binance api key and secret key are required or specify environment to connect to")
 	}
-	log.Printf("Connecting to Binance with API Key: %s, Paper Trading: %v", cfg.ApiKey, cfg.Paper)
 
 	binance.UseDemo = cfg.Paper
 	futures.UseDemo = cfg.Paper
@@ -256,6 +255,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 			result.Errors[t] = err
 			return
 		}
+		log.Printf("Successfully authenticated Binance account type: %s, assigned account ID: %v", t, id)
 		result.Accounts[t] = id
 	}
 
@@ -285,7 +285,7 @@ func (b *BinanceConnection) Connect(ctx context.Context, registry *AccountRegist
 			log.Printf("Failed to authenticate binance margin account: %v", err)
 			record(messages.BinanceAccountTypeMargin, 0, fmt.Errorf("failed to authenticate binance margin account: %w", err))
 		} else {
-			id := newAccountID(&spotAcct.UID)
+			id := newAccountID(nil)
 			registry.put(&Naccount{
 				id:          id,
 				accountType: messages.BinanceAccountTypeMargin,
