@@ -279,12 +279,12 @@ type AccountConnectTradingAccountRes struct {
 
 // AccountConnectTrendBar  is model message providing the  OHLC values
 type AccountConnectTrendBar struct {
-	High                  float64 `json:"high"`
-	Open                  float64 `json:"open"`
-	Close                 float64 `json:"close"`
-	Low                   float64 `json:"low"`
-	UtcTimestampInMinutes uint32  `json:"utcTimeStampInMinutes"`
-	Volume                int64   `json:"volume"`
+	High                      float64 `json:"high"`
+	Open                      float64 `json:"open"`
+	Close                     float64 `json:"close"`
+	Low                       float64 `json:"low"`
+	UtcTimestampInNanoSeconds int64   `json:"utcTimeStampInNanoSeconds"`
+	Volume                    int64   `json:"volume"`
 }
 
 // AccountConnectTrendBar  is  wrapper model message for the [AccountConnectTrendBar] containing additional metadata.
