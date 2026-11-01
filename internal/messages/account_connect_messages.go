@@ -35,9 +35,10 @@ const (
 
 const (
 	// session
-	TypeConnect    MessageType = "session.connect"
-	TypeDisconnect MessageType = "session.disconnect"
-	TypeError      MessageType = "error"
+	TypeConnect            MessageType = "session.connect"
+	TypeDisconnect         MessageType = "session.disconnect"
+	TypeError              MessageType = "error"
+	TypeProviderConnection MessageType = "provider.connection"
 
 	// account
 	TypeAccountAuthorize MessageType = "account.authorize"
@@ -92,6 +93,13 @@ type AccountConnectMsgRes struct {
 	TradeShareClientId        string          `json:"tradeshare_client_id"`
 	RequestId                 string          `json:"request_id"`
 	Payload                   json.RawMessage `json:"payload"`
+}
+
+type ProviderConnectionStatus struct {
+	State        string `json:"state"`
+	StreamID     string `json:"stream_id,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	RetryAfterMs int64  `json:"retry_after_ms,omitempty"`
 }
 
 // CTraderConnectPayload  is payload structure defining fields  required to establish a ctrader connection.
