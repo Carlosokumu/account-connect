@@ -464,15 +464,8 @@ func (a *AlpacaAdapter) subscribeStockBars(ctx context.Context, symbol string, s
 	a.streamMu.Lock()
 	defer a.streamMu.Unlock()
 
-	if a.stocksStreamClient == nil {
-		streamCtx, cancel := context.WithCancel(context.Background())
-		client := stream.NewStocksClient("iex", stream.WithCredentials(a.apiKey, a.secretKey))
-		if err := client.Connect(streamCtx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to connect alpaca stocks stream: %w", err)
-		}
-		a.stocksStreamClient = client
-		a.stocksStreamCancel = cancel
+	if err := a.ensureStocksStreamClient(); err != nil {
+		return err
 	}
 
 	handler := func(b stream.Bar) {
@@ -513,15 +506,8 @@ func (a *AlpacaAdapter) subscribeCryptoBars(ctx context.Context, symbol string, 
 	a.streamMu.Lock()
 	defer a.streamMu.Unlock()
 
-	if a.cryptoStreamClient == nil {
-		streamCtx, cancel := context.WithCancel(context.Background())
-		client := stream.NewCryptoClient("us", stream.WithCredentials(a.apiKey, a.secretKey))
-		if err := client.Connect(streamCtx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to connect alpaca crypto stream: %w", err)
-		}
-		a.cryptoStreamClient = client
-		a.cryptoStreamCancel = cancel
+	if err := a.ensureCryptoStreamClient(); err != nil {
+		return err
 	}
 
 	handler := func(b stream.CryptoBar) {
@@ -1176,13 +1162,18 @@ func (a *AlpacaAdapter) ensureCryptoStreamClient() error {
 		return nil
 	}
 	streamCtx, cancel := context.WithCancel(context.Background())
-	client := stream.NewCryptoClient("us", stream.WithCredentials(a.apiKey, a.secretKey))
+	options := []stream.CryptoOption{stream.WithCredentials(a.apiKey, a.secretKey)}
+	for _, option := range a.streamLifecycleOptions(streamCtx, "alpaca.crypto") {
+		options = append(options, option)
+	}
+	client := stream.NewCryptoClient("us", options...)
 	if err := client.Connect(streamCtx); err != nil {
 		cancel()
 		return fmt.Errorf("failed to connect alpaca crypto stream: %w", err)
 	}
 	a.cryptoStreamClient = client
 	a.cryptoStreamCancel = cancel
+	a.watchStreamTermination(streamCtx, "alpaca.crypto", client.Terminated())
 	return nil
 }
 
@@ -1193,14 +1184,62 @@ func (a *AlpacaAdapter) ensureStocksStreamClient() error {
 		return nil
 	}
 	streamCtx, cancel := context.WithCancel(context.Background())
-	client := stream.NewStocksClient("iex", stream.WithCredentials(a.apiKey, a.secretKey))
+	options := []stream.StockOption{stream.WithCredentials(a.apiKey, a.secretKey)}
+	for _, option := range a.streamLifecycleOptions(streamCtx, "alpaca.stocks") {
+		options = append(options, option)
+	}
+	client := stream.NewStocksClient("iex", options...)
 	if err := client.Connect(streamCtx); err != nil {
 		cancel()
 		return fmt.Errorf("failed to connect alpaca stocks stream: %w", err)
 	}
 	a.stocksStreamClient = client
 	a.stocksStreamCancel = cancel
+	a.watchStreamTermination(streamCtx, "alpaca.stocks", client.Terminated())
 	return nil
+}
+
+func (a *AlpacaAdapter) streamLifecycleOptions(ctx context.Context, streamID string) []stream.Option {
+	var mu sync.Mutex
+	reconnecting := false
+
+	return []stream.Option{
+		stream.WithReconnectSettings(0, time.Second),
+		stream.WithDisconnectCallback(func() {
+			if ctx.Err() != nil {
+				return
+			}
+			mu.Lock()
+			reconnecting = true
+			mu.Unlock()
+			notifyProviderConnection(ctx, a.AccountConnClient, messages.Alpaca, streamID,
+				"reconnecting", "upstream stream disconnected", 0)
+		}),
+		stream.WithConnectCallback(func() {
+			mu.Lock()
+			recovered := reconnecting
+			reconnecting = false
+			mu.Unlock()
+			if recovered {
+				notifyProviderConnection(ctx, a.AccountConnClient, messages.Alpaca, streamID,
+					"connected", "", 0)
+			}
+		}),
+	}
+}
+
+func (a *AlpacaAdapter) watchStreamTermination(ctx context.Context, streamID string, terminated <-chan error) {
+	go func() {
+		err, ok := <-terminated
+		if ctx.Err() != nil {
+			return
+		}
+		if !ok || err == nil {
+			err = fmt.Errorf("upstream stream terminated")
+		}
+		notifyProviderConnection(ctx, a.AccountConnClient, messages.Alpaca, streamID,
+			"failed", err.Error(), 0)
+	}()
 }
 
 func toAlpacaDepthLevels(in []alpacaBookLevel) []messages.AccountConnectDepthLevel {

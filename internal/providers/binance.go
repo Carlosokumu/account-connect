@@ -502,85 +502,35 @@ func (b *BinanceConnection) StartDepthStream(ctx context.Context, accountType me
 
 	symbol := strings.ToLower(symbolName)
 	streamKey := fmt.Sprintf("depth_%s_%d", symbol, limit)
-
-	b.wsServeMux.Lock()
-	doneChan := make(chan struct{})
-	b.doneChans[streamKey] = doneChan
-	b.wsServeMux.Unlock()
-
 	wsURL := url.URL{
 		Scheme: "wss",
 		Host:   host,
 		Path:   fmt.Sprintf("/ws/%s@depth%d", symbol, limit),
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
-	if err != nil {
-		b.wsServeMux.Lock()
-		delete(b.doneChans, streamKey)
-		b.wsServeMux.Unlock()
-		close(doneChan)
-		return fmt.Errorf("failed to connect depth stream WebSocket: %w", err)
-	}
-
-	go func() {
-		defer conn.Close()
-		cleanup := func() {
-			b.wsServeMux.Lock()
-			delete(b.doneChans, streamKey)
-			b.wsServeMux.Unlock()
-			close(doneChan)
+	return b.maintainWebSocketStream(ctx, streamKey, wsURL.String(), messages.Binance, func(msg []byte) {
+		var event BinanceDepthStreamEvent
+		if err := json.Unmarshal(msg, &event); err != nil {
+			log.Printf("Failed to unmarshal depth event for %s, skipping frame: %v", streamKey, err)
+			return
 		}
-
-		for {
-			msgChan := make(chan []byte)
-			errChan := make(chan error)
-			go func() {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					errChan <- err
-					return
-				}
-				msgChan <- msg
-			}()
-
-			select {
-			case <-ctx.Done():
-				log.Printf("Context cancelled for depth stream %s", streamKey)
-				cleanup()
-				return
-			case err := <-errChan:
-				log.Printf("Error in depth stream %s: %v", streamKey, err)
-				cleanup()
-				return
-			case msg := <-msgChan:
-				var event BinanceDepthStreamEvent
-				if err := json.Unmarshal(msg, &event); err != nil {
-					log.Printf("Failed to unmarshal depth event for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				depth := messages.AccountConnectDepthRes{
-					Bids:         parseDepthLevels(event.Bids),
-					Asks:         parseDepthLevels(event.Asks),
-					LastUpdateId: event.LastUpdateId,
-					SymbolName:   symbolName,
-				}
-				depthB, err := json.Marshal(depth)
-				if err != nil {
-					log.Printf("Failed to marshal depth for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				select {
-				case <-ctx.Done():
-					cleanup()
-					return
-				case strm <- depthB:
-				default:
-					log.Printf("Depth stream channel full for %s, dropping update", streamKey)
-				}
-			}
+		depth := messages.AccountConnectDepthRes{
+			Bids:         parseDepthLevels(event.Bids),
+			Asks:         parseDepthLevels(event.Asks),
+			LastUpdateId: event.LastUpdateId,
+			SymbolName:   symbolName,
 		}
-	}()
-	return nil
+		depthB, err := json.Marshal(depth)
+		if err != nil {
+			log.Printf("Failed to marshal depth for %s, skipping frame: %v", streamKey, err)
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case strm <- depthB:
+		default:
+			log.Printf("Depth stream channel full for %s, dropping update", streamKey)
+		}
+	})
 }
 
 func (b *BinanceConnection) StartBBOStream(ctx context.Context, accountType messages.BinanceAccountType, symbolName string, strm chan []byte) error {
@@ -600,83 +550,33 @@ func (b *BinanceConnection) StartBBOStream(ctx context.Context, accountType mess
 		return err
 	}
 
-	b.wsServeMux.Lock()
-	doneChan := make(chan struct{})
-	b.doneChans[streamKey] = doneChan
-	b.wsServeMux.Unlock()
-
 	wsURL := url.URL{Scheme: "wss", Host: host, Path: path}
-
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
-	if err != nil {
-		b.wsServeMux.Lock()
-		delete(b.doneChans, streamKey)
-		b.wsServeMux.Unlock()
-		close(doneChan)
-		return fmt.Errorf("failed to connect BBO stream WebSocket: %w", err)
-	}
-
-	go func() {
-		defer conn.Close()
-		cleanup := func() {
-			b.wsServeMux.Lock()
-			delete(b.doneChans, streamKey)
-			b.wsServeMux.Unlock()
-			close(doneChan)
+	return b.maintainWebSocketStream(ctx, streamKey, wsURL.String(), messages.Binance, func(msg []byte) {
+		var event BinanceBookTickerEvent
+		if err := json.Unmarshal(msg, &event); err != nil {
+			log.Printf("Failed to unmarshal BBO event for %s, skipping frame: %v", streamKey, err)
+			return
 		}
-
-		for {
-			msgChan := make(chan []byte)
-			errChan := make(chan error)
-			go func() {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					errChan <- err
-					return
-				}
-				msgChan <- msg
-			}()
-
-			select {
-			case <-ctx.Done():
-				log.Printf("Context cancelled for BBO stream %s", streamKey)
-				cleanup()
-				return
-			case err := <-errChan:
-				log.Printf("Error in BBO stream %s: %v", streamKey, err)
-				cleanup()
-				return
-			case msg := <-msgChan:
-				var event BinanceBookTickerEvent
-				if err := json.Unmarshal(msg, &event); err != nil {
-					log.Printf("Failed to unmarshal BBO event for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				bbo := messages.AccountConnectBBO{
-					SymbolName: event.Symbol,
-					BidPrice:   parseFloat(event.BidPrice),
-					BidQty:     parseFloat(event.BidQty),
-					AskPrice:   parseFloat(event.AskPrice),
-					AskQty:     parseFloat(event.AskQty),
-					UpdateId:   event.UpdateId,
-				}
-				bboB, err := json.Marshal(bbo)
-				if err != nil {
-					log.Printf("Failed to marshal BBO for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				select {
-				case <-ctx.Done():
-					cleanup()
-					return
-				case strm <- bboB:
-				default:
-					log.Printf("BBO stream channel full for %s, dropping update", streamKey)
-				}
-			}
+		bbo := messages.AccountConnectBBO{
+			SymbolName: event.Symbol,
+			BidPrice:   parseFloat(event.BidPrice),
+			BidQty:     parseFloat(event.BidQty),
+			AskPrice:   parseFloat(event.AskPrice),
+			AskQty:     parseFloat(event.AskQty),
+			UpdateId:   event.UpdateId,
 		}
-	}()
-	return nil
+		bboB, err := json.Marshal(bbo)
+		if err != nil {
+			log.Printf("Failed to marshal BBO for %s, skipping frame: %v", streamKey, err)
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case strm <- bboB:
+		default:
+			log.Printf("BBO stream channel full for %s, dropping update", streamKey)
+		}
+	})
 }
 
 // StartTickStream starts a real-time aggregate-trade stream for a symbol.
@@ -684,80 +584,121 @@ func (b *BinanceConnection) StartTickStream(ctx context.Context, symbolName stri
 	symbol := strings.ToLower(symbolName)
 	streamKey := "ticks_" + symbol
 
-	b.wsServeMux.Lock()
-	doneChan := make(chan struct{})
-	b.doneChans[streamKey] = doneChan
-	b.wsServeMux.Unlock()
-
 	wsURL := url.URL{
 		Scheme: "wss",
 		Host:   "stream.binance.com:443",
 		Path:   fmt.Sprintf("/ws/%s@aggTrade", symbol),
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
+	return b.maintainWebSocketStream(ctx, streamKey, wsURL.String(), messages.Binance, func(msg []byte) {
+		var event BinanceAggTradeStreamEvent
+		if err := json.Unmarshal(msg, &event); err != nil {
+			log.Printf("Failed to unmarshal aggTrade event for %s, skipping frame: %v", streamKey, err)
+			return
+		}
+		tick := messages.AccountConnectTickStreamMsg{
+			SymbolName: event.Symbol,
+			Price:      parseFloat(event.Price),
+			Quantity:   parseFloat(event.Quantity),
+			Timestamp:  mappers.MillisecondsToNanoseconds(event.TradeTime),
+		}
+		tickB, err := json.Marshal(tick)
+		if err != nil {
+			log.Printf("Failed to marshal tick for %s, skipping frame: %v", streamKey, err)
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case strm <- tickB:
+		default:
+			log.Printf("Tick stream channel full for %s, dropping update", streamKey)
+		}
+	})
+}
+
+func (b *BinanceConnection) maintainWebSocketStream(
+	ctx context.Context,
+	streamID, wsURL string,
+	provider messages.Provider,
+	handleMessage func([]byte),
+) error {
+	b.wsServeMux.Lock()
+	doneChan := make(chan struct{})
+	b.doneChans[streamID] = doneChan
+	b.wsServeMux.Unlock()
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
 		b.wsServeMux.Lock()
-		delete(b.doneChans, streamKey)
+		delete(b.doneChans, streamID)
 		b.wsServeMux.Unlock()
 		close(doneChan)
-		return fmt.Errorf("failed to connect tick stream WebSocket: %w", err)
+		return fmt.Errorf("failed to connect provider stream %s: %w", streamID, err)
 	}
 
 	go func() {
-		defer conn.Close()
-
-		cleanup := func() {
+		defer func() {
+			conn.Close()
 			b.wsServeMux.Lock()
-			delete(b.doneChans, streamKey)
+			if b.doneChans[streamID] == doneChan {
+				delete(b.doneChans, streamID)
+			}
 			b.wsServeMux.Unlock()
 			close(doneChan)
-		}
+		}()
 
+		backoff := time.Second
 		for {
-			msgChan := make(chan []byte)
-			errChan := make(chan error)
+			type readResult struct {
+				message []byte
+				err     error
+			}
+			result := make(chan readResult, 1)
+			currentConn := conn
 			go func() {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					errChan <- err
-					return
-				}
-				msgChan <- msg
+				_, message, readErr := currentConn.ReadMessage()
+				result <- readResult{message: message, err: readErr}
 			}()
 
 			select {
 			case <-ctx.Done():
-				log.Printf("Context cancelled for tick stream %s", streamKey)
-				cleanup()
+				conn.Close()
 				return
-			case err := <-errChan:
-				log.Printf("Error in tick stream %s: %v", streamKey, err)
-				cleanup()
-				return
-			case msg := <-msgChan:
-				var event BinanceAggTradeStreamEvent
-				if err := json.Unmarshal(msg, &event); err != nil {
-					log.Printf("Failed to unmarshal aggTrade event for %s, skipping frame: %v", streamKey, err)
+			case read := <-result:
+				if read.err == nil {
+					handleMessage(read.message)
 					continue
 				}
-				tick := messages.AccountConnectTickStreamMsg{
-					SymbolName: event.Symbol,
-					Price:      parseFloat(event.Price),
-					Quantity:   parseFloat(event.Quantity),
-					Timestamp:  mappers.MillisecondsToNanoseconds(event.TradeTime),
-				}
-				tickB, err := json.Marshal(tick)
-				if err != nil {
-					log.Printf("Failed to marshal tick for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				select {
-				case <-ctx.Done():
-					cleanup()
+				if ctx.Err() != nil {
 					return
-				case strm <- tickB:
-				default:
-					log.Printf("Tick stream channel full for %s, dropping update", streamKey)
+				}
+
+				log.Printf("Binance stream %s disconnected: %v", streamID, read.err)
+				conn.Close()
+				notifyProviderConnection(ctx, b.AccountConnClient, provider, streamID, "reconnecting", read.err.Error(), backoff)
+
+				for {
+					timer := time.NewTimer(backoff)
+					select {
+					case <-ctx.Done():
+						if !timer.Stop() {
+							<-timer.C
+						}
+						return
+					case <-timer.C:
+					}
+
+					reconnected, _, dialErr := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
+					if dialErr == nil {
+						conn = reconnected
+						backoff = time.Second
+						notifyProviderConnection(ctx, b.AccountConnClient, provider, streamID, "connected", "", 0)
+						break
+					}
+					notifyProviderConnection(ctx, b.AccountConnClient, provider, streamID, "reconnecting", dialErr.Error(), backoff)
+					backoff *= 2
+					if backoff > 30*time.Second {
+						backoff = 30 * time.Second
+					}
 				}
 			}
 		}
@@ -1513,96 +1454,46 @@ func (b *BinanceAdapter) enrichSymbolsWithAssetInfo(syms []messages.AccountConne
 
 // StartCandlestickStream starts a real-time candlestick/kline stream for a given symbol and period.
 func (b *BinanceAdapter) StartCandlestickStream(ctx context.Context, payload messages.AccountConnectCandlestickStreamPayload, strm chan []byte) error {
-	b.wsServeMux.Lock()
 	symbol := strings.ToLower(payload.SymbolName)
 	streamKey := symbol + "_" + payload.Period
-	doneChan := make(chan struct{})
-	b.doneChans[streamKey] = doneChan
-	b.wsServeMux.Unlock()
-
 	wsURL := url.URL{
 		Scheme: "wss",
 		Host:   "stream.binance.com:443",
 		Path:   fmt.Sprintf("/ws/%s@kline_%s", symbol, payload.Period),
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
-	if err != nil {
-		b.wsServeMux.Lock()
-		delete(b.doneChans, streamKey)
-		b.wsServeMux.Unlock()
-		close(doneChan)
-		return fmt.Errorf("failed to connect candlestick WebSocket: %w", err)
-	}
-
-	go func() {
-		defer conn.Close()
-
-		cleanup := func() {
-			b.wsServeMux.Lock()
-			delete(b.doneChans, streamKey)
-			b.wsServeMux.Unlock()
-			close(doneChan)
+	return b.binanceConn.maintainWebSocketStream(ctx, streamKey, wsURL.String(), messages.Binance, func(msg []byte) {
+		var event BinanceKlineEvent
+		if err := json.Unmarshal(msg, &event); err != nil {
+			log.Printf("Failed to unmarshal kline event for %s, skipping frame: %v", streamKey, err)
+			return
 		}
-
-		for {
-			msgChan := make(chan []byte)
-			errChan := make(chan error)
-			go func() {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					errChan <- err
-					return
-				}
-				msgChan <- msg
-			}()
-
-			select {
-			case <-ctx.Done():
-				log.Printf("Context cancelled for candlestick stream %s", streamKey)
-				cleanup()
-				return
-			case err := <-errChan:
-				log.Printf("Error in candlestick stream %s: %v", streamKey, err)
-				cleanup()
-				return
-			case msg := <-msgChan:
-				var event BinanceKlineEvent
-				if err := json.Unmarshal(msg, &event); err != nil {
-					log.Printf("Failed to unmarshal kline event for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				bar := messages.AccountConnectCandlestickBar{
-					OpenTime:  mappers.MillisecondsToNanoseconds(event.Kline.StartTime),
-					Open:      parseFloat(event.Kline.Open),
-					High:      parseFloat(event.Kline.High),
-					Low:       parseFloat(event.Kline.Low),
-					Close:     parseFloat(event.Kline.Close),
-					Volume:    parseFloat(event.Kline.Volume),
-					CloseTime: mappers.MillisecondsToNanoseconds(event.Kline.EndTime),
-					IsFinal:   event.Kline.IsFinal,
-				}
-				barRes := messages.AccountConnectCandlestickBarRes{
-					Bars:     []messages.AccountConnectCandlestickBar{bar},
-					Symbol:   payload.SymbolName,
-					Interval: payload.Period,
-				}
-				barB, err := json.Marshal(barRes)
-				if err != nil {
-					log.Printf("Failed to marshal candlestick bar for %s, skipping frame: %v", streamKey, err)
-					continue
-				}
-				select {
-				case <-ctx.Done():
-					cleanup()
-					return
-				case strm <- barB:
-				default:
-					log.Printf("Stream channel full for %s, dropping update", streamKey)
-				}
-			}
+		bar := messages.AccountConnectCandlestickBar{
+			OpenTime:  mappers.MillisecondsToNanoseconds(event.Kline.StartTime),
+			Open:      parseFloat(event.Kline.Open),
+			High:      parseFloat(event.Kline.High),
+			Low:       parseFloat(event.Kline.Low),
+			Close:     parseFloat(event.Kline.Close),
+			Volume:    parseFloat(event.Kline.Volume),
+			CloseTime: mappers.MillisecondsToNanoseconds(event.Kline.EndTime),
+			IsFinal:   event.Kline.IsFinal,
 		}
-	}()
-	return nil
+		barRes := messages.AccountConnectCandlestickBarRes{
+			Bars:     []messages.AccountConnectCandlestickBar{bar},
+			Symbol:   payload.SymbolName,
+			Interval: payload.Period,
+		}
+		barB, err := json.Marshal(barRes)
+		if err != nil {
+			log.Printf("Failed to marshal candlestick bar for %s, skipping frame: %v", streamKey, err)
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case strm <- barB:
+		default:
+			log.Printf("Stream channel full for %s, dropping update", streamKey)
+		}
+	})
 }
 
 func (b *BinanceAdapter) SubscribeTicks(ctx context.Context, payload messages.AccountConnectTickDataPayload) error {

@@ -107,26 +107,31 @@ type CTrader struct {
 	reqs              *reqtrack.Tracker[ctraderReqMeta]
 	mutex             sync.Mutex
 
-	candleBuilders   map[int64][]*candleBuilder
-	symbolDigits     map[int64]int32
-	builderMutex     sync.Mutex
-	tickListeners    map[int64][]chan []byte
-	writeMu          sync.Mutex
-	symbolCategories map[int64]*SymCategory
-	assetClasses     map[int64]string
-	categoryMutex    sync.Mutex
-	accountEnvs      map[int64]bool // ctid -> Live (true = live account, false = demo)
-	accountEnvMu     sync.Mutex
-	currentEnv       string
-	connMu           sync.Mutex
-	connCancel       context.CancelFunc
-	clientId         string
-	clientSecret     string
-	hasConnectedOnce bool
-	symbolNameToId   map[int64]map[string]int64 // ctid -> symbol name -> symbol id
-	symbolMu         sync.Mutex
-	assetsByCtid     map[int64]map[int64]*AssetInfo // ctid -> assetId -> AssetInfo
-	assetInfoMu      sync.Mutex
+	candleBuilders     map[int64][]*candleBuilder
+	symbolDigits       map[int64]int32
+	builderMutex       sync.Mutex
+	tickListeners      map[int64][]chan []byte
+	writeMu            sync.Mutex
+	symbolCategories   map[int64]*SymCategory
+	assetClasses       map[int64]string
+	categoryMutex      sync.Mutex
+	accountEnvs        map[int64]bool // ctid -> Live (true = live account, false = demo)
+	accountEnvMu       sync.Mutex
+	activeAccounts     map[int64]bool
+	accountAuthWaiters map[int64]chan struct{}
+	sessionCtx         context.Context
+	sessionMu          sync.Mutex
+	symbolAccounts     map[int64]map[int64]struct{} // symbol ID -> active CTIDs
+	currentEnv         string
+	connMu             sync.Mutex
+	connCancel         context.CancelFunc
+	clientId           string
+	clientSecret       string
+	hasConnectedOnce   bool
+	symbolNameToId     map[int64]map[string]int64 // ctid -> symbol name -> symbol id
+	symbolMu           sync.Mutex
+	assetsByCtid       map[int64]map[int64]*AssetInfo // ctid -> assetId -> AssetInfo
+	assetInfoMu        sync.Mutex
 }
 
 type CtraderAdapter struct {
@@ -141,20 +146,23 @@ func NewCtraderAdapter(accdb accdb.AccountConnectCache, accountConnClient *clien
 
 func NewCTrader(accdb accdb.AccountConnectCache, accountConnClient *clients.AccountConnectClient, ctraderconfig *config.CtraderConfig) *CTrader {
 	return &CTrader{
-		accDb:             accdb,
-		AccountConnClient: accountConnClient,
-		AccessToken:       ctraderconfig.AccessToken,
-		handlers:          make(map[uint32]MessageHandler),
-		authCompleted:     make(chan bool, 1),
-		reqs:              reqtrack.NewTracker[ctraderReqMeta](),
-		candleBuilders:    make(map[int64][]*candleBuilder),
-		tickListeners:     make(map[int64][]chan []byte),
-		symbolDigits:      make(map[int64]int32),
-		symbolCategories:  make(map[int64]*SymCategory),
-		assetClasses:      make(map[int64]string),
-		accountEnvs:       make(map[int64]bool),
-		symbolNameToId:    make(map[int64]map[string]int64),
-		assetsByCtid:      make(map[int64]map[int64]*AssetInfo),
+		accDb:              accdb,
+		AccountConnClient:  accountConnClient,
+		AccessToken:        ctraderconfig.AccessToken,
+		handlers:           make(map[uint32]MessageHandler),
+		authCompleted:      make(chan bool, 1),
+		reqs:               reqtrack.NewTracker[ctraderReqMeta](),
+		candleBuilders:     make(map[int64][]*candleBuilder),
+		tickListeners:      make(map[int64][]chan []byte),
+		symbolDigits:       make(map[int64]int32),
+		symbolCategories:   make(map[int64]*SymCategory),
+		assetClasses:       make(map[int64]string),
+		accountEnvs:        make(map[int64]bool),
+		activeAccounts:     make(map[int64]bool),
+		accountAuthWaiters: make(map[int64]chan struct{}),
+		symbolAccounts:     make(map[int64]map[int64]struct{}),
+		symbolNameToId:     make(map[int64]map[string]int64),
+		assetsByCtid:       make(map[int64]map[int64]*AssetInfo),
 	}
 }
 
@@ -368,6 +376,9 @@ func (t *CTrader) connectToEnvironment(ctx context.Context, env string) error {
 }
 
 func (cta *CtraderAdapter) EstablishConnection(ctx context.Context, cfg config.PlatformConfigs) error {
+	cta.ctrader.sessionMu.Lock()
+	cta.ctrader.sessionCtx = ctx
+	cta.ctrader.sessionMu.Unlock()
 	if err := cta.ctrader.EstablishCtraderConnection(ctx, config.CtraderConfig{
 		ClientId:     cfg.Ctrader.ClientId,
 		ClientSecret: cfg.Ctrader.ClientSecret,
@@ -519,6 +530,9 @@ func (cta *CtraderAdapter) Disconnect(ctx context.Context) error {
 }
 
 func (t *CTrader) EstablishCtraderConnection(ctx context.Context, ctraderConfig config.CtraderConfig) error {
+	t.sessionMu.Lock()
+	t.sessionCtx = ctx
+	t.sessionMu.Unlock()
 	if ctraderConfig.ClientId == "" || ctraderConfig.ClientSecret == "" {
 		return fmt.Errorf("missing cTrader client credentials")
 	}
@@ -620,13 +634,133 @@ func (t *CTrader) handleConnectionLost(ctx context.Context, conn *websocket.Conn
 	conn.Close()
 
 	t.connMu.Lock()
-	if t.PlatformConn == conn {
-		t.PlatformConn = nil
+	if t.PlatformConn != conn {
+		t.connMu.Unlock()
+		return
 	}
+	t.PlatformConn = nil
+	env := t.currentEnv
 	t.connMu.Unlock()
 
-	go t.sendFailure(ctx, acount_connect_messages.TypeError,
-		fmt.Errorf("connection to ctrader was lost: authorize the account again and resubscribe"))
+	t.reqs.FailAll(fmt.Errorf("connection to ctrader was lost: %w", err))
+	t.sessionMu.Lock()
+	sessionCtx := t.sessionCtx
+	t.sessionMu.Unlock()
+	if sessionCtx == nil {
+		sessionCtx = ctx
+	}
+	notifyProviderConnection(sessionCtx, t.AccountConnClient, acount_connect_messages.Ctrader,
+		"ctrader.connection", "reconnecting", err.Error(), 0)
+	go t.reconnect(sessionCtx, env)
+}
+
+func (t *CTrader) reconnect(ctx context.Context, env string) {
+	backoff := time.Second
+	for ctx.Err() == nil {
+		err := t.connectToEnvironment(ctx, env)
+		if err == nil {
+			err = t.restoreSubscriptions(ctx, env)
+		}
+		if err == nil {
+			notifyProviderConnection(ctx, t.AccountConnClient, acount_connect_messages.Ctrader,
+				"ctrader.connection", "connected", "", 0)
+			return
+		}
+		t.DisconnectPlatformConn()
+
+		notifyProviderConnection(ctx, t.AccountConnClient, acount_connect_messages.Ctrader,
+			"ctrader.connection", "reconnecting", err.Error(), backoff)
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return
+		case <-timer.C:
+		}
+		backoff *= 2
+		if backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+func (t *CTrader) restoreSubscriptions(ctx context.Context, env string) error {
+	t.accountEnvMu.Lock()
+	activeAccounts := make([]int64, 0, len(t.activeAccounts))
+	accountEnvs := make(map[int64]bool, len(t.accountEnvs))
+	for ctid, isLive := range t.accountEnvs {
+		accountEnvs[ctid] = isLive
+	}
+	for ctid := range t.activeAccounts {
+		if (env == "live") == accountEnvs[ctid] {
+			activeAccounts = append(activeAccounts, ctid)
+		}
+	}
+	t.accountEnvMu.Unlock()
+
+	for _, ctid := range activeAccounts {
+		authenticated := make(chan struct{}, 1)
+		t.accountEnvMu.Lock()
+		t.accountAuthWaiters[ctid] = authenticated
+		t.accountEnvMu.Unlock()
+		if err := t.AuthorizeAccount(ctx, &ctid); err != nil {
+			t.accountEnvMu.Lock()
+			delete(t.accountAuthWaiters, ctid)
+			t.accountEnvMu.Unlock()
+			return fmt.Errorf("failed to reauthorize cTrader account %d: %w", ctid, err)
+		}
+		select {
+		case <-ctx.Done():
+			t.accountEnvMu.Lock()
+			delete(t.accountAuthWaiters, ctid)
+			t.accountEnvMu.Unlock()
+			return ctx.Err()
+		case <-time.After(ctraderCallTimeout):
+			t.accountEnvMu.Lock()
+			delete(t.accountAuthWaiters, ctid)
+			t.accountEnvMu.Unlock()
+			return fmt.Errorf("timed out reauthorizing cTrader account %d", ctid)
+		case <-authenticated:
+		}
+	}
+
+	t.builderMutex.Lock()
+	type spotSubscription struct {
+		ctid     int64
+		symbolID int64
+		builders []*candleBuilder
+	}
+	var subscriptions []spotSubscription
+	for symbolID, accounts := range t.symbolAccounts {
+		for ctid := range accounts {
+			if (env == "live") != accountEnvs[ctid] {
+				continue
+			}
+			var builders []*candleBuilder
+			for _, builder := range t.candleBuilders[symbolID] {
+				if builder.ctid == ctid {
+					builders = append(builders, builder)
+				}
+			}
+			subscriptions = append(subscriptions, spotSubscription{ctid: ctid, symbolID: symbolID, builders: builders})
+		}
+	}
+	t.builderMutex.Unlock()
+
+	for _, sub := range subscriptions {
+		ctid := sub.ctid
+		if err := t.subscribeSpots(ctx, &ctid, []int64{sub.symbolID}); err != nil {
+			return fmt.Errorf("failed to restore cTrader spot subscription: %w", err)
+		}
+		for _, builder := range sub.builders {
+			if err := t.subscribeLiveTrendbar(ctx, &ctid, sub.symbolID, builder.period); err != nil {
+				return fmt.Errorf("failed to restore cTrader trendbar subscription: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 // AuthorizeApplication is a request  authorizing an application to work with the cTrader platform Proxies.
@@ -809,7 +943,7 @@ func (t *CTrader) StartCandlestickStream(ctx context.Context, payload acount_con
 		return fmt.Errorf("failed to fetch symbol digits: %w", err)
 	}
 
-	builder, err := newCandleBuilder(symbolId, payload.SymbolName, payload.Period, digits, strm)
+	builder, err := newCandleBuilder(ctid, symbolId, payload.SymbolName, payload.Period, digits, strm)
 	if err != nil {
 		return fmt.Errorf("invalid period: %w", err)
 	}
@@ -819,6 +953,10 @@ func (t *CTrader) StartCandlestickStream(ctx context.Context, payload acount_con
 	existingTicks := t.tickListeners[symbolId]
 	spotAlreadySubscribed := len(existingCandles) > 0 || len(existingTicks) > 0
 	t.candleBuilders[symbolId] = append(existingCandles, builder)
+	if t.symbolAccounts[symbolId] == nil {
+		t.symbolAccounts[symbolId] = make(map[int64]struct{})
+	}
+	t.symbolAccounts[symbolId][ctid] = struct{}{}
 	t.builderMutex.Unlock()
 
 	if !spotAlreadySubscribed {
@@ -848,6 +986,10 @@ func (t *CTrader) StartTickStream(ctx context.Context, ctid *int64, symbolName s
 	existingCandles := len(t.candleBuilders[symbolId]) > 0
 	existingTicks := len(t.tickListeners[symbolId]) > 0
 	t.tickListeners[symbolId] = append(t.tickListeners[symbolId], strm)
+	if t.symbolAccounts[symbolId] == nil {
+		t.symbolAccounts[symbolId] = make(map[int64]struct{})
+	}
+	t.symbolAccounts[symbolId][*ctid] = struct{}{}
 	t.builderMutex.Unlock()
 
 	if !existingCandles && !existingTicks {
@@ -1339,6 +1481,19 @@ func (t *CTrader) handleAccountAuthResponse(ctx context.Context, clientMsgId str
 	)
 	if err := proto.Unmarshal(payload, &r); err != nil {
 		return fmt.Errorf("failed to unmarshal account auth response: %w", err)
+	}
+	if r.CtidTraderAccountId != nil {
+		t.accountEnvMu.Lock()
+		t.activeAccounts[*r.CtidTraderAccountId] = true
+		waiter := t.accountAuthWaiters[*r.CtidTraderAccountId]
+		delete(t.accountAuthWaiters, *r.CtidTraderAccountId)
+		t.accountEnvMu.Unlock()
+		if waiter != nil {
+			select {
+			case waiter <- struct{}{}:
+			default:
+			}
+		}
 	}
 
 	accauthresB, err := json.Marshal(map[string]any{
@@ -2080,6 +2235,7 @@ func (t *CTrader) callReqTimeout(ctx context.Context, timeout time.Duration, pre
 // tracks scale and the last fully-seen bar so that, on rollover to a new timestamp, it can
 // emit a clean IsFinal snapshot of the bar that just closed before relaying the new one.
 type candleBuilder struct {
+	ctid          int64
 	symbolId      int64
 	symbolName    string
 	period        string                             // string form, used for output Interval field
@@ -2094,7 +2250,7 @@ type candleBuilder struct {
 	out chan []byte
 }
 
-func newCandleBuilder(symbolId int64, symbolName, period string, digits int32, out chan []byte) (*candleBuilder, error) {
+func newCandleBuilder(ctid, symbolId int64, symbolName, period string, digits int32, out chan []byte) (*candleBuilder, error) {
 	d, err := mappers.PeriodStrToDuration(period)
 	if err != nil {
 		return nil, err
@@ -2104,6 +2260,7 @@ func newCandleBuilder(symbolId int64, symbolName, period string, digits int32, o
 		return nil, err
 	}
 	return &candleBuilder{
+		ctid:          ctid,
 		symbolId:      symbolId,
 		symbolName:    symbolName,
 		period:        period,
