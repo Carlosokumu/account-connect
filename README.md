@@ -58,10 +58,11 @@ All messages are JSON over the WebSocket and share one envelope:
 |-------|-------------|
 | `messagetype` | What the message is, for example `ohlc.history` |
 | `provider` | Which provider the message goes to or came from (`binance`, `ctrader`, `alpaca`) |
-| `tradeshare_client_id` | Identifies your client |
 | `request_id` | Your own ID for a request. It is echoed back on the response so you can match them up |
 | `status` | Present on responses: `success`, or an error |
 | `payload` | The message-specific data |
+
+Provide `tradeshare_client_id` once in the WebSocket URL (for example, `/ws?tradeshare_client_id=foo`). Requests are associated with that connection, and responses include the ID.
 
 ### Message types
 
@@ -84,6 +85,12 @@ Each live stream follows the same pattern: send `<stream>.subscribe` to start, r
 | Order book depth | `depth.subscribe` | `depth.update` | `depth.unsubscribe` |
 | Best bid/offer | `bbo.subscribe` | `bbo.update` | `bbo.unsubscribe` |
 
+### Provider connection recovery
+
+When an upstream provider stream disconnects, the server sends a `provider.connection` response with `status: "success"`. Its payload contains a `state` (`reconnecting`, `connected`, or `failed`), an optional `stream_id`, a `reason`, and `retry_after_ms`. Binance streams retry with backoff; Alpaca's streaming SDK retries and restores its subscriptions; cTrader reconnects, reauthorizes active accounts, and restores active subscriptions. Updates may have a gap while the provider connection is recovering.
+
+If the client's WebSocket connection to account-connect itself closes, the server cannot deliver these events and the session is discarded. The client must establish a new session and send its provider authorization and subscriptions again.
+
 ### Provider support by category
 
 | Category | Binance | cTrader | Alpaca |
@@ -103,7 +110,6 @@ Request one day of 1-minute candles for a symbol:
 ```json
 {
   "messagetype": "ohlc.history",
-  "tradeshare_client_id": "foo",
   "provider": "alpaca",
   "request_id": "12345666",
   "payload": {
@@ -143,7 +149,7 @@ Response (truncated):
         "low": 20.69,
         "close": 20.69,
         "volume": 573,
-        "utcTimeStampInMinutes": 29818891
+        "utcTimeStampInNanoSeconds": 1789133460000000000
       },
       {
         "open": 20.73,
@@ -151,7 +157,7 @@ Response (truncated):
         "low": 20.63,
         "close": 20.63,
         "volume": 1625,
-        "utcTimeStampInMinutes": 29818892
+        "utcTimeStampInNanoSeconds": 1789133520000000000
       }
       // ...more bars
     ]
@@ -161,5 +167,4 @@ Response (truncated):
 
 ## Behavior notes
 
-- Connections are not revalidated in the background. If a connection has gone invalid, the next request using it returns an error.
-
+- Recoverable upstream streaming disconnects are retried automatically. API request failures are returned as request errors.
